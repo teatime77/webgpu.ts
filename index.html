@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>WebGPU sphere</title>
+  <script src="gl-matrix-min.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/depth.js"></script>
+  <script src="js/texture.js"></script>
+  <script src="js/instance.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/compute.js"></script>
+
+  <script src="js/shape.js"></script>
+  <script src="js/sphere.js?ver=1"></script>
+
+  <script src="js/computeBoids.js"></script>
+
+  <script>
+    function bodyOnLoad() {
+      console.log("body is loaded\n");
+
+      // asyncBodyOnLoadBoi().then(result => {
+      //   console.log(result);
+      // });
+    }
+    function start(fnc){
+      fnc().then(result => {
+        console.log(`result is ${result}`);
+      });
+    }
+    // function boids(){
+    //   start(asyncBodyOnLoadBoi);
+    // }
+  </script>
+
+
+</head>
+
+<body onload="bodyOnLoad()">
+  <h1>WebGPU triangle</h1>
+
+  <button onclick="start(asyncBodyOnLoadDep)">Depth</button>
+  <button onclick="start(asyncBodyOnLoadIns)">Instance</button>
+  <button onclick="start(asyncBodyOnLoadCone)">Cone</button>
+  <button onclick="start(asyncBodyOnLoadSphere)">Sphere</button>
+  <button onclick="start(asyncBodyOnLoadCube)">Cube</button>
+  <button onclick="start(asyncBodyOnLoadDemo)">Demo</button>
+  <button onclick="start(asyncBodyOnLoadCom)">Compute</button>
+  <button onclick="start(asyncBodyOnLoadBoi)">Boids</button>
+  <button onclick="start(asyncBodyOnLoadTex)">Texture</button>
+<br/>
+  <canvas id="world" width="800" height="800"></canvas>
+</body>
+
+</html>
