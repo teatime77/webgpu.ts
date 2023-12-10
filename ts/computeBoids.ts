@@ -1,3 +1,5 @@
+namespace webgputs {
+
 const particleDim = 8;
 
 async function fetchText(fileURL: string) {
@@ -7,7 +9,7 @@ async function fetchText(fileURL: string) {
     return text;
 }
 
-async function asyncBodyOnLoadBoi() {
+export async function asyncBodyOnLoadBoi() {
     const spriteWGSL = await fetchText('../wgsl/sprite.wgsl');
     const updateSpritesWGSL = await fetchText('../wgsl/updateSprites.wgsl');
 
@@ -328,3 +330,4 @@ async function asyncBodyOnLoadBoi() {
     requestAnimationFrame(frame);
 };
 
+}

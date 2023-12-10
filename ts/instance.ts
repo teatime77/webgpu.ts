@@ -1,6 +1,8 @@
 var glMatrix: any;
 
-async function asyncBodyOnLoadIns() {
+namespace webgputs {
+
+export async function asyncBodyOnLoadIns() {
 
     const cubeVertexSize = 4 * 8; // Byte size of one vertex.
     const cubePositionOffset = 4 * 0;
@@ -328,5 +330,7 @@ async function asyncBodyOnLoadIns() {
 
     const { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer } = await init(document.getElementById('world') as HTMLCanvasElement);
     requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer }));
+
+}
 
 }

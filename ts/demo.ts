@@ -1,3 +1,5 @@
+namespace webgputs {
+
 // Define global buffer size
 const BUFFER_SIZE = 1000;
 
@@ -26,7 +28,7 @@ fn main(
 
 // Main function
 
-async function asyncBodyOnLoadDemo() {
+export async function asyncBodyOnLoadDemo() {
     // 1: request adapter and device
     if (!navigator.gpu) {
         throw Error('WebGPU not supported.');
@@ -130,3 +132,5 @@ async function asyncBodyOnLoadDemo() {
 }
 
 // asyncBodyOnLoadDemo();
+
+}

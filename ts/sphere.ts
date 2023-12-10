@@ -1,19 +1,20 @@
-
 var glMatrix: any;
 
-async function asyncBodyOnLoadCone(){
+namespace webgputs {
+
+export async function asyncBodyOnLoadCone(){
     asyncBodyOnLoadSph(makeCone);
 }
 
-async function asyncBodyOnLoadSphere(){
+export async function asyncBodyOnLoadSphere(){
     asyncBodyOnLoadSph(makeSphere);
 }
 
-async function asyncBodyOnLoadCube(){
+export async function asyncBodyOnLoadCube(){
     asyncBodyOnLoadSph(makeCube);
 }
 
-async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
+export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
 
 
     const [cubeVertexCount, cubeVertexArray] = makeFnc();    
@@ -250,5 +251,7 @@ async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
 
     const { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture } = await init(document.getElementById('world') as HTMLCanvasElement);
     requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture }));
+
+}
 
 }

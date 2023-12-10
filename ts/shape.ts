@@ -1,5 +1,6 @@
+namespace webgputs {
 
-function makeSphere() : [number, Float32Array]{
+export function makeSphere() : [number, Float32Array]{
     const [top_number, top_array] = makeConeSub(true);
     const [bottom_number, bottom_array] = makeConeSub(false);
 
@@ -21,7 +22,7 @@ function makeSphere3() : Float32Array{
     return concat_array;
 }
 
-function makeCone() : [number, Float32Array]{
+export function makeCone() : [number, Float32Array]{
     return makeConeSub(true);
 }
 
@@ -104,7 +105,7 @@ function makeConeSub(is_top : boolean) : [number, Float32Array]{
 }
 
 
-function makeConeSub3(is_top : boolean) : Float32Array{
+export function makeConeSub3(is_top : boolean) : Float32Array{
     const phiCnt = 16;
     const cubeVertexCount = 3 * phiCnt;
 
@@ -174,7 +175,7 @@ function makeConeSub3(is_top : boolean) : Float32Array{
 
 
 
-function makeCube() : [number, Float32Array]{
+export function makeCube() : [number, Float32Array]{
     const cubeVertexArray = new Float32Array([
         // float4 position, float4 color
         1, -1, 1, 1, 1, 0, 1, 1,
@@ -273,4 +274,6 @@ function makeCube3() : Float32Array{
     ]);
 
     return cubeVertexArray;
+}
+
 }

@@ -1,3 +1,4 @@
+namespace webgputs {
 
 class UI3D {
     camPhi : number = 0.0;
@@ -71,13 +72,13 @@ class UI3D {
 
 }
 
-let ui3D : UI3D;
+export let ui3D : UI3D;
 
-function initUI3D(canvas : HTMLCanvasElement){
+export function initUI3D(canvas : HTMLCanvasElement){
     ui3D = new UI3D(canvas);
 }
 
-function makeLightDir(){
+export function makeLightDir(){
     const v = glMatrix.vec3.create();
 
     v[0] = 1.0;
@@ -87,4 +88,6 @@ function makeLightDir(){
     glMatrix.vec3.normalize(v, v);
 
     return v;
+}
+
 }

@@ -1,5 +1,7 @@
+namespace webgputs {
 
-async function asyncBodyOnLoadCom() {
+
+export async function asyncBodyOnLoadCom() {
     const shader = `
 struct Input {
     data: array<f32>,
@@ -149,5 +151,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     const data = copyArrayBuffer.slice(0);
     stagingBuffer.unmap();
     console.log(new Float32Array(data));  // [2, 4, 6, 8]
+
+}
 
 }
