@@ -2,7 +2,7 @@ var glMatrix: any;
 
 namespace webgputs {
 
-    export async function asyncBodyOnLoadDep() {
+export async function asyncBodyOnLoadDep() {
 
     const cubeVertexSize = 4 * 8; // Byte size of one vertex.
     const cubePositionOffset = 4 * 0;
@@ -57,41 +57,9 @@ namespace webgputs {
 
     const quadIndexArray = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
-    const vertWGSL = `
-    struct Uniforms {
-      projectionMatrix : mat4x4<f32>,
-      viewMatrix : mat4x4<f32>,
-      worldMatrix : mat4x4<f32>,
-    }
-    @binding(0) @group(0) var<uniform> uniforms : Uniforms;
-    
-    struct VertexOutput {
-      @builtin(position) Position : vec4<f32>,
-      @location(0) fragColor : vec4<f32>,
-    }
-    
-    @vertex
-    fn main(
-      @location(0) position: vec4<f32>,
-      @location(1) color: vec4<f32>
-    ) -> VertexOutput {
-    
-        var output : VertexOutput;
-        output.Position = uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.worldMatrix * position;
-      output.fragColor = color;
-      
-      return output;
-    }
-    `;
+    const vertWGSL = await fetchText('../wgsl/depth-vert.wgsl');
 
-    const fragWGSL = `
-    @fragment
-    fn main(
-      @location(0) fragColor: vec4<f32>,
-    ) -> @location(0) vec4<f32> {
-      return fragColor;
-    }
-    `;
+    const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
 
     const g_adapter = await navigator.gpu.requestAdapter();
     const g_device = await g_adapter!.requestDevice();

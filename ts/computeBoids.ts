@@ -2,7 +2,7 @@ namespace webgputs {
 
 const particleDim = 8;
 
-async function fetchText(fileURL: string) {
+export async function fetchText(fileURL: string) {
     const response = await fetch(fileURL);
     const text = await response!.text();
 
