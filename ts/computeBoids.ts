@@ -19,21 +19,11 @@ export async function asyncBodyOnLoadBoi() {
 
     const adapter = await navigator.gpu.requestAdapter();
     console.assert(adapter != null, 'requestAdapter returned null');
-    const device = await adapter!.requestDevice();
+    const g_device = await adapter!.requestDevice();
 
-    const context = canvas.getContext('webgpu') as GPUCanvasContext;
-    const devicePixelRatio = window.devicePixelRatio || 1;
-    canvas.width = canvas.clientWidth * devicePixelRatio;
-    canvas.height = canvas.clientHeight * devicePixelRatio;
-    const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+    const [context, presentationFormat] = initContext(g_device, canvas, 'premultiplied');
 
-    context.configure({
-        device,
-        format: presentationFormat,
-        alphaMode: 'premultiplied',
-    });
-
-    const renderBindGroupLayout = device.createBindGroupLayout({
+    const renderBindGroupLayout = g_device.createBindGroupLayout({
         entries: [
             {
                 // common_uniforms
@@ -44,12 +34,12 @@ export async function asyncBodyOnLoadBoi() {
         ],
     });
 
-    const renderPipelineLayout = device.createPipelineLayout({
+    const renderPipelineLayout = g_device.createPipelineLayout({
         bindGroupLayouts: [renderBindGroupLayout],
     });
     
-    const spriteShaderModule = device.createShaderModule({ code: spriteWGSL });
-    const renderPipeline = device.createRenderPipeline({
+    const spriteShaderModule = g_device.createShaderModule({ code: spriteWGSL });
+    const renderPipeline = g_device.createRenderPipeline({
         layout: renderPipelineLayout,           // 'auto'
         vertex: {
             module: spriteShaderModule,
@@ -110,10 +100,10 @@ export async function asyncBodyOnLoadBoi() {
         },
     });
 
-    const computePipeline = device.createComputePipeline({
+    const computePipeline = g_device.createComputePipeline({
         layout: 'auto',
         compute: {
-            module: device.createShaderModule({
+            module: g_device.createShaderModule({
                 code: updateSpritesWGSL,
             }),
             entryPoint: 'main',
@@ -140,7 +130,7 @@ export async function asyncBodyOnLoadBoi() {
 
     const vertexBufferData = makeConeSub3(true); // makeSphere3(); // makeCube3();
 
-    const spriteVertexBuffer = device.createBuffer({
+    const spriteVertexBuffer = g_device.createBuffer({
         size: vertexBufferData.byteLength,
         usage: GPUBufferUsage.VERTEX,
         mappedAtCreation: true,
@@ -159,7 +149,7 @@ export async function asyncBodyOnLoadBoi() {
     };
 
     const simParamBufferSize = 7 * Float32Array.BYTES_PER_ELEMENT;
-    const simParamBuffer = device.createBuffer({
+    const simParamBuffer = g_device.createBuffer({
         size: simParamBufferSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -167,7 +157,7 @@ export async function asyncBodyOnLoadBoi() {
     // function updateSimParams() {
     // }
     // updateSimParams();
-    device.queue.writeBuffer(
+    g_device.queue.writeBuffer(
         simParamBuffer,
         0,
         new Float32Array([
@@ -216,7 +206,7 @@ export async function asyncBodyOnLoadBoi() {
 
     const particleBuffers: GPUBuffer[] = new Array(2);
     for (let i = 0; i < 2; ++i) {
-        particleBuffers[i] = device.createBuffer({
+        particleBuffers[i] = g_device.createBuffer({
             size: initialParticleData.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
             mappedAtCreation: true,
@@ -229,7 +219,7 @@ export async function asyncBodyOnLoadBoi() {
 
     const computeBindGroups: GPUBindGroup[] = new Array(2);
     for (let i = 0; i < 2; ++i) {
-        computeBindGroups[i] = device.createBindGroup({
+        computeBindGroups[i] = g_device.createBindGroup({
             layout: computePipeline.getBindGroupLayout(0),
             entries: [
                 {
@@ -258,12 +248,12 @@ export async function asyncBodyOnLoadBoi() {
         });
     }
 
-    const uniformBuffer = device.createBuffer({
+    const uniformBuffer = g_device.createBuffer({
         size: 4 * (4 * 4 + 4),
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const uniformBindGroup = device.createBindGroup({
+    const uniformBindGroup = g_device.createBindGroup({
         layout: renderBindGroupLayout,  // renderPipeline.getBindGroupLayout(0)
         entries: [
             {
@@ -281,7 +271,7 @@ export async function asyncBodyOnLoadBoi() {
     function frame() {
 
         const pvw = ui3D.getTransformationMatrix();
-        device.queue.writeBuffer(
+        g_device.queue.writeBuffer(
             uniformBuffer,
             0,
             pvw.buffer,
@@ -290,7 +280,7 @@ export async function asyncBodyOnLoadBoi() {
         );
 
         console.assert(pvw.byteLength == 4 * (4 * 4));
-        device.queue.writeBuffer(
+        g_device.queue.writeBuffer(
             uniformBuffer,
             pvw.byteLength,
             lightDir.buffer,
@@ -302,7 +292,7 @@ export async function asyncBodyOnLoadBoi() {
             .getCurrentTexture()
             .createView();
 
-        const commandEncoder = device.createCommandEncoder();
+        const commandEncoder = g_device.createCommandEncoder();
         {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
@@ -322,7 +312,7 @@ export async function asyncBodyOnLoadBoi() {
             passEncoder.draw(vertexBufferData.length / (3 + 3), numParticles, 0, 0);
             passEncoder.end();
         }
-        device.queue.submit([commandEncoder.finish()]);
+        g_device.queue.submit([commandEncoder.finish()]);
 
         ++t;
         requestAnimationFrame(frame);

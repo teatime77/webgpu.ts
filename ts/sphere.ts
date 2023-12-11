@@ -30,23 +30,7 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
     const g_device = await g_adapter!.requestDevice();
 
     async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture }> {
-
-        const context = canvas.getContext('webgpu') as GPUCanvasContext;
-
-        const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        const presentationSize = [
-            canvas.clientWidth * devicePixelRatio,
-            canvas.clientHeight * devicePixelRatio,
-        ];
-        canvas.width = presentationSize[0];
-        canvas.height = presentationSize[1];
-
-        context.configure({
-            device: g_device,
-            format: presentationFormat,
-            alphaMode: 'opaque',
-        });
+        const [context, presentationFormat] = initContext(g_device, canvas, 'opaque');
 
         // create a render pipeline
         const pipeline = g_device.createRenderPipeline({
