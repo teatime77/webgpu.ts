@@ -15,12 +15,7 @@ export async function asyncBodyOnLoadCube(){
 }
 
 export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
-
-
     const [cubeVertexCount, cubeVertexArray] = makeFnc();    
-
-
-    const quadIndexArray = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
     const vertWGSL = await fetchText('../wgsl/shape-vert.wgsl');
 
@@ -137,17 +132,13 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
             colorAttachments: [
                 {
                     view: textureView,
-
                     clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-
                     loadOp: 'clear',
-
                     storeOp: 'store',
                 },
             ],
             depthStencilAttachment: {
                 view: depthTexture.createView(),
-
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
@@ -165,7 +156,6 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
             visited = true;
             console.log("PVW mat");
         }
-
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(pipeline);

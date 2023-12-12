@@ -22,25 +22,10 @@ export async function asyncBodyOnLoadBoi() {
     const g_device = await adapter!.requestDevice();
 
     const [context, presentationFormat] = initContext(g_device, canvas, 'premultiplied');
-
-    const renderBindGroupLayout = g_device.createBindGroupLayout({
-        entries: [
-            {
-                // common_uniforms
-                binding: 0,
-                visibility: GPUShaderStage.VERTEX,
-                buffer: { type: 'uniform' },
-            }
-        ],
-    });
-
-    const renderPipelineLayout = g_device.createPipelineLayout({
-        bindGroupLayouts: [renderBindGroupLayout],
-    });
     
     const spriteShaderModule = g_device.createShaderModule({ code: spriteWGSL });
     const renderPipeline = g_device.createRenderPipeline({
-        layout: renderPipelineLayout,           // 'auto'
+        layout: 'auto',
         vertex: {
             module: spriteShaderModule,
             entryPoint: 'vert_main',
@@ -187,20 +172,6 @@ export async function asyncBodyOnLoadBoi() {
         initialParticleData[base + 6] = speed * (Math.random() - 0.5);
         initialParticleData[base + 7] = 0.0;
 
-        // while(true){
-        //     const vel = glMatrix.vec3.create();
-        //     for(let i = 0; i < 3; i++){
-        //         vel[i] = 2 * (Math.random() - 0.5) * 0.2;
-        //     }
-
-        //     if(true || 0.5 < glMatrix.vec3.length(vel) && 0.2 < Math.abs(vel[0]) && 0.2 < Math.abs(vel[1]) && 0.2 < Math.abs(vel[2])){
-        //         initialParticleData[base + 3] = vel[0];
-        //         initialParticleData[base + 4] = vel[1];
-        //         initialParticleData[base + 5] = vel[2];
-        //         break;
-        //     }
-        // }
-
         base += particleDim;
     }
 
@@ -254,7 +225,7 @@ export async function asyncBodyOnLoadBoi() {
     });
 
     const uniformBindGroup = g_device.createBindGroup({
-        layout: renderBindGroupLayout,  // renderPipeline.getBindGroupLayout(0)
+        layout: renderPipeline.getBindGroupLayout(0),
         entries: [
             {
                 binding: 0,

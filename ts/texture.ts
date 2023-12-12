@@ -55,9 +55,6 @@ export async function asyncBodyOnLoadTex() {
         -1, 1, -1, 1, 0, 1, 0, 1, 0, 0,
     ]);
 
-
-    const quadIndexArray = new Uint16Array([0, 1, 2, 0, 2, 3]);
-
     const vertWGSL = await fetchText('../wgsl/texture-vert.wgsl');
 
     const fragWGSL = await fetchText('../wgsl/texture-frag.wgsl');

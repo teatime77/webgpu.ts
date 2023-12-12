@@ -67,9 +67,6 @@ export async function asyncBodyOnLoadIns() {
         5, 5
     ]);
 
-
-    const quadIndexArray = new Uint16Array([0, 1, 2, 0, 2, 3]);
-
     const vertWGSL = await fetchText('../wgsl/instance-vert.wgsl');
 
     const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
@@ -210,17 +207,13 @@ export async function asyncBodyOnLoadIns() {
             colorAttachments: [
                 {
                     view: textureView,
-
                     clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-
                     loadOp: 'clear',
-
                     storeOp: 'store',
                 },
             ],
             depthStencilAttachment: {
                 view: depthTexture.createView(),
-
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
