@@ -219,22 +219,7 @@ export async function asyncBodyOnLoadBoi() {
         });
     }
 
-    const uniformBuffer = g_device.createBuffer({
-        size: 4 * (4 * 4 + 4),
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    const uniformBindGroup = g_device.createBindGroup({
-        layout: renderPipeline.getBindGroupLayout(0),
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: uniformBuffer,
-                },
-            },
-        ],
-    });
+    const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, renderPipeline, 4 * (4 * 4 + 4));
 
     const lightDir = makeLightDir();
 

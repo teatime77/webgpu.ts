@@ -127,12 +127,6 @@ export async function asyncBodyOnLoadTex() {
             },
         });
 
-        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
-        const uniformBuffer = g_device.createBuffer({
-            size: uniformBufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-
         // Create a vertex buffer from the quad data.
         const verticesBuffer = g_device.createBuffer({
             size: cubeVertexArray.byteLength,
@@ -174,6 +168,12 @@ export async function asyncBodyOnLoadTex() {
         const sampler = g_device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear',
+        });
+
+        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
+        const uniformBuffer = g_device.createBuffer({
+            size: uniformBufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
         const uniformBindGroup = g_device.createBindGroup({

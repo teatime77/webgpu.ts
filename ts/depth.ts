@@ -120,23 +120,8 @@ export async function asyncBodyOnLoadDep() {
         });
 
         const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
-        const uniformBuffer = g_device.createBuffer({
-            size: uniformBufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
 
-
-        const uniformBindGroup = g_device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [
-                {
-                    binding: 0,
-                    resource: {
-                        buffer: uniformBuffer,
-                    },
-                },
-            ],
-        });
+        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, pipeline, uniformBufferSize);
 
         // Create a vertex buffer from the quad data.
         const verticesBuffer = g_device.createBuffer({
