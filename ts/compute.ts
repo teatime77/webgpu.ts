@@ -34,7 +34,7 @@ export async function asyncBodyOnLoadCom() {
     device.queue.writeBuffer(inputBuffer, 0, inputArray);
 
     // 出力用バッファ
-    const output = device.createBuffer({
+    const outputBuffer = device.createBuffer({
         size: inputArray.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     });
@@ -46,38 +46,6 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const bindGroupLayout =
-        device.createBindGroupLayout({
-            entries: [{
-                binding: 0,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: "storage"
-                }
-            }]
-        });
-
-    // bindGroupを生成
-    /*
-    const bindGroup = device.createBindGroup({
-        layout: computePipeline.getBindGroupLayout(0),
-        entries: [
-            // { binding: 0, resource: { buffer: inputBuffer } },
-            // { binding: 1, resource: { buffer: outputBuffer } }
-        ]
-    });
-    */
-
-    const bindGroup = device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: [{
-            binding: 0,
-            resource: {
-                buffer: output,
-            }
-        }]
-    });
-
     // ComputePipelineを生成
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
@@ -85,6 +53,25 @@ export async function asyncBodyOnLoadCom() {
             module: shaderModule,
             entryPoint: 'main'
         }
+    });
+
+    const bindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: inputBuffer,
+                }
+            }
+            ,
+            {
+                binding: 1,
+                resource: {
+                    buffer: outputBuffer,
+                }
+            }
+        ]
     });
 
     // 5: Create GPUCommandEncoder to issue commands to the GPU
@@ -105,7 +92,7 @@ export async function asyncBodyOnLoadCom() {
     // Encode commands for copying buffer to buffer.
     // const copyEncoder = device.createCommandEncoder();
     commandEncoder.copyBufferToBuffer(
-        output, //source buffer,
+        outputBuffer, //source buffer,
         0, //source offset,
         stagingBuffer, //destination buffer,
         0, //destination offset,
