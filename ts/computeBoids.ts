@@ -15,7 +15,7 @@ export async function asyncBodyOnLoadBoi() {
 
     const canvas = document.getElementById('world') as HTMLCanvasElement;
 
-    initUI3D(canvas);
+    initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -5));
 
     const adapter = await navigator.gpu.requestAdapter();
     console.assert(adapter != null, 'requestAdapter returned null');

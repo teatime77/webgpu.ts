@@ -32,6 +32,8 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
     async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture }> {
         const [context, presentationFormat] = initContext(g_device, canvas, 'opaque');
 
+        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -4));
+
         // create a render pipeline
         const pipeline = g_device.createRenderPipeline({
             layout: 'auto',
@@ -152,7 +154,12 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
             },
         };
 
-        queueTransformationMatrix(g_device, uniformBuffer, glMatrix.vec3.fromValues(0, 0, -4));
+        const pvw = ui3D.getTransformationMatrix();
+
+        g_device.queue.writeBuffer(
+            uniformBuffer, 4 * 16 * 2, 
+            pvw.buffer, pvw.byteOffset, pvw.byteLength
+        );
 
         if(!visited){
             visited = true;

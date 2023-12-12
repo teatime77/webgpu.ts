@@ -1,6 +1,10 @@
 namespace webgputs {
 
 class UI3D {
+    autoRotate : boolean = false;
+
+    eye : any;
+
     camPhi : number = 0.0;
     camTheta : number = 0.5 * Math.PI;
     camDistance    : number = -5.0;
@@ -8,7 +12,10 @@ class UI3D {
     lastMouseX : number | null = null;
     lastMouseY : number | null = null;
 
-    constructor(canvas : HTMLCanvasElement){
+
+    constructor(canvas : HTMLCanvasElement, eye : any){
+        this.eye = eye;
+        this.camDistance = eye[2];
 
         canvas.addEventListener('pointermove', (ev: PointerEvent)=> {
 
@@ -37,9 +44,48 @@ class UI3D {
             // ホイール操作によるスクロールを無効化する
             // ev.preventDefault();
         }, { passive: true });
+
+        const auto_rotate = document.getElementById("auto-rotate") as HTMLInputElement;
+        this.autoRotate = auto_rotate.checked;
+
+        auto_rotate.addEventListener("click", (ev : MouseEvent)=>{
+            this.autoRotate = auto_rotate.checked;            
+        });
     }    
 
     getTransformationMatrix() {
+        if(this.autoRotate){
+            return this.getAutoTransformationMatrix();
+        }
+        else{
+            return this.getManualTransformationMatrix();
+        }
+    }    
+
+    getAutoTransformationMatrix() {
+        const projectionMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
+    
+        const viewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.translate(viewMatrix, viewMatrix, this.eye);
+    
+        const worldMatrix = glMatrix.mat4.create();
+        const now = Date.now() / 1000;
+        glMatrix.mat4.rotate(
+            worldMatrix,
+            worldMatrix,
+            1,
+            glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
+        );
+    
+        const pvw = glMatrix.mat4.create();
+        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
+        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
+    
+        return pvw;
+    }
+    
+    getManualTransformationMatrix() {
         const camY = this.camDistance * Math.cos(this.camTheta);
         const r = this.camDistance * Math.abs(Math.sin(this.camTheta));
         const camZ = r * Math.cos(this.camPhi);
@@ -74,8 +120,8 @@ class UI3D {
 
 export let ui3D : UI3D;
 
-export function initUI3D(canvas : HTMLCanvasElement){
-    ui3D = new UI3D(canvas);
+export function initUI3D(canvas : HTMLCanvasElement, eye : any){
+    ui3D = new UI3D(canvas, eye);
 }
 
 export function makeLightDir(){

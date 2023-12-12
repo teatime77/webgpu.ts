@@ -69,6 +69,8 @@ export async function asyncBodyOnLoadTex() {
 
         const [context, presentationFormat] = initContext(g_device, canvas, 'opaque');
 
+        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -4));
+
         // create a render pipeline
         const pipeline = g_device.createRenderPipeline({
             layout: 'auto',
@@ -229,7 +231,12 @@ export async function asyncBodyOnLoadTex() {
             },
         };
 
-        queueTransformationMatrix(g_device, uniformBuffer, glMatrix.vec3.fromValues(0, 0, -4));
+        const pvw = ui3D.getTransformationMatrix();
+
+        g_device.queue.writeBuffer(
+            uniformBuffer, 4 * 16 * 2, 
+            pvw.buffer, pvw.byteOffset, pvw.byteLength
+        );
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(pipeline);
