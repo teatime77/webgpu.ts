@@ -18,7 +18,7 @@ fn main(
 ) -> VertexOutput {
 
     var output : VertexOutput;
-    output.Position = uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.worldMatrix * (position + vec4<f32>(pos.x, pos.y, 0, 1));
+    output.Position = uniforms.worldMatrix * (position + vec4<f32>(pos.x, pos.y, 0, 1));
     output.fragColor = color;
     
     return output;

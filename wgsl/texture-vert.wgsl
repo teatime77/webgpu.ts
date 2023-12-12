@@ -18,7 +18,7 @@ fn main(
 ) -> VertexOutput {
 
     var output : VertexOutput;
-    output.Position = uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.worldMatrix * position;
+    output.Position = uniforms.worldMatrix * position;
     output.fragUV = uv;
     
     return output;

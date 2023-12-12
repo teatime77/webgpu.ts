@@ -197,45 +197,6 @@ export async function asyncBodyOnLoadIns() {
         return { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer };
     }
 
-    function getTransformationMatrix(uniformBuffer: GPUBuffer) {
-        const projectionMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
-        g_device.queue.writeBuffer(
-            uniformBuffer,
-            4 * 16 * 0,
-            projectionMatrix.buffer,
-            projectionMatrix.byteOffset,
-            projectionMatrix.byteLength
-        );
-
-
-        const viewMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.translate(viewMatrix, viewMatrix, glMatrix.vec3.fromValues(0, 0, -12));
-        g_device.queue.writeBuffer(
-            uniformBuffer,
-            4 * 16 * 1,
-            viewMatrix.buffer,
-            viewMatrix.byteOffset,
-            viewMatrix.byteLength
-        );
-
-        const worldMatrix = glMatrix.mat4.create();
-        const now = Date.now() / 1000;
-        glMatrix.mat4.rotate(
-            worldMatrix,
-            worldMatrix,
-            1,
-            glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
-        );
-        g_device.queue.writeBuffer(
-            uniformBuffer,
-            4 * 16 * 2,
-            worldMatrix.buffer,
-            worldMatrix.byteOffset,
-            worldMatrix.byteLength
-        );
-    }
-
     function frame(
         { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer }:
             { context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, instancesBuffer: GPUBuffer }
@@ -264,7 +225,7 @@ export async function asyncBodyOnLoadIns() {
             },
         };
 
-        getTransformationMatrix(uniformBuffer);
+        queueTransformationMatrix(g_device, uniformBuffer, glMatrix.vec3.fromValues(0, 0, -12));
 
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);

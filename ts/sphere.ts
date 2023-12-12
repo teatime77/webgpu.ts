@@ -123,28 +123,6 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
     }
 
     var visited = false;
-    function getTransformationMatrix() {
-        const projectionMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
-
-        const viewMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.translate(viewMatrix, viewMatrix, glMatrix.vec3.fromValues(0, 0, -4));
-
-        const worldMatrix = glMatrix.mat4.create();
-        const now = Date.now() / 1000;
-        glMatrix.mat4.rotate(
-            worldMatrix,
-            worldMatrix,
-            1,
-            glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
-        );
-
-        const pvw = glMatrix.mat4.create();
-        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
-        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
-
-        return pvw;
-    }
 
     function frame(
         { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture }:
@@ -174,14 +152,7 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
             },
         };
 
-        const pvw = getTransformationMatrix();
-        g_device.queue.writeBuffer(
-            uniformBuffer,
-            4 * 16 * 2,
-            pvw.buffer,
-            pvw.byteOffset,
-            pvw.byteLength
-        );
+        queueTransformationMatrix(g_device, uniformBuffer, glMatrix.vec3.fromValues(0, 0, -4));
 
         if(!visited){
             visited = true;
