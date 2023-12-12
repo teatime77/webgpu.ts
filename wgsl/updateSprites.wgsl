@@ -14,9 +14,9 @@ struct SimParams {
 struct Particles {
   particles : array<Particle>,
 }
-@binding(0) @group(0) var<uniform> params : SimParams;
-@binding(1) @group(0) var<storage, read> particlesA : Particles;
-@binding(2) @group(0) var<storage, read_write> particlesB : Particles;
+@group(0) @binding(0) var<uniform> params : SimParams;
+@group(0) @binding(1) var<storage, read> particlesA : Particles;
+@group(0) @binding(2) var<storage, read_write> particlesB : Particles;
 
 // https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 @compute @workgroup_size(64)
