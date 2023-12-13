@@ -133,7 +133,20 @@ export async function asyncBodyOnLoadBoi() {
         rule3Scale: 0.005,
     };
 
+    const simParamData = new Float32Array([
+        simParams.deltaT,
+        simParams.rule1Distance,
+        simParams.rule2Distance,
+        simParams.rule3Distance,
+        simParams.rule1Scale,
+        simParams.rule2Scale,
+        simParams.rule3Scale,
+    ]);
+    
+
     const simParamBufferSize = 7 * Float32Array.BYTES_PER_ELEMENT;
+    console.assert(simParamData.byteLength == simParamBufferSize);
+    
     const simParamBuffer = g_device.createBuffer({
         size: simParamBufferSize,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -145,15 +158,7 @@ export async function asyncBodyOnLoadBoi() {
     g_device.queue.writeBuffer(
         simParamBuffer,
         0,
-        new Float32Array([
-            simParams.deltaT,
-            simParams.rule1Distance,
-            simParams.rule2Distance,
-            simParams.rule3Distance,
-            simParams.rule1Scale,
-            simParams.rule2Scale,
-            simParams.rule3Scale,
-        ])
+        simParamData
     );
     console.log("write sim param");
 
