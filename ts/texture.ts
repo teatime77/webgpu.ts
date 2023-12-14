@@ -61,7 +61,7 @@ export async function asyncBodyOnLoadTex() {
 
     async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, texture: GPUTexture }> {
 
-        const [context, presentationFormat] = initContext(canvas, 'opaque');
+        const context = initContext(canvas, 'opaque');
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -4));
 
@@ -110,7 +110,7 @@ export async function asyncBodyOnLoadTex() {
                 targets: [
                     // 0
                     { // @location(0) in fragment shader
-                        format: presentationFormat,
+                        format: g_presentationFormat,
                     },
                 ],
             },

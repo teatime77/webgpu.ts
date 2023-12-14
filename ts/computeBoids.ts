@@ -2,13 +2,6 @@ namespace webgputs {
 
 const particleDim = 8;
 
-export async function fetchText(fileURL: string) {
-    const response = await fetch(fileURL);
-    const text = await response!.text();
-
-    return text;
-}
-
 export async function asyncBodyOnLoadBoi() {
     const spriteWGSL = await fetchText('../wgsl/sprite.wgsl');
     const updateSpritesWGSL = await fetchText('../wgsl/updateSprites.wgsl');
@@ -17,7 +10,7 @@ export async function asyncBodyOnLoadBoi() {
 
     initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -5));
 
-    const [context, presentationFormat] = initContext(canvas, 'premultiplied');
+    const context = initContext(canvas, 'premultiplied');
     
     const spriteShaderModule = g_device.createShaderModule({ code: spriteWGSL });
     const renderPipeline = g_device.createRenderPipeline({
@@ -72,7 +65,7 @@ export async function asyncBodyOnLoadBoi() {
             entryPoint: 'frag_main',
             targets: [
                 {
-                    format: presentationFormat,
+                    format: g_presentationFormat,
                 },
             ],
         },

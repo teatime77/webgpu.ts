@@ -22,9 +22,6 @@ class Run {
         this.isInstance = is_instance.checked;
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
-        const cubeVertexSize = 4 * 8; // Byte size of one vertex.
-        const cubePositionOffset = 4 * 0;
-        const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
     
         this.cubeVertexCount = cube_vertex_count;
 
@@ -49,92 +46,15 @@ class Run {
 
             vert_shader = "shape-vert";
         }
-    
-        const vertWGSL = await fetchText(`../wgsl/${vert_shader}.wgsl`);
-    
-        const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
-        
-        const [context, presentationFormat] = initContext(canvas, 'opaque');
+            
+        const context = initContext(canvas, 'opaque');
         this.context = context;
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
-        const vertex_buffer_layouts : GPUVertexBufferLayout[] = [
-            {
-                // 配列の要素間の距離をバイト単位で指定します。
-                arrayStride: cubeVertexSize,
-
-                // バッファを頂点ごとに参照することを意味します。
-                stepMode: 'vertex',
-
-                // 頂点バッファの属性を指定します。
-                attributes: [
-                    {
-                        // position
-                        shaderLocation: 0, // @location(0) in vertex shader
-                        offset: cubePositionOffset,
-                        format: 'float32x4',
-                    },
-                    {
-                        // color
-                        shaderLocation: 1, // @location(1) in vertex shader
-                        offset: cubeColorOffset,
-                        format: 'float32x4',
-                    },
-                ],
-            }            
-        ];
-
-        if(this.isInstance){
-            vertex_buffer_layouts.push({
-                arrayStride: 4 * 2,
-
-                // バッファをインスタンスごとに参照することを意味します。
-                stepMode: 'instance',
-
-                attributes: [
-                    {
-                        shaderLocation: 2,
-                        offset: 0,
-                        format: 'float32x2'
-                    }
-                ]
-            });
-        }
-
-        const pipeline_descriptor : GPURenderPipelineDescriptor = {
-            layout: 'auto',
-            vertex: {
-                module: g_device.createShaderModule({
-                    code: vertWGSL,
-                }),
-                entryPoint: 'main',
-                buffers: vertex_buffer_layouts,
-            },
-            fragment: {
-                module: g_device.createShaderModule({
-                    code: fragWGSL,
-                }),
-                entryPoint: 'main',
-                targets: [
-                    // 0
-                    { // @location(0) in fragment shader
-                        format: presentationFormat,
-                    },
-                ],
-            },
-            primitive: {
-                topology: topology,
-            },
-            depthStencil: {
-                depthWriteEnabled: true,
-                depthCompare: 'less',
-                format: 'depth24plus',
-            },
-        };
 
         // create a render pipeline
-        this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
+        this.pipeline = await makePipeline(vert_shader, 'depth-frag', topology, this.isInstance);
 
         const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
 
