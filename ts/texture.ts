@@ -59,12 +59,9 @@ export async function asyncBodyOnLoadTex() {
 
     const fragWGSL = await fetchText('../wgsl/texture-frag.wgsl');
 
-    const g_adapter = await navigator.gpu.requestAdapter();
-    const g_device = await g_adapter!.requestDevice();
-
     async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, texture: GPUTexture }> {
 
-        const [context, presentationFormat] = initContext(g_device, canvas, 'opaque');
+        const [context, presentationFormat] = initContext(canvas, 'opaque');
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -4));
 

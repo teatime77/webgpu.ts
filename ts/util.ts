@@ -4,9 +4,28 @@ export function range(n: number) : number[]{
     return [...Array(n).keys()];
 }
 
+export let g_device : GPUDevice;
+
+export async function asyncBodyOnLoad(){
+    console.log("body is loaded\n");
+    
+    if (!navigator.gpu) {
+        throw Error('WebGPU not supported.');
+    }
+
+    const adapter = await navigator.gpu.requestAdapter();
+
+    if (!adapter) {
+        throw Error('Couldn\'t request WebGPU adapter.');
+    }
+
+    g_device = await adapter!.requestDevice();
+    console.log("device is ready\n");
+}
+
 let g_context : GPUCanvasContext | null = null;
 
-export function initContext(g_device : GPUDevice, canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlphaMode) : [GPUCanvasContext, GPUTextureFormat] {
+export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlphaMode) : [GPUCanvasContext, GPUTextureFormat] {
     if(g_context != null){
         const tex = g_context.getCurrentTexture();
         tex.destroy();

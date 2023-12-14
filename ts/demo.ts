@@ -10,31 +10,19 @@ export async function asyncBodyOnLoadDemo() {
     // Compute shader
     const shader = await fetchText('../wgsl/demo.wgsl');
 
-    // 1: request adapter and device
-    if (!navigator.gpu) {
-        throw Error('WebGPU not supported.');
-    }
-
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) {
-        throw Error('Couldn\'t request WebGPU adapter.');
-    }
-
-    const device = await adapter.requestDevice();
-
     // 2: Create a shader module from the shader template literal
-    const shaderModule = device.createShaderModule({
+    const shaderModule = g_device.createShaderModule({
         code: shader
     });
 
     // 3: Create an output buffer to read GPU calculations to, and a staging buffer to be mapped for JavaScript access
 
-    const output = device.createBuffer({
+    const output = g_device.createBuffer({
         size: BUFFER_SIZE,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     });
 
-    const stagingBuffer = device.createBuffer({
+    const stagingBuffer = g_device.createBuffer({
         size: BUFFER_SIZE,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
@@ -43,7 +31,7 @@ export async function asyncBodyOnLoadDemo() {
     // then use it to create a GPUComputePipeline
 
     const bindGroupLayout =
-        device.createBindGroupLayout({
+        g_device.createBindGroupLayout({
             entries: [{
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
@@ -53,7 +41,7 @@ export async function asyncBodyOnLoadDemo() {
             }]
         });
 
-    const bindGroup = device.createBindGroup({
+    const bindGroup = g_device.createBindGroup({
         layout: bindGroupLayout,
         entries: [{
             binding: 0,
@@ -63,8 +51,8 @@ export async function asyncBodyOnLoadDemo() {
         }]
     });
 
-    const computePipeline = device.createComputePipeline({
-        layout: device.createPipelineLayout({
+    const computePipeline = g_device.createComputePipeline({
+        layout: g_device.createPipelineLayout({
             bindGroupLayouts: [bindGroupLayout]
         }),
         compute: {
@@ -74,7 +62,7 @@ export async function asyncBodyOnLoadDemo() {
     });
 
     // 5: Create GPUCommandEncoder to issue commands to the GPU
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = g_device.createCommandEncoder();
 
     // 6: Initiate render pass
     const passEncoder = commandEncoder.beginComputePass();
@@ -97,7 +85,7 @@ export async function asyncBodyOnLoadDemo() {
     );
 
     // 8: End frame by passing array of command buffers to command queue for execution
-    device.queue.submit([commandEncoder.finish()]);
+    g_device.queue.submit([commandEncoder.finish()]);
 
     // map staging buffer to read results back to JS
     await stagingBuffer.mapAsync(

@@ -18,13 +18,6 @@
   <script src="js/computeBoids.js"></script>
 
   <script>
-    function bodyOnLoad() {
-      console.log("body is loaded\n");
-
-      // asyncBodyOnLoadBoi().then(result => {
-      //   console.log(result);
-      // });
-    }
     function start(fnc){
       fnc().then(result => {
         console.log(`result is ${result}`);
@@ -38,7 +31,7 @@
 
 </head>
 
-<body onload="bodyOnLoad()">
+<body onload="start(webgputs.asyncBodyOnLoad)">
   <h1>WebGPU triangle</h1>
 
   <button onclick="start(webgputs.asyncBodyOnLoadCone)">Cone</button>

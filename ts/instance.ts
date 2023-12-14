@@ -6,7 +6,6 @@ let validFrame : boolean = false;
 
 class Run {
     cubeVertexCount! : number;
-    g_device!: GPUDevice;
     context!: GPUCanvasContext;
     pipeline!: GPURenderPipeline;
     verticesBuffer!: GPUBuffer;
@@ -54,11 +53,8 @@ class Run {
         const vertWGSL = await fetchText(`../wgsl/${vert_shader}.wgsl`);
     
         const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
-    
-        const g_adapter = await navigator.gpu.requestAdapter();
-        this.g_device = await g_adapter!.requestDevice();
-    
-        const [context, presentationFormat] = initContext(this.g_device, canvas, 'opaque');
+        
+        const [context, presentationFormat] = initContext(canvas, 'opaque');
         this.context = context;
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
@@ -109,14 +105,14 @@ class Run {
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
             vertex: {
-                module: this.g_device.createShaderModule({
+                module: g_device.createShaderModule({
                     code: vertWGSL,
                 }),
                 entryPoint: 'main',
                 buffers: vertex_buffer_layouts,
             },
             fragment: {
-                module: this.g_device.createShaderModule({
+                module: g_device.createShaderModule({
                     code: fragWGSL,
                 }),
                 entryPoint: 'main',
@@ -138,16 +134,16 @@ class Run {
         };
 
         // create a render pipeline
-        this.pipeline = this.g_device.createRenderPipeline(pipeline_descriptor);
+        this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
 
         const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
 
-        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(this.g_device, this.pipeline, uniformBufferSize);
+        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
         this.uniformBuffer    = uniformBuffer;
         this.uniformBindGroup = uniformBindGroup;
 
         // Create a vertex buffer from the quad data.
-        this.verticesBuffer = this.g_device.createBuffer({
+        this.verticesBuffer = g_device.createBuffer({
             size: cubeVertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
@@ -158,7 +154,7 @@ class Run {
         if(this.isInstance){
 
             // Create a instances buffer
-            this.instancesBuffer = this.g_device.createBuffer({
+            this.instancesBuffer = g_device.createBuffer({
                 size: this.instancePositions!.byteLength,
                 usage: GPUBufferUsage.VERTEX,
                 mappedAtCreation: true,
@@ -168,7 +164,7 @@ class Run {
         }
 
 
-        this.depthTexture = this.g_device.createTexture({
+        this.depthTexture = g_device.createTexture({
             size: [canvas.width, canvas.height],
             format: 'depth24plus',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
@@ -181,7 +177,7 @@ class Run {
             return;
         }
 
-        const commandEncoder = this.g_device.createCommandEncoder();
+        const commandEncoder = g_device.createCommandEncoder();
         const textureView = this.context.getCurrentTexture().createView();
 
         const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -203,7 +199,7 @@ class Run {
 
         const pvw = ui3D.getTransformationMatrix();
 
-        this.g_device.queue.writeBuffer(
+        g_device.queue.writeBuffer(
             this.uniformBuffer, 4 * 16 * 2, 
             pvw.buffer, pvw.byteOffset, pvw.byteLength
         );
@@ -223,7 +219,7 @@ class Run {
         }
         passEncoder.end();
 
-        this.g_device.queue.submit([commandEncoder.finish()]);
+        g_device.queue.submit([commandEncoder.finish()]);
         requestAnimationFrame(this.frame.bind(this));
     }
 }

@@ -17,11 +17,7 @@ export async function asyncBodyOnLoadBoi() {
 
     initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -5));
 
-    const adapter = await navigator.gpu.requestAdapter();
-    console.assert(adapter != null, 'requestAdapter returned null');
-    const g_device = await adapter!.requestDevice();
-
-    const [context, presentationFormat] = initContext(g_device, canvas, 'premultiplied');
+    const [context, presentationFormat] = initContext(canvas, 'premultiplied');
     
     const spriteShaderModule = g_device.createShaderModule({ code: spriteWGSL });
     const renderPipeline = g_device.createRenderPipeline({

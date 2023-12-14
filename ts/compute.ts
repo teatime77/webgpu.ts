@@ -3,20 +3,9 @@ namespace webgputs {
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');
-    
-    if (!navigator.gpu) {
-        throw Error('WebGPU not supported.');
-    }
-
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) {
-        throw Error('Couldn\'t request WebGPU adapter.');
-    }
-
-    const device = await adapter!.requestDevice();
 
     // シェーダーコードを準備
-    const shaderModule = device.createShaderModule({
+    const shaderModule = g_device.createShaderModule({
         code: shader
     });
 
@@ -25,29 +14,29 @@ export async function asyncBodyOnLoadCom() {
 
     // Compute Shader用のバッファーを作成
     // 入力用バッファ
-    const inputBuffer = device.createBuffer({
+    const inputBuffer = g_device.createBuffer({
         size: inputArray.byteLength,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE
     });
 
     // 入力データをinputBufferに書き込み
-    device.queue.writeBuffer(inputBuffer, 0, inputArray);
+    g_device.queue.writeBuffer(inputBuffer, 0, inputArray);
 
     // 出力用バッファ
-    const outputBuffer = device.createBuffer({
+    const outputBuffer = g_device.createBuffer({
         size: inputArray.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     });
 
     // Get a GPU buffer for reading in an unmapped state.
-    const stagingBuffer = device.createBuffer({
+    const stagingBuffer = g_device.createBuffer({
         mappedAtCreation: false,
         size: 16,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
     // ComputePipelineを生成
-    const computePipeline = device.createComputePipeline({
+    const computePipeline = g_device.createComputePipeline({
         layout: 'auto',
         compute: {
             module: shaderModule,
@@ -55,7 +44,7 @@ export async function asyncBodyOnLoadCom() {
         }
     });
 
-    const bindGroup = device.createBindGroup({
+    const bindGroup = g_device.createBindGroup({
         layout: computePipeline.getBindGroupLayout(0),
         entries: [
             {
@@ -75,7 +64,7 @@ export async function asyncBodyOnLoadCom() {
     });
 
     // 5: Create GPUCommandEncoder to issue commands to the GPU
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = g_device.createCommandEncoder();
 
     // 6: Initiate render pass
     const passEncoder = commandEncoder.beginComputePass();
@@ -100,7 +89,7 @@ export async function asyncBodyOnLoadCom() {
     );
 
     // 8: End frame by passing array of command buffers to command queue for execution
-    device.queue.submit([commandEncoder.finish()]);
+    g_device.queue.submit([commandEncoder.finish()]);
 
     // const copyCommands = copyEncoder.finish();
     // device.queue.submit([copyCommands]);
