@@ -1,4 +1,5 @@
 namespace webgputs {
+const thetaCnt = 8;
 
 export function makeSphere() : [number, Float32Array]{
     const [top_number, top_array] = makeConeSub(true);
@@ -27,16 +28,16 @@ export function makeCone() : [number, Float32Array]{
 }
 
 function makeConeSub(is_top : boolean) : [number, Float32Array]{
-    const phiCnt = 16;
+    const phiCnt = 2 * thetaCnt;
     const cubeVertexCount = 3 * phiCnt;
 
     const cubeVertexArray = new Float32Array(cubeVertexCount * (4 + 4));
     let theta : number;
     if(is_top){
-        theta = 0.2 * Math.PI;
+        theta = (1 / thetaCnt) * Math.PI;
     }
     else{
-        theta = 0.8 * Math.PI;
+        theta = (thetaCnt - 1) / thetaCnt * Math.PI;
     }
 
     for(let idx = 0; idx < cubeVertexCount; idx++){        

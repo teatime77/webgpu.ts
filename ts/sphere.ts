@@ -14,6 +14,10 @@ export async function asyncBodyOnLoadCube(){
     asyncBodyOnLoadSph(makeCube);
 }
 
+export async function asyncBodyOnLoadGeodesic(){
+    asyncBodyOnLoadSph(makeGeodesicPolyhedron);
+}
+
 export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
     const [cubeVertexCount, cubeVertexArray] = makeFnc();    
 
@@ -104,8 +108,6 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
         return { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture };
     }
 
-    var visited = false;
-
     function frame(
         { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture }:
             { context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture }
@@ -137,10 +139,6 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
             pvw.buffer, pvw.byteOffset, pvw.byteLength
         );
 
-        if(!visited){
-            visited = true;
-            console.log("PVW mat");
-        }
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(pipeline);
