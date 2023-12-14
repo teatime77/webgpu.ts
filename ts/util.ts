@@ -3,10 +3,18 @@ namespace webgputs {
 export function range(n: number) : number[]{
     return [...Array(n).keys()];
 }
-    
+
+let g_context : GPUCanvasContext | null = null;
 
 export function initContext(g_device : GPUDevice, canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlphaMode) : [GPUCanvasContext, GPUTextureFormat] {
+    if(g_context != null){
+        const tex = g_context.getCurrentTexture();
+        tex.destroy();
+        g_context.unconfigure();
+    }
+
     const context = canvas.getContext('webgpu') as GPUCanvasContext;
+    g_context = context;
 
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     const devicePixelRatio = window.devicePixelRatio || 1;

@@ -8,14 +8,12 @@
   <script src="js/util.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/primitive.js"></script>
-  <script src="js/depth.js"></script>
   <script src="js/texture.js"></script>
   <script src="js/instance.js"></script>
   <script src="js/demo.js"></script>
   <script src="js/compute.js"></script>
 
   <script src="js/shape.js"></script>
-  <script src="js/sphere.js?ver=1"></script>
 
   <script src="js/computeBoids.js"></script>
 
@@ -43,7 +41,6 @@
 <body onload="bodyOnLoad()">
   <h1>WebGPU triangle</h1>
 
-  <button onclick="start(webgputs.asyncBodyOnLoadIns)">Instance</button>
   <button onclick="start(webgputs.asyncBodyOnLoadCone)">Cone</button>
   <button onclick="start(webgputs.asyncBodyOnLoadSphere)">Sphere</button>
   <button onclick="start(webgputs.asyncBodyOnLoadCube)">Cube</button>
@@ -55,6 +52,7 @@
   <button onclick="start(webgputs.asyncBodyOnLoadTex)">Texture</button>
 <br/>
 <input type="checkbox" id="auto-rotate" checked /> <label for="auto-rotatate">auto rotate</label>
+<input type="checkbox" id="is-instance" checked /> <label for="is-instance">instance</label>
 <br/>
   <canvas id="world" width="800" height="800"></canvas>
 </body>
