@@ -21,7 +21,63 @@ export async function fetchModule(shader_name: string) : Promise<GPUShaderModule
 }
 
 export class Pipeline {
-    async initPipeline(){
+    pipeline! : GPURenderPipeline;
+
+    cubeVertexCount! : number;
+
+    verticesBuffer!: GPUBuffer;
+    uniformBindGroup!: GPUBindGroup;
+    uniformBuffer!: GPUBuffer;
+
+    instancePositions : Float32Array | undefined;
+    instancesBuffer: GPUBuffer | undefined;
+    isInstance! : boolean;
+
+    makeBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
+        this.cubeVertexCount = cube_vertex_count;
+
+        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
+
+        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
+        this.uniformBuffer    = uniformBuffer;
+        this.uniformBindGroup = uniformBindGroup;
+
+        // Create a vertex buffer from the quad data.
+        this.verticesBuffer = g_device.createBuffer({
+            size: cubeVertexArray.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
+        this.verticesBuffer.unmap();
+
+        if(this.isInstance){
+
+            // Create a instances buffer
+            this.instancesBuffer = g_device.createBuffer({
+                size: this.instancePositions!.byteLength,
+                usage: GPUBufferUsage.VERTEX,
+                mappedAtCreation: true,
+            });
+            new Float32Array(this.instancesBuffer.getMappedRange()).set(this.instancePositions!);
+            this.instancesBuffer.unmap();
+        }
+    }
+
+    render(passEncoder : GPURenderPassEncoder){
+        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setBindGroup(0, this.uniformBindGroup);
+        passEncoder.setVertexBuffer(0, this.verticesBuffer);
+        if(this.isInstance){
+
+            passEncoder.setVertexBuffer(1, this.instancesBuffer!);
+            passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
+        }
+        else{
+
+            passEncoder.draw(this.cubeVertexCount);
+        }
+
     }
 }
 
@@ -76,7 +132,7 @@ function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[
     return vertex_buffer_layouts;
 }
 
-export async function makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology, is_instance : boolean){
+export async function makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology, is_instance : boolean) : Promise<Pipeline> {
     const vert_module = await fetchModule(vert_name);
     const frag_module = await fetchModule(frag_name);
 
@@ -109,7 +165,28 @@ export async function makePipeline(vert_name : string, frag_name : string, topol
         },
     };
 
-    return g_device.createRenderPipeline(pipeline_descriptor);
+    const pipeline = new Pipeline();
+    pipeline.isInstance = is_instance;
+
+    if(is_instance){
+
+        pipeline.instancePositions = new Float32Array([
+            // x, y
+            -5, -5,
+            -5, 0,
+            -5, 5,
+            0, -5,
+            0, 0,
+            0, 5,
+            5, -5,
+            5, 0,
+            5, 5
+        ]);
+    }
+
+    pipeline.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
+
+    return pipeline;
 }
 
 export async function asyncBodyOnLoad(){

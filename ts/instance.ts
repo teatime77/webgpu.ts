@@ -5,46 +5,24 @@ namespace webgputs {
 let validFrame : boolean = false;
 
 class Run {
-    cubeVertexCount! : number;
     context!: GPUCanvasContext;
-    pipeline!: GPURenderPipeline;
-    verticesBuffer!: GPUBuffer;
-    uniformBindGroup!: GPUBindGroup;
-    uniformBuffer!: GPUBuffer;
+    pipelines: Pipeline[] = [];
     depthTexture!: GPUTexture;
-    instancePositions : Float32Array | undefined;
-    instancesBuffer: GPUBuffer | undefined;
-    isInstance! : boolean;
 
     
-    async init(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
-        const is_instance = document.getElementById("is-instance") as HTMLInputElement;
-        this.isInstance = is_instance.checked;
+    async init(cube_vertex_count : number, cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
+        const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
     
-        this.cubeVertexCount = cube_vertex_count;
-
-        let vert_shader : string;
-        if(this.isInstance){
-            vert_shader = "instance-vert";
+        let vert_name : string;
+        if(is_instance){
+            vert_name = "instance-vert";
         
-            this.instancePositions = new Float32Array([
-                // x, y
-                -5, -5,
-                -5, 0,
-                -5, 5,
-                0, -5,
-                0, 0,
-                0, 5,
-                5, -5,
-                5, 0,
-                5, 5
-            ]);
         }
         else{
 
-            vert_shader = "shape-vert";
+            vert_name = "shape-vert";
         }
             
         const context = initContext(canvas, 'opaque');
@@ -52,37 +30,12 @@ class Run {
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
-
         // create a render pipeline
-        this.pipeline = await makePipeline(vert_shader, 'depth-frag', topology, this.isInstance);
+        const pipeline = await makePipeline(vert_name, 'depth-frag', topology, is_instance);
 
-        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
+        pipeline.makeBuffer(cube_vertex_count, cubeVertexArray);
 
-        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
-        this.uniformBuffer    = uniformBuffer;
-        this.uniformBindGroup = uniformBindGroup;
-
-        // Create a vertex buffer from the quad data.
-        this.verticesBuffer = g_device.createBuffer({
-            size: cubeVertexArray.byteLength,
-            usage: GPUBufferUsage.VERTEX,
-            mappedAtCreation: true,
-        });
-        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
-        this.verticesBuffer.unmap();
-
-        if(this.isInstance){
-
-            // Create a instances buffer
-            this.instancesBuffer = g_device.createBuffer({
-                size: this.instancePositions!.byteLength,
-                usage: GPUBufferUsage.VERTEX,
-                mappedAtCreation: true,
-            });
-            new Float32Array(this.instancesBuffer.getMappedRange()).set(this.instancePositions!);
-            this.instancesBuffer.unmap();
-        }
-
+        this.pipelines.push(pipeline);
 
         this.depthTexture = g_device.createTexture({
             size: [canvas.width, canvas.height],
@@ -119,24 +72,20 @@ class Run {
 
         const pvw = ui3D.getTransformationMatrix();
 
-        g_device.queue.writeBuffer(
-            this.uniformBuffer, 4 * 16 * 2, 
-            pvw.buffer, pvw.byteOffset, pvw.byteLength
-        );
+        for(let pipeline of this.pipelines){
+            g_device.queue.writeBuffer(
+                pipeline.uniformBuffer, 4 * 16 * 2, 
+                pvw.buffer, pvw.byteOffset, pvw.byteLength
+            );
+        }
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-        passEncoder.setPipeline(this.pipeline);
-        passEncoder.setBindGroup(0, this.uniformBindGroup);
-        passEncoder.setVertexBuffer(0, this.verticesBuffer);
-        if(this.isInstance){
 
-            passEncoder.setVertexBuffer(1, this.instancesBuffer!);
-            passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
-        }
-        else{
+        for(let pipeline of this.pipelines){
 
-            passEncoder.draw(this.cubeVertexCount);
+            pipeline.render(passEncoder);
         }
+
         passEncoder.end();
 
         g_device.queue.submit([commandEncoder.finish()]);
