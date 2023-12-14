@@ -7,52 +7,8 @@ export async function asyncBodyOnLoadIns() {
     const cubeVertexSize = 4 * 8; // Byte size of one vertex.
     const cubePositionOffset = 4 * 0;
     const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
-    const cubeVertexCount = 36;
 
-    const cubeVertexArray = new Float32Array([
-        // float4 position, float4 color
-        1, -1, 1, 1, 1, 0, 1, 1,
-        -1, -1, 1, 1, 0, 0, 1, 1,
-        -1, -1, -1, 1, 0, 0, 0, 1,
-        1, -1, -1, 1, 1, 0, 0, 1,
-        1, -1, 1, 1, 1, 0, 1, 1,
-        -1, -1, -1, 1, 0, 0, 0, 1,
-
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, -1, 1, 1, 1, 0, 1, 1,
-        1, -1, -1, 1, 1, 0, 0, 1,
-        1, 1, -1, 1, 1, 1, 0, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, -1, -1, 1, 1, 0, 0, 1,
-
-        -1, 1, 1, 1, 0, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, -1, 1, 1, 1, 0, 1,
-        -1, 1, -1, 1, 0, 1, 0, 1,
-        -1, 1, 1, 1, 0, 1, 1, 1,
-        1, 1, -1, 1, 1, 1, 0, 1,
-
-        -1, -1, 1, 1, 0, 0, 1, 1,
-        -1, 1, 1, 1, 0, 1, 1, 1,
-        -1, 1, -1, 1, 0, 1, 0, 1,
-        -1, -1, -1, 1, 0, 0, 0, 1,
-        -1, -1, 1, 1, 0, 0, 1, 1,
-        -1, 1, -1, 1, 0, 1, 0, 1,
-
-        1, 1, 1, 1, 1, 1, 1, 1,
-        -1, 1, 1, 1, 0, 1, 1, 1,
-        -1, -1, 1, 1, 0, 0, 1, 1,
-        -1, -1, 1, 1, 0, 0, 1, 1,
-        1, -1, 1, 1, 1, 0, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-
-        1, -1, -1, 1, 1, 0, 0, 1,
-        -1, -1, -1, 1, 0, 0, 0, 1,
-        -1, 1, -1, 1, 0, 1, 0, 1,
-        1, 1, -1, 1, 1, 1, 0, 1,
-        1, -1, -1, 1, 1, 0, 0, 1,
-        -1, 1, -1, 1, 0, 1, 0, 1,
-    ]);
+    const [cubeVertexCount , cubeVertexArray, topology] = makeCube();
 
     const instancePositions = new Float32Array([
         // x, y
@@ -140,7 +96,7 @@ export async function asyncBodyOnLoadIns() {
                 ],
             },
             primitive: {
-                topology: 'triangle-list',
+                topology: topology,
             },
             depthStencil: {
                 depthWriteEnabled: true,

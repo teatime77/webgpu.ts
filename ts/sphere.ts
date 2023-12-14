@@ -142,7 +142,6 @@ export async function asyncBodyOnLoadSph(cubeVertexCount : number, cubeVertexArr
             pvw.buffer, pvw.byteOffset, pvw.byteLength
         );
 
-
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(pipeline);
         passEncoder.setBindGroup(0, uniformBindGroup);
