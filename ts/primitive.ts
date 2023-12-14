@@ -340,7 +340,7 @@ function divideTriangle(points1: Vertex[], triangles: Triangle[], sphere_r: numb
     return [ points2, triangles, edges ];
 }
 
-export function makeGeodesicPolyhedron() : [number, Float32Array]{
+export function makeGeodesicPolyhedron() : [number, Float32Array, GPUPrimitiveTopology]{
     const divide_cnt = 3;
 
     const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
@@ -371,7 +371,43 @@ export function makeGeodesicPolyhedron() : [number, Float32Array]{
         }
     }
 
-    return [vertex_count , vertexes];
+    return [vertex_count , vertexes, 'triangle-list'];
+}
+
+function setPosColor4(v : Float32Array, idx : number, x : number, y : number, z : number, r : number, g : number, b : number){
+    const base = idx * (4 + 4);
+
+    v[base    ] = x;
+    v[base + 1] = y;
+    v[base + 2] = z;
+    v[base + 3] = 1;
+
+    v[base + 4] = r;
+    v[base + 5] = g;
+    v[base + 6] = b;
+    v[base + 7] = 1;
+}
+
+export function makeTube() : [number, Float32Array, GPUPrimitiveTopology]{
+    const num_division = 16;
+    const vertex_count = (num_division + 1) * 2;
+
+    // 位置の配列
+    let vertices = new Float32Array(vertex_count * (4 + 4));
+    
+    for(let idx of range(num_division + 1)){
+        let theta = 2 * Math.PI * idx / num_division;
+        let x = Math.cos(theta);
+        let y = Math.sin(theta);
+
+        const r = Math.abs(x);
+        const g = Math.abs(y);
+
+        setPosColor4(vertices, 2 * idx    , x, y,  1, r, g, 1);
+        setPosColor4(vertices, 2 * idx + 1, x, y, -1, r, g, 0);
+    }
+
+    return [vertex_count , vertices, 'triangle-strip'];
 }
 
 }

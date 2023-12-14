@@ -3,23 +3,26 @@ var glMatrix: any;
 namespace webgputs {
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadSph(makeCone);
+    asyncBodyOnLoadSph(... makeCone());
 }
 
 export async function asyncBodyOnLoadSphere(){
-    asyncBodyOnLoadSph(makeSphere);
+    asyncBodyOnLoadSph(... makeSphere());
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadSph(makeCube);
+    asyncBodyOnLoadSph(... makeCube());
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadSph(makeGeodesicPolyhedron);
+    asyncBodyOnLoadSph(... makeGeodesicPolyhedron());
 }
 
-export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
-    const [cubeVertexCount, cubeVertexArray] = makeFnc();    
+export async function asyncBodyOnLoadTube(){
+    asyncBodyOnLoadSph(... makeTube());
+}
+
+export async function asyncBodyOnLoadSph(cubeVertexCount : number, cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology) {
 
     const vertWGSL = await fetchText('../wgsl/shape-vert.wgsl');
 
@@ -77,7 +80,7 @@ export async function asyncBodyOnLoadSph(makeFnc: ()=>[number, Float32Array]) {
                 ],
             },
             primitive: {
-                topology: 'triangle-list',
+                topology: topology,
             },
             depthStencil: {
                 depthWriteEnabled: true,

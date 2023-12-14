@@ -1,5 +1,10 @@
 namespace webgputs {
 
+export function range(n: number) : number[]{
+    return [...Array(n).keys()];
+}
+    
+
 export function initContext(g_device : GPUDevice, canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlphaMode) : [GPUCanvasContext, GPUTextureFormat] {
     const context = canvas.getContext('webgpu') as GPUCanvasContext;
 

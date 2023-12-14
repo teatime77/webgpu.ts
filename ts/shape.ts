@@ -1,7 +1,7 @@
 namespace webgputs {
 const thetaCnt = 8;
 
-export function makeSphere() : [number, Float32Array]{
+export function makeSphere() : [number, Float32Array, GPUPrimitiveTopology]{
     const [top_number, top_array] = makeConeSub(true);
     const [bottom_number, bottom_array] = makeConeSub(false);
 
@@ -9,7 +9,7 @@ export function makeSphere() : [number, Float32Array]{
     concat_array.set(top_array);
     concat_array.set(bottom_array, top_array.length);
 
-    return [top_number + bottom_number, concat_array]
+    return [top_number + bottom_number, concat_array, 'triangle-list']
 }
 
 function makeSphere3() : Float32Array{
@@ -23,11 +23,11 @@ function makeSphere3() : Float32Array{
     return concat_array;
 }
 
-export function makeCone() : [number, Float32Array]{
+export function makeCone() : [number, Float32Array, GPUPrimitiveTopology]{
     return makeConeSub(true);
 }
 
-function makeConeSub(is_top : boolean) : [number, Float32Array]{
+function makeConeSub(is_top : boolean) : [number, Float32Array, GPUPrimitiveTopology]{
     const phiCnt = 2 * thetaCnt;
     const cubeVertexCount = 3 * phiCnt;
 
@@ -102,7 +102,7 @@ function makeConeSub(is_top : boolean) : [number, Float32Array]{
     }
 
     console.log("make cone");
-    return [cubeVertexCount, cubeVertexArray];
+    return [cubeVertexCount, cubeVertexArray, 'triangle-list'];
 }
 
 
@@ -176,7 +176,7 @@ export function makeConeSub3(is_top : boolean) : Float32Array{
 
 
 
-export function makeCube() : [number, Float32Array]{
+export function makeCube() : [number, Float32Array, GPUPrimitiveTopology]{
     const cubeVertexArray = new Float32Array([
         // float4 position, float4 color
         1, -1, 1, 1, 1, 0, 1, 1,
@@ -224,7 +224,7 @@ export function makeCube() : [number, Float32Array]{
 
     const cubeVertexCount = cubeVertexArray.length / (4 + 4);
 
-    return [cubeVertexCount , cubeVertexArray];
+    return [cubeVertexCount , cubeVertexArray, 'triangle-list'];
 }
 
 
