@@ -2,44 +2,57 @@ var glMatrix: any;
 
 namespace webgputs {
 
-export async function asyncBodyOnLoadIns() {
+class Run {
+    cubeVertexCount! : number;
+    g_device!: GPUDevice;
+    context!: GPUCanvasContext;
+    pipeline!: GPURenderPipeline;
+    verticesBuffer!: GPUBuffer;
+    uniformBindGroup!: GPUBindGroup;
+    uniformBuffer!: GPUBuffer;
+    depthTexture!: GPUTexture;
+    instancePositions! : Float32Array;
+    instancesBuffer!: GPUBuffer;
+    
+    async init(canvas: HTMLCanvasElement){
 
-    const cubeVertexSize = 4 * 8; // Byte size of one vertex.
-    const cubePositionOffset = 4 * 0;
-    const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
-
-    const [cubeVertexCount , cubeVertexArray, topology] = makeCube();
-
-    const instancePositions = new Float32Array([
-        // x, y
-        -5, -5,
-        -5, 0,
-        -5, 5,
-        0, -5,
-        0, 0,
-        0, 5,
-        5, -5,
-        5, 0,
-        5, 5
-    ]);
-
-    const vertWGSL = await fetchText('../wgsl/instance-vert.wgsl');
-
-    const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
-
-    const g_adapter = await navigator.gpu.requestAdapter();
-    const g_device = await g_adapter!.requestDevice();
-
-    async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, instancesBuffer: GPUBuffer }> {
-        const [context, presentationFormat] = initContext(g_device, canvas, 'opaque');
+        const cubeVertexSize = 4 * 8; // Byte size of one vertex.
+        const cubePositionOffset = 4 * 0;
+        const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
+    
+        const [cube_vertex_count , cubeVertexArray, topology ] = makeCube();
+        this.cubeVertexCount = cube_vertex_count;
+    
+        this.instancePositions = new Float32Array([
+            // x, y
+            -5, -5,
+            -5, 0,
+            -5, 5,
+            0, -5,
+            0, 0,
+            0, 5,
+            5, -5,
+            5, 0,
+            5, 5
+        ]);
+    
+        const vertWGSL = await fetchText('../wgsl/instance-vert.wgsl');
+    
+        const fragWGSL = await fetchText('../wgsl/depth-frag.wgsl');
+    
+        const g_adapter = await navigator.gpu.requestAdapter();
+        this.g_device = await g_adapter!.requestDevice();
+    
+        const [context, presentationFormat] = initContext(this.g_device, canvas, 'opaque');
+        this.context = context;
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
         // create a render pipeline
-        const pipeline = g_device.createRenderPipeline({
+        this.pipeline = this.g_device.createRenderPipeline({
             layout: 'auto',
             vertex: {
-                module: g_device.createShaderModule({
+                module: this.g_device.createShaderModule({
                     code: vertWGSL,
                 }),
                 entryPoint: 'main',
@@ -84,7 +97,7 @@ export async function asyncBodyOnLoadIns() {
                 ],
             },
             fragment: {
-                module: g_device.createShaderModule({
+                module: this.g_device.createShaderModule({
                     code: fragWGSL,
                 }),
                 entryPoint: 'main',
@@ -107,42 +120,40 @@ export async function asyncBodyOnLoadIns() {
 
         const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
 
-        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, pipeline, uniformBufferSize);
+        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(this.g_device, this.pipeline, uniformBufferSize);
+        this.uniformBuffer    = uniformBuffer;
+        this.uniformBindGroup = uniformBindGroup;
 
         // Create a vertex buffer from the quad data.
-        const verticesBuffer = g_device.createBuffer({
+        this.verticesBuffer = this.g_device.createBuffer({
             size: cubeVertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
         });
-        new Float32Array(verticesBuffer.getMappedRange()).set(cubeVertexArray);
-        verticesBuffer.unmap();
+        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
+        this.verticesBuffer.unmap();
 
         // Create a instances buffer
-        const instancesBuffer = g_device.createBuffer({
-            size: instancePositions.byteLength,
+        this.instancesBuffer = this.g_device.createBuffer({
+            size: this.instancePositions.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
         });
-        new Float32Array(instancesBuffer.getMappedRange()).set(instancePositions);
-        instancesBuffer.unmap();
+        new Float32Array(this.instancesBuffer.getMappedRange()).set(this.instancePositions);
+        this.instancesBuffer.unmap();
 
 
-        const depthTexture = g_device.createTexture({
+        this.depthTexture = this.g_device.createTexture({
             size: [canvas.width, canvas.height],
             format: 'depth24plus',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         });
 
-        return { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer };
     }
 
-    function frame(
-        { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer }:
-            { context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, instancesBuffer: GPUBuffer }
-    ): void {
-        const commandEncoder = g_device.createCommandEncoder();
-        const textureView = context.getCurrentTexture().createView();
+    frame(): void {
+        const commandEncoder = this.g_device.createCommandEncoder();
+        const textureView = this.context.getCurrentTexture().createView();
 
         const renderPassDescriptor: GPURenderPassDescriptor = {
             colorAttachments: [
@@ -154,7 +165,7 @@ export async function asyncBodyOnLoadIns() {
                 },
             ],
             depthStencilAttachment: {
-                view: depthTexture.createView(),
+                view: this.depthTexture.createView(),
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
@@ -163,25 +174,30 @@ export async function asyncBodyOnLoadIns() {
 
         const pvw = ui3D.getTransformationMatrix();
 
-        g_device.queue.writeBuffer(
-            uniformBuffer, 4 * 16 * 2, 
+        this.g_device.queue.writeBuffer(
+            this.uniformBuffer, 4 * 16 * 2, 
             pvw.buffer, pvw.byteOffset, pvw.byteLength
         );
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-        passEncoder.setPipeline(pipeline);
-        passEncoder.setBindGroup(0, uniformBindGroup);
-        passEncoder.setVertexBuffer(0, verticesBuffer);
-        passEncoder.setVertexBuffer(1, instancesBuffer);
-        passEncoder.draw(cubeVertexCount, Math.floor(instancePositions.length / 2));
+        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setBindGroup(0, this.uniformBindGroup);
+        passEncoder.setVertexBuffer(0, this.verticesBuffer);
+        passEncoder.setVertexBuffer(1, this.instancesBuffer);
+        passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions.length / 2));
         passEncoder.end();
 
-        g_device.queue.submit([commandEncoder.finish()]);
-        requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer }));
+        this.g_device.queue.submit([commandEncoder.finish()]);
+        requestAnimationFrame(this.frame.bind(this));
     }
 
-    const { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer } = await init(document.getElementById('world') as HTMLCanvasElement);
-    requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, instancesBuffer }));
+
+}
+
+export async function asyncBodyOnLoadIns() {
+    const run = new Run();
+    await run.init(document.getElementById('world') as HTMLCanvasElement);
+    requestAnimationFrame(run.frame.bind(run));
 
 }
 
