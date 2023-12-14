@@ -14,13 +14,13 @@ class Run {
     instancePositions! : Float32Array;
     instancesBuffer!: GPUBuffer;
     
-    async init(canvas: HTMLCanvasElement){
+    async init(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
 
+        const canvas = document.getElementById('world') as HTMLCanvasElement;
         const cubeVertexSize = 4 * 8; // Byte size of one vertex.
         const cubePositionOffset = 4 * 0;
         const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
     
-        const [cube_vertex_count , cubeVertexArray, topology ] = makeCube();
         this.cubeVertexCount = cube_vertex_count;
     
         this.instancePositions = new Float32Array([
@@ -194,9 +194,9 @@ class Run {
 
 }
 
-export async function asyncBodyOnLoadIns() {
+export async function asyncBodyOnLoadIns(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology) {
     const run = new Run();
-    await run.init(document.getElementById('world') as HTMLCanvasElement);
+    await run.init(cube_vertex_count , cubeVertexArray, topology);
     requestAnimationFrame(run.frame.bind(run));
 
 }

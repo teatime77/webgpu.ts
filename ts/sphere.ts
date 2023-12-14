@@ -3,23 +3,23 @@ var glMatrix: any;
 namespace webgputs {
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadSph(... makeCone());
+    asyncBodyOnLoadIns(... makeCone());
 }
 
 export async function asyncBodyOnLoadSphere(){
-    asyncBodyOnLoadSph(... makeSphere());
+    asyncBodyOnLoadIns(... makeSphere());
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadSph(... makeCube());
+    asyncBodyOnLoadIns(... makeCube());
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadSph(... makeGeodesicPolyhedron());
+    asyncBodyOnLoadIns(... makeGeodesicPolyhedron());
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadSph(... makeTube());
+    asyncBodyOnLoadIns(... makeTube());
 }
 
 export async function asyncBodyOnLoadSph(cubeVertexCount : number, cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology) {
