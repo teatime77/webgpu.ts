@@ -77,19 +77,11 @@ class Run {
 
         const pvw = ui3D.getTransformationMatrix();
 
-        for(let mesh of this.meshes){
-            g_device.queue.writeBuffer(
-                mesh.uniformBuffer, 4 * 16 * 2, 
-                pvw.buffer, pvw.byteOffset, pvw.byteLength
-            );
-        }
+        this.meshes.forEach(mesh => mesh.writeUniformBuffer(pvw));
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-        for(let mesh of this.meshes){
-
-            mesh.render(passEncoder);
-        }
+        this.meshes.forEach(mesh => mesh.render(passEncoder));
 
         passEncoder.end();
 
@@ -98,10 +90,10 @@ class Run {
     }
 }
 
-export async function asyncBodyOnLoadIns(polygons: Mesh[]) {
+export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
     validFrame = false;
     const run = new Run();
-    await run.init(polygons);
+    await run.init(meshes);
     validFrame = true;
     requestAnimationFrame(run.frame.bind(run));
 }

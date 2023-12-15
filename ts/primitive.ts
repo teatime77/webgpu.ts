@@ -1,5 +1,8 @@
 namespace webgputs {
 
+const mat4x4_size = 4 * 4 * 4;
+const vec3_size   = 3 * 4;
+const minimum_binding_size = 112;
 
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
@@ -173,7 +176,7 @@ export class Mesh {
 
 
     makeUniformBuffer(){
-        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
+        const uniformBufferSize = Math.max(minimum_binding_size, mat4x4_size + 3 * vec3_size);
 
         const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
         this.uniformBuffer    = uniformBuffer;
@@ -260,6 +263,13 @@ export class Mesh {
         }
     
         this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
+    }
+
+    writeUniformBuffer(pvw : any){
+        g_device.queue.writeBuffer(
+            this.uniformBuffer, 0, 
+            pvw.buffer, pvw.byteOffset, pvw.byteLength
+        );
     }
     
     render(passEncoder : GPURenderPassEncoder){

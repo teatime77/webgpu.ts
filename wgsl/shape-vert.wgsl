@@ -1,8 +1,11 @@
 struct Uniforms {
-    projectionMatrix : mat4x4<f32>,
-    viewMatrix : mat4x4<f32>,
-    worldMatrix : mat4x4<f32>,
+    viewMatrix        : mat4x4<f32>,
+
+    ambientColor      : vec3<f32>,
+    directionalColor  : vec3<f32>,
+    lightingDirection : vec3<f32>
 }
+
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
 struct VertexOutput {
@@ -17,8 +20,7 @@ fn main(
 ) -> VertexOutput {
 
     var output : VertexOutput;
-    // output.Position = uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.worldMatrix * position;
-    output.Position = uniforms.worldMatrix * position;
+    output.Position = uniforms.viewMatrix * position;
     output.fragColor = color;
     
     return output;
