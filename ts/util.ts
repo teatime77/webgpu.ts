@@ -21,9 +21,9 @@ export async function fetchModule(shader_name: string) : Promise<GPUShaderModule
 }
 
 export function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
-    const cubeVertexSize = 4 * 8; // Byte size of one vertex.
-    const cubePositionOffset = 4 * 0;
-    const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
+    const cubeVertexSize = 2 * vec3_size; // Byte size of one vertex.
+    const cubePositionOffset = 0;
+    const cubeNormOffset = vec3_size; // Byte offset of cube vertex norm attribute.
 
     const vertex_buffer_layouts : GPUVertexBufferLayout[] = [
         {
@@ -39,13 +39,13 @@ export function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBuffer
                     // position
                     shaderLocation: 0, // @location(0) in vertex shader
                     offset: cubePositionOffset,
-                    format: 'float32x4',
+                    format: 'float32x3',
                 },
                 {
-                    // color
+                    // norm
                     shaderLocation: 1, // @location(1) in vertex shader
-                    offset: cubeColorOffset,
-                    format: 'float32x4',
+                    offset: cubeNormOffset,
+                    format: 'float32x3',
                 },
             ],
         }            

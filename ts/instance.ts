@@ -99,23 +99,23 @@ export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
 }
 
 export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([new Mesh(... makeCone()) , new Mesh(... makeCube()), new Mesh(... makeGeodesicPolyhedron()), new Mesh(... makeTube())]);
+    // asyncBodyOnLoadIns([new Mesh(... makeCone()) , new Mesh(... makeCube()), new Mesh(... makeGeodesicPolyhedron()), new Mesh(... makeTube())]);
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([new Mesh(... makeCone())]);
+    // asyncBodyOnLoadIns([new Mesh(... makeCone())]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([new Mesh(... makeCube())]);
+    // asyncBodyOnLoadIns([new Mesh(... makeCube())]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([new Mesh(... makeGeodesicPolyhedron())]);
+    // asyncBodyOnLoadIns([new Mesh(... makeGeodesicPolyhedron())]);
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns([new Mesh(... makeTube())]);
+    asyncBodyOnLoadIns([new Tube()]);
 }
 
 

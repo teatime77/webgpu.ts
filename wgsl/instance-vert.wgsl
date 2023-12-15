@@ -15,14 +15,15 @@ struct VertexOutput {
 
 @vertex
 fn main(
-    @location(0) position: vec4<f32>,
-    @location(1) color: vec4<f32>,
+    @location(0) position: vec3<f32>,
+    @location(1) norm: vec3<f32>,
     @location(2) pos: vec2<f32>
 ) -> VertexOutput {
 
     var output : VertexOutput;
-    output.Position = uniforms.viewMatrix * (position + vec4<f32>(pos.x, pos.y, 0, 1));
-    output.fragColor = color;
+
+    output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(pos.x, pos.y, 0, 1));
+    output.fragColor = vec4<f32>(norm, 1.0);
     
     return output;
 }

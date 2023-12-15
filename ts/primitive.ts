@@ -1,7 +1,7 @@
 namespace webgputs {
 
 const mat4x4_size = 4 * 4 * 4;
-const vec3_size   = 3 * 4;
+export const vec3_size   = 3 * 4;
 const minimum_binding_size = 112;
 
 function vecLen(p: Vec3) {
@@ -151,10 +151,10 @@ class Triangle {
     }
 }
 
-export class Mesh {
-    cube_vertex_count : number;
-    cubeVertexArray : Float32Array;
-    topology : GPUPrimitiveTopology;
+export abstract class Mesh {
+    cube_vertex_count!: number;
+    cubeVertexArray!: Float32Array;
+    topology!: GPUPrimitiveTopology;
 
     pipeline! : GPURenderPipeline;
 
@@ -168,11 +168,11 @@ export class Mesh {
     instanceBuffer: GPUBuffer | undefined;
     isInstance! : boolean;
 
-    constructor(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
-        this.cube_vertex_count = cube_vertex_count;
-        this.cubeVertexArray   = cubeVertexArray;
-        this.topology          = topology;
-    }
+    // constructor(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
+    //     this.cube_vertex_count = cube_vertex_count;
+    //     this.cubeVertexArray   = cubeVertexArray;
+    //     this.topology          = topology;
+    // }
 
 
     makeUniformBuffer(){
@@ -285,6 +285,33 @@ export class Mesh {
 
             passEncoder.draw(this.cubeVertexCount);
         }
+    }
+}
+
+export class Tube extends Mesh {
+    constructor(){
+        super();
+        const num_division = 16;
+        
+        this.cube_vertex_count = (num_division + 1) * 2;
+    
+        // 位置の配列
+        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3));
+
+        let base = 0;
+        for(let idx of range(num_division + 1)){
+            let theta = 2 * Math.PI * idx / num_division;
+            let x = Math.cos(theta);
+            let y = Math.sin(theta);
+
+            for(const z of [1, -1]){
+
+                setPosNorm(this.cubeVertexArray, base, x, y, z, x, y, 0);
+                base++;
+            }
+        }
+    
+        this.topology = 'triangle-strip';
     }
 }
 
@@ -513,40 +540,16 @@ export function makeGeodesicPolyhedron() : [number, Float32Array, GPUPrimitiveTo
     return [vertex_count , vertexes, 'triangle-list'];
 }
 
-function setPosColor4(v : Float32Array, idx : number, x : number, y : number, z : number, r : number, g : number, b : number){
-    const base = idx * (4 + 4);
+function setPosNorm(v : Float32Array, idx : number, x : number, y : number, z : number, nx : number, ny : number, nz : number){
+    const base = idx * (3 + 3);
 
     v[base    ] = x;
     v[base + 1] = y;
     v[base + 2] = z;
-    v[base + 3] = 1;
 
-    v[base + 4] = r;
-    v[base + 5] = g;
-    v[base + 6] = b;
-    v[base + 7] = 1;
-}
-
-export function makeTube() : [number, Float32Array, GPUPrimitiveTopology]{
-    const num_division = 16;
-    const vertex_count = (num_division + 1) * 2;
-
-    // 位置の配列
-    let vertices = new Float32Array(vertex_count * (4 + 4));
-    
-    for(let idx of range(num_division + 1)){
-        let theta = 2 * Math.PI * idx / num_division;
-        let x = Math.cos(theta);
-        let y = Math.sin(theta);
-
-        const r = Math.abs(x);
-        const g = Math.abs(y);
-
-        setPosColor4(vertices, 2 * idx    , x, y,  1, r, g, 1);
-        setPosColor4(vertices, 2 * idx + 1, x, y, -1, r, g, 0);
-    }
-
-    return [vertex_count , vertices, 'triangle-strip'];
+    v[base + 3] = nx;
+    v[base + 4] = ny;
+    v[base + 5] = nz;
 }
 
 }
