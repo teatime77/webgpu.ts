@@ -102,7 +102,7 @@ export async function asyncBodyOnLoadBoi() {
          0.0 ,  0.02, 0.0
     ]);
 
-    const vertexBufferData = makeConeSub3(true); // makeSphere3(); // makeCube3();
+    const vertexBufferData = makeConeSub3(true);
 
     const spriteVertexBuffer = g_device.createBuffer({
         size: vertexBufferData.byteLength,

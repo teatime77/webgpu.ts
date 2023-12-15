@@ -1,28 +1,6 @@
 namespace webgputs {
 const thetaCnt = 8;
 
-export function makeSphere() : [number, Float32Array, GPUPrimitiveTopology]{
-    const [top_number, top_array] = makeConeSub(true);
-    const [bottom_number, bottom_array] = makeConeSub(false);
-
-    const concat_array = new Float32Array(top_array.length + bottom_array.length);
-    concat_array.set(top_array);
-    concat_array.set(bottom_array, top_array.length);
-
-    return [top_number + bottom_number, concat_array, 'triangle-list']
-}
-
-function makeSphere3() : Float32Array{
-    const top_array    = makeConeSub3(true);
-    const bottom_array = makeConeSub3(false);
-
-    const concat_array = new Float32Array(top_array.length + bottom_array.length);
-    concat_array.set(top_array);
-    concat_array.set(bottom_array, top_array.length);
-
-    return concat_array;
-}
-
 export function makeCone() : [number, Float32Array, GPUPrimitiveTopology]{
     return makeConeSub(true);
 }
@@ -225,56 +203,6 @@ export function makeCube() : [number, Float32Array, GPUPrimitiveTopology]{
     const cubeVertexCount = cubeVertexArray.length / (4 + 4);
 
     return [cubeVertexCount , cubeVertexArray, 'triangle-list'];
-}
-
-
-function makeCube3() : Float32Array{
-    const cubeVertexArray = new Float32Array([
-        // float4 position, float4 color
-        1, -1, 1,
-        -1, -1, 1,
-        -1, -1, -1,
-        1, -1, -1,
-        1, -1, 1,
-        -1, -1, -1,
-
-        1, 1, 1,
-        1, -1, 1,
-        1, -1, -1,
-        1, 1, -1,
-        1, 1, 1,
-        1, -1, -1,
-
-        -1, 1, 1,
-        1, 1, 1,
-        1, 1, -1,
-        -1, 1, -1,
-        -1, 1, 1,
-        1, 1, -1,
-
-        -1, -1, 1,
-        -1, 1, 1,
-        -1, 1, -1,
-        -1, -1, -1,
-        -1, -1, 1,
-        -1, 1, -1,
-
-        1, 1, 1,
-        -1, 1, 1,
-        -1, -1, 1,
-        -1, -1, 1,
-        1, -1, 1,
-        1, 1, 1,
-
-        1, -1, -1,
-        -1, -1, -1,
-        -1, 1, -1,
-        1, 1, -1,
-        1, -1, -1,
-        -1, 1, -1,
-    ]);
-
-    return cubeVertexArray;
 }
 
 }

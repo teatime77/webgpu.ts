@@ -98,12 +98,12 @@ export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
     requestAnimationFrame(run.frame.bind(run));
 }
 
-export async function asyncBodyOnLoadCone(){
+export async function asyncBodyOnLoadMulti(){
     asyncBodyOnLoadIns([new Mesh(... makeCone()) , new Mesh(... makeCube()), new Mesh(... makeGeodesicPolyhedron()), new Mesh(... makeTube())]);
 }
 
-export async function asyncBodyOnLoadSphere(){
-    asyncBodyOnLoadIns([new Mesh(... makeSphere())]);
+export async function asyncBodyOnLoadCone(){
+    asyncBodyOnLoadIns([new Mesh(... makeCone())]);
 }
 
 export async function asyncBodyOnLoadCube(){
