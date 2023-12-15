@@ -182,6 +182,10 @@ export async function makePipeline(vert_name : string, frag_name : string, topol
             5, 0,
             5, 5
         ]);
+
+        for(let i = 0; i < pipeline.instancePositions.length; i++){
+            pipeline.instancePositions[i] += 4 * Math.random() - 2;
+        }
     }
 
     pipeline.pipeline = g_device.createRenderPipeline(pipeline_descriptor);

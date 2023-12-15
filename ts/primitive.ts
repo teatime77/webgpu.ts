@@ -148,6 +148,17 @@ class Triangle {
     }
 }
 
+export class Polygon {
+    cube_vertex_count : number;
+    cubeVertexArray : Float32Array;
+    topology : GPUPrimitiveTopology;
+
+    constructor(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
+        this.cube_vertex_count = cube_vertex_count;
+        this.cubeVertexArray   = cubeVertexArray;
+        this.topology          = topology;
+    }
+}
 
 function makeRegularIcosahedron() : [ Vertex[], Triangle[], number ] {
     var G = (1 + Math.sqrt(5)) / 2;

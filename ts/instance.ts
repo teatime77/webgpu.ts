@@ -10,7 +10,7 @@ class Run {
     depthTexture!: GPUTexture;
 
     
-    async init(cube_vertex_count : number, cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
+    async init(polygons: Polygon[]){
         const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -30,12 +30,14 @@ class Run {
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
-        // create a render pipeline
-        const pipeline = await makePipeline(vert_name, 'depth-frag', topology, is_instance);
+        for(let polygon of polygons){
+            // create a render pipeline
+            const pipeline = await makePipeline(vert_name, 'depth-frag', polygon.topology, is_instance);
 
-        pipeline.makeBuffer(cube_vertex_count, cubeVertexArray);
+            pipeline.makeBuffer(polygon.cube_vertex_count, polygon.cubeVertexArray);
 
-        this.pipelines.push(pipeline);
+            this.pipelines.push(pipeline);
+        }
 
         this.depthTexture = g_device.createTexture({
             size: [canvas.width, canvas.height],
@@ -93,32 +95,32 @@ class Run {
     }
 }
 
-export async function asyncBodyOnLoadIns(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology) {
+export async function asyncBodyOnLoadIns(polygons: Polygon[]) {
     validFrame = false;
     const run = new Run();
-    await run.init(cube_vertex_count , cubeVertexArray, topology);
+    await run.init(polygons);
     validFrame = true;
     requestAnimationFrame(run.frame.bind(run));
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns(... makeCone());
+    asyncBodyOnLoadIns([new Polygon(... makeCone()) , new Polygon(... makeCube()), new Polygon(... makeGeodesicPolyhedron()), new Polygon(... makeTube())]);
 }
 
 export async function asyncBodyOnLoadSphere(){
-    asyncBodyOnLoadIns(... makeSphere());
+    asyncBodyOnLoadIns([new Polygon(... makeSphere())]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns(... makeCube());
+    asyncBodyOnLoadIns([new Polygon(... makeCube())]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns(... makeGeodesicPolyhedron());
+    asyncBodyOnLoadIns([new Polygon(... makeGeodesicPolyhedron())]);
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns(... makeTube());
+    asyncBodyOnLoadIns([new Polygon(... makeTube())]);
 }
 
 
