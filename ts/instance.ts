@@ -34,8 +34,14 @@ class Run {
             // create a render pipeline
             const pipeline = await makePipeline(vert_name, 'depth-frag', polygon.topology, is_instance);
 
-            pipeline.makeBuffer(polygon.cube_vertex_count, polygon.cubeVertexArray);
+            pipeline.makeUniformBuffer();
 
+            pipeline.makeVertexBuffer(polygon.cube_vertex_count, polygon.cubeVertexArray);
+
+            if(pipeline.isInstance){
+                pipeline.makeInstanceBuffer();
+            }
+    
             this.pipelines.push(pipeline);
         }
 

@@ -30,17 +30,19 @@ export class Pipeline {
     uniformBuffer!: GPUBuffer;
 
     instancePositions : Float32Array | undefined;
-    instancesBuffer: GPUBuffer | undefined;
+    instanceBuffer: GPUBuffer | undefined;
     isInstance! : boolean;
 
-    makeBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
-        this.cubeVertexCount = cube_vertex_count;
-
+    makeUniformBuffer(){
         const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
 
         const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
         this.uniformBuffer    = uniformBuffer;
         this.uniformBindGroup = uniformBindGroup;
+    }
+
+    makeVertexBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
+        this.cubeVertexCount = cube_vertex_count;
 
         // Create a vertex buffer from the quad data.
         this.verticesBuffer = g_device.createBuffer({
@@ -50,18 +52,17 @@ export class Pipeline {
         });
         new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
         this.verticesBuffer.unmap();
+    }
 
-        if(this.isInstance){
-
-            // Create a instances buffer
-            this.instancesBuffer = g_device.createBuffer({
-                size: this.instancePositions!.byteLength,
-                usage: GPUBufferUsage.VERTEX,
-                mappedAtCreation: true,
-            });
-            new Float32Array(this.instancesBuffer.getMappedRange()).set(this.instancePositions!);
-            this.instancesBuffer.unmap();
-        }
+    makeInstanceBuffer(){
+        // Create a instances buffer
+        this.instanceBuffer = g_device.createBuffer({
+            size: this.instancePositions!.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.instanceBuffer.getMappedRange()).set(this.instancePositions!);
+        this.instanceBuffer.unmap();
     }
 
     render(passEncoder : GPURenderPassEncoder){
@@ -70,7 +71,7 @@ export class Pipeline {
         passEncoder.setVertexBuffer(0, this.verticesBuffer);
         if(this.isInstance){
 
-            passEncoder.setVertexBuffer(1, this.instancesBuffer!);
+            passEncoder.setVertexBuffer(1, this.instanceBuffer!);
             passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
         }
         else{
