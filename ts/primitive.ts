@@ -148,15 +148,133 @@ class Triangle {
     }
 }
 
-export class Polygon {
+export class Mesh {
     cube_vertex_count : number;
     cubeVertexArray : Float32Array;
     topology : GPUPrimitiveTopology;
+
+    pipeline! : GPURenderPipeline;
+
+    cubeVertexCount! : number;
+
+    verticesBuffer!: GPUBuffer;
+    uniformBindGroup!: GPUBindGroup;
+    uniformBuffer!: GPUBuffer;
+
+    instancePositions : Float32Array | undefined;
+    instanceBuffer: GPUBuffer | undefined;
+    isInstance! : boolean;
 
     constructor(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
         this.cube_vertex_count = cube_vertex_count;
         this.cubeVertexArray   = cubeVertexArray;
         this.topology          = topology;
+    }
+
+
+    makeUniformBuffer(){
+        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
+
+        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
+        this.uniformBuffer    = uniformBuffer;
+        this.uniformBindGroup = uniformBindGroup;
+    }
+
+    makeVertexBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
+        this.cubeVertexCount = cube_vertex_count;
+
+        // Create a vertex buffer from the quad data.
+        this.verticesBuffer = g_device.createBuffer({
+            size: cubeVertexArray.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
+        this.verticesBuffer.unmap();
+    }
+
+    makeInstanceBuffer(){
+        // Create a instances buffer
+        this.instanceBuffer = g_device.createBuffer({
+            size: this.instancePositions!.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.instanceBuffer.getMappedRange()).set(this.instancePositions!);
+        this.instanceBuffer.unmap();
+    }
+
+    async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology, is_instance : boolean) {
+        const vert_module = await fetchModule(vert_name);
+        const frag_module = await fetchModule(frag_name);
+    
+        const vertex_buffer_layouts = makeVertexBufferLayouts(is_instance);
+    
+        const pipeline_descriptor : GPURenderPipelineDescriptor = {
+            layout: 'auto',
+            vertex: {
+                module: vert_module,
+                entryPoint: 'main',
+                buffers: vertex_buffer_layouts,
+            },
+            fragment: {
+                module: frag_module,
+                entryPoint: 'main',
+                targets: [
+                    // 0
+                    { // @location(0) in fragment shader
+                        format: g_presentationFormat,
+                    },
+                ],
+            },
+            primitive: {
+                topology: topology,
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth24plus',
+            },
+        };
+    
+        this.isInstance = is_instance;
+    
+        if(is_instance){
+    
+            this.instancePositions = new Float32Array([
+                // x, y
+                -5, -5,
+                -5, 0,
+                -5, 5,
+                0, -5,
+                0, 0,
+                0, 5,
+                5, -5,
+                5, 0,
+                5, 5
+            ]);
+    
+            for(let i = 0; i < this.instancePositions.length; i++){
+                this.instancePositions[i] += 4 * Math.random() - 2;
+            }
+        }
+    
+        this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
+    }
+    
+    render(passEncoder : GPURenderPassEncoder){
+        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setBindGroup(0, this.uniformBindGroup);
+        passEncoder.setVertexBuffer(0, this.verticesBuffer);
+        if(this.isInstance){
+
+            passEncoder.setVertexBuffer(1, this.instanceBuffer!);
+            passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
+        }
+        else{
+
+            passEncoder.draw(this.cubeVertexCount);
+        }
     }
 }
 

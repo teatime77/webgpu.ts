@@ -6,11 +6,12 @@ let validFrame : boolean = false;
 
 class Run {
     context!: GPUCanvasContext;
-    pipelines: Pipeline[] = [];
+    meshes: Mesh[] = [];
     depthTexture!: GPUTexture;
 
-    
-    async init(polygons: Polygon[]){
+    async init(meshes: Mesh[]){
+        this.meshes = meshes.splice(0);
+
         const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -18,10 +19,8 @@ class Run {
         let vert_name : string;
         if(is_instance){
             vert_name = "instance-vert";
-        
         }
         else{
-
             vert_name = "shape-vert";
         }
             
@@ -30,19 +29,17 @@ class Run {
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
-        for(let polygon of polygons){
+        for(let mesh of this.meshes){
             // create a render pipeline
-            const pipeline = await makePipeline(vert_name, 'depth-frag', polygon.topology, is_instance);
+            await mesh.makePipeline(vert_name, 'depth-frag', mesh.topology, is_instance);
 
-            pipeline.makeUniformBuffer();
+            mesh.makeUniformBuffer();
 
-            pipeline.makeVertexBuffer(polygon.cube_vertex_count, polygon.cubeVertexArray);
+            mesh.makeVertexBuffer(mesh.cube_vertex_count, mesh.cubeVertexArray);
 
-            if(pipeline.isInstance){
-                pipeline.makeInstanceBuffer();
+            if(mesh.isInstance){
+                mesh.makeInstanceBuffer();
             }
-    
-            this.pipelines.push(pipeline);
         }
 
         this.depthTexture = g_device.createTexture({
@@ -80,18 +77,18 @@ class Run {
 
         const pvw = ui3D.getTransformationMatrix();
 
-        for(let pipeline of this.pipelines){
+        for(let mesh of this.meshes){
             g_device.queue.writeBuffer(
-                pipeline.uniformBuffer, 4 * 16 * 2, 
+                mesh.uniformBuffer, 4 * 16 * 2, 
                 pvw.buffer, pvw.byteOffset, pvw.byteLength
             );
         }
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-        for(let pipeline of this.pipelines){
+        for(let mesh of this.meshes){
 
-            pipeline.render(passEncoder);
+            mesh.render(passEncoder);
         }
 
         passEncoder.end();
@@ -101,7 +98,7 @@ class Run {
     }
 }
 
-export async function asyncBodyOnLoadIns(polygons: Polygon[]) {
+export async function asyncBodyOnLoadIns(polygons: Mesh[]) {
     validFrame = false;
     const run = new Run();
     await run.init(polygons);
@@ -110,23 +107,23 @@ export async function asyncBodyOnLoadIns(polygons: Polygon[]) {
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([new Polygon(... makeCone()) , new Polygon(... makeCube()), new Polygon(... makeGeodesicPolyhedron()), new Polygon(... makeTube())]);
+    asyncBodyOnLoadIns([new Mesh(... makeCone()) , new Mesh(... makeCube()), new Mesh(... makeGeodesicPolyhedron()), new Mesh(... makeTube())]);
 }
 
 export async function asyncBodyOnLoadSphere(){
-    asyncBodyOnLoadIns([new Polygon(... makeSphere())]);
+    asyncBodyOnLoadIns([new Mesh(... makeSphere())]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([new Polygon(... makeCube())]);
+    asyncBodyOnLoadIns([new Mesh(... makeCube())]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([new Polygon(... makeGeodesicPolyhedron())]);
+    asyncBodyOnLoadIns([new Mesh(... makeGeodesicPolyhedron())]);
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns([new Polygon(... makeTube())]);
+    asyncBodyOnLoadIns([new Mesh(... makeTube())]);
 }
 
 

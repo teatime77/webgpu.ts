@@ -20,69 +20,7 @@ export async function fetchModule(shader_name: string) : Promise<GPUShaderModule
     return g_device.createShaderModule({ code: text });
 }
 
-export class Pipeline {
-    pipeline! : GPURenderPipeline;
-
-    cubeVertexCount! : number;
-
-    verticesBuffer!: GPUBuffer;
-    uniformBindGroup!: GPUBindGroup;
-    uniformBuffer!: GPUBuffer;
-
-    instancePositions : Float32Array | undefined;
-    instanceBuffer: GPUBuffer | undefined;
-    isInstance! : boolean;
-
-    makeUniformBuffer(){
-        const uniformBufferSize = 4 * 16 * 3; // 4x4 matrix * 3
-
-        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
-        this.uniformBuffer    = uniformBuffer;
-        this.uniformBindGroup = uniformBindGroup;
-    }
-
-    makeVertexBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
-        this.cubeVertexCount = cube_vertex_count;
-
-        // Create a vertex buffer from the quad data.
-        this.verticesBuffer = g_device.createBuffer({
-            size: cubeVertexArray.byteLength,
-            usage: GPUBufferUsage.VERTEX,
-            mappedAtCreation: true,
-        });
-        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
-        this.verticesBuffer.unmap();
-    }
-
-    makeInstanceBuffer(){
-        // Create a instances buffer
-        this.instanceBuffer = g_device.createBuffer({
-            size: this.instancePositions!.byteLength,
-            usage: GPUBufferUsage.VERTEX,
-            mappedAtCreation: true,
-        });
-        new Float32Array(this.instanceBuffer.getMappedRange()).set(this.instancePositions!);
-        this.instanceBuffer.unmap();
-    }
-
-    render(passEncoder : GPURenderPassEncoder){
-        passEncoder.setPipeline(this.pipeline);
-        passEncoder.setBindGroup(0, this.uniformBindGroup);
-        passEncoder.setVertexBuffer(0, this.verticesBuffer);
-        if(this.isInstance){
-
-            passEncoder.setVertexBuffer(1, this.instanceBuffer!);
-            passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
-        }
-        else{
-
-            passEncoder.draw(this.cubeVertexCount);
-        }
-
-    }
-}
-
-function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
+export function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
     const cubeVertexSize = 4 * 8; // Byte size of one vertex.
     const cubePositionOffset = 4 * 0;
     const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
@@ -131,67 +69,6 @@ function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[
     }
 
     return vertex_buffer_layouts;
-}
-
-export async function makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology, is_instance : boolean) : Promise<Pipeline> {
-    const vert_module = await fetchModule(vert_name);
-    const frag_module = await fetchModule(frag_name);
-
-    const vertex_buffer_layouts = makeVertexBufferLayouts(is_instance);
-
-    const pipeline_descriptor : GPURenderPipelineDescriptor = {
-        layout: 'auto',
-        vertex: {
-            module: vert_module,
-            entryPoint: 'main',
-            buffers: vertex_buffer_layouts,
-        },
-        fragment: {
-            module: frag_module,
-            entryPoint: 'main',
-            targets: [
-                // 0
-                { // @location(0) in fragment shader
-                    format: g_presentationFormat,
-                },
-            ],
-        },
-        primitive: {
-            topology: topology,
-        },
-        depthStencil: {
-            depthWriteEnabled: true,
-            depthCompare: 'less',
-            format: 'depth24plus',
-        },
-    };
-
-    const pipeline = new Pipeline();
-    pipeline.isInstance = is_instance;
-
-    if(is_instance){
-
-        pipeline.instancePositions = new Float32Array([
-            // x, y
-            -5, -5,
-            -5, 0,
-            -5, 5,
-            0, -5,
-            0, 0,
-            0, 5,
-            5, -5,
-            5, 0,
-            5, 5
-        ]);
-
-        for(let i = 0; i < pipeline.instancePositions.length; i++){
-            pipeline.instancePositions[i] += 4 * Math.random() - 2;
-        }
-    }
-
-    pipeline.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
-
-    return pipeline;
 }
 
 export async function asyncBodyOnLoad(){
