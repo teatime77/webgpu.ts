@@ -374,6 +374,73 @@ export class Cube extends Mesh {
     }
 }
 
+export class Cone extends Mesh {
+    constructor(){
+        super();
+
+        const num_division = 16;
+
+        this.topology = 'triangle-list';
+        this.cube_vertex_count = num_division * 3;
+        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3));
+
+        const xs = new Float32Array(3);
+        const ys = new Float32Array(3);
+        const zs = new Float32Array(3);
+
+        const nxs = new Float32Array(3);
+        const nys = new Float32Array(3);
+        const nzs = new Float32Array(3);
+
+        const root2 = Math.sqrt(2);
+
+        for(let tri_i = 0; tri_i < num_division; tri_i++){
+
+            // 1st vertex
+            const phi1 = 2.0 * Math.PI * tri_i / num_division;
+            xs[0] = Math.cos(phi1);
+            ys[0] = Math.sin(phi1);
+            zs[0] = 0;
+
+            nxs[0] = xs[0];
+            nys[0] = ys[0];
+            nzs[0] = 1;
+
+            // 2nd vertex
+            const phi2 = 2.0 * Math.PI * (tri_i + 1) / num_division;
+            xs[1] = Math.cos(phi2);
+            ys[1] = Math.sin(phi2);
+            zs[1] = 0;
+
+            nxs[1] = xs[1];
+            nys[1] = ys[1];
+            nzs[1] = 1;
+
+            // 3rd vertex
+            const phi3 = 2.0 * Math.PI * (tri_i + 0.5) / num_division;
+            xs[2] = 0;
+            ys[2] = 0;
+            zs[2] = 1;
+
+            nxs[2] = Math.cos(phi3);
+            nys[2] = Math.sin(phi3);
+            nzs[2] = 1;
+    
+            for(let i = 0; i < 3; i++){
+                const base = (tri_i * 3 + i) * (3 + 3);
+
+                this.cubeVertexArray[base    ] = xs[i];
+                this.cubeVertexArray[base + 1] = ys[i];
+                this.cubeVertexArray[base + 2] = zs[i];
+
+                this.cubeVertexArray[base + 3] = nxs[i] / root2;
+                this.cubeVertexArray[base + 4] = nys[i] / root2;
+                this.cubeVertexArray[base + 4] = nzs[i] / root2;
+            }
+        }
+    }
+}
+
 function makeRegularIcosahedron() : [ Vertex[], Triangle[], number ] {
     var G = (1 + Math.sqrt(5)) / 2;
 
