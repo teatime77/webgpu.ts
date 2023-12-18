@@ -122,7 +122,7 @@ export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
 }
 
 export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([ new Cone(), new Cube(), new Tube() ]);
+    asyncBodyOnLoadIns([ new Cone(), new Cube(), new Tube(), new GeodesicPolyhedron() ]);
 }
 
 export async function asyncBodyOnLoadCone(){
@@ -134,7 +134,7 @@ export async function asyncBodyOnLoadCube(){
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    // asyncBodyOnLoadIns([new Mesh(... makeGeodesicPolyhedron())]);
+    asyncBodyOnLoadIns([new GeodesicPolyhedron()]);
 }
 
 export async function asyncBodyOnLoadTube(){

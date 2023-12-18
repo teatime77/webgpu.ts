@@ -435,7 +435,43 @@ export class Cone extends Mesh {
 
                 this.cubeVertexArray[base + 3] = nxs[i] / root2;
                 this.cubeVertexArray[base + 4] = nys[i] / root2;
-                this.cubeVertexArray[base + 4] = nzs[i] / root2;
+                this.cubeVertexArray[base + 5] = nzs[i] / root2;
+            }
+        }
+    }
+}
+
+export class GeodesicPolyhedron extends Mesh {
+    constructor(){
+        super();
+
+        this.topology = 'triangle-list';
+
+        const divide_cnt = 3;
+
+        const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
+        const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
+    
+        this.cube_vertex_count = triangles2.length * 3;
+        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3) );
+    
+        let idx = 0;
+        for(let i = 0; i < triangles2.length; i++){
+            const tri = triangles2[i];
+            for(let j = 0; j < 3; j++){
+                const vert = tri.Vertexes[j];
+    
+                this.cubeVertexArray[idx    ] = vert.x;
+                this.cubeVertexArray[idx + 1] = vert.y;
+                this.cubeVertexArray[idx + 2] = vert.z;
+    
+                const len = vert.len();
+    
+                this.cubeVertexArray[idx + 3] = vert.x / len;
+                this.cubeVertexArray[idx + 4] = vert.y / len;
+                this.cubeVertexArray[idx + 5] = vert.z / len;
+    
+                idx += 3 + 3;
             }
         }
     }
@@ -630,40 +666,6 @@ function divideTriangle(points1: Vertex[], triangles: Triangle[], sphere_r: numb
    console.log(`半径:${sphere_r} 三角形 ${triangles.length}`);
 
     return [ points2, triangles, edges ];
-}
-
-export function makeGeodesicPolyhedron() : [number, Float32Array, GPUPrimitiveTopology]{
-    const divide_cnt = 3;
-
-    const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
-    const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
-
-    const vertex_count = triangles2.length * 3;
-    const vertexes = new Float32Array(vertex_count * (4 + 4) );
-
-    let idx = 0;
-    for(let i = 0; i < triangles2.length; i++){
-        const tri = triangles2[i];
-        for(let j = 0; j < 3; j++){
-            const vert = tri.Vertexes[j];
-
-            vertexes[idx    ] = vert.x;
-            vertexes[idx + 1] = vert.y;
-            vertexes[idx + 2] = vert.z;
-            vertexes[idx + 3] = 1;
-
-            const len = vert.len();
-
-            vertexes[idx + 4] = vert.x / len;
-            vertexes[idx + 5] = vert.y / len;
-            vertexes[idx + 6] = vert.z / len;
-            vertexes[idx + 7] = 1;
-
-            idx += 4 + 4;
-        }
-    }
-
-    return [vertex_count , vertexes, 'triangle-list'];
 }
 
 function setPosNorm(v : Float32Array, idx : number, x : number, y : number, z : number, nx : number, ny : number, nz : number){
