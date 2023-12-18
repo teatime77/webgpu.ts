@@ -51,24 +51,31 @@ class UI3D {
         auto_rotate.addEventListener("click", (ev : MouseEvent)=>{
             this.autoRotate = auto_rotate.checked;            
         });
-    }    
+    }
 
     getTransformationMatrix() {
+        let worldMatrix : any;
+        let viewMatrix : any;
+
         if(this.autoRotate){
-            return this.getAutoTransformationMatrix();
+            [worldMatrix, viewMatrix] = this.getAutoTransformationMatrix();
         }
         else{
-            return this.getManualTransformationMatrix();
+            [worldMatrix, viewMatrix] = this.getManualTransformationMatrix();
         }
-    }    
 
-    getAutoTransformationMatrix() {
         const projectionMatrix = glMatrix.mat4.create();
         glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
+
+
+        const pvw = glMatrix.mat4.create();
+        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
+        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
     
-        const viewMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.translate(viewMatrix, viewMatrix, this.eye);
-    
+        return [pvw, worldMatrix];
+    }    
+
+    getAutoTransformationMatrix() {    
         const worldMatrix = glMatrix.mat4.create();
         const now = Date.now() / 1000;
         glMatrix.mat4.rotate(
@@ -78,21 +85,19 @@ class UI3D {
             glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
         );
     
-        const pvw = glMatrix.mat4.create();
-        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
-        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
-    
-        return pvw;
+        const viewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.translate(viewMatrix, viewMatrix, this.eye);
+
+        return [ worldMatrix , viewMatrix ];
     }
     
     getManualTransformationMatrix() {
+        const worldMatrix = glMatrix.mat4.create();
+
         const camY = this.camDistance * Math.cos(this.camTheta);
         const r = this.camDistance * Math.abs(Math.sin(this.camTheta));
         const camZ = r * Math.cos(this.camPhi);
         const camX = r * Math.sin(this.camPhi);
-
-        const projectionMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1.0, 100.0);
 
         const viewMatrix = glMatrix.mat4.create();
         const cameraPosition = [camX, camY, camZ];
@@ -100,20 +105,7 @@ class UI3D {
         const upDirection    = [0, 1, 0];
         glMatrix.mat4.lookAt(viewMatrix, cameraPosition, lookAtPosition, upDirection);
 
-        const worldMatrix = glMatrix.mat4.create();
-        // const now = Date.now() / 1000;
-        // glMatrix.mat4.rotate(
-        //     worldMatrix,
-        //     worldMatrix,
-        //     1,
-        //     glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
-        // );
-
-        const pvw = glMatrix.mat4.create();
-        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
-        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
-
-        return pvw;
+        return [ worldMatrix , viewMatrix ];
     }
 
 }

@@ -225,7 +225,7 @@ export async function asyncBodyOnLoadTex() {
             },
         };
 
-        const pvw = ui3D.getTransformationMatrix();
+        const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
 
         g_device.queue.writeBuffer(
             uniformBuffer, 4 * 16 * 2, 

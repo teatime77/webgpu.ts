@@ -1,5 +1,7 @@
 struct Uniforms {
+    // @uniform
     viewMatrix        : mat4x4<f32>,
+    normMatrix        : mat3x3<f32>,
 
     ambientColor      : vec3<f32>,
     directionalColor  : vec3<f32>,

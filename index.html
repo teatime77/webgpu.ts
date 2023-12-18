@@ -32,7 +32,18 @@
 </head>
 
 <body onload="start(webgputs.asyncBodyOnLoad)">
-  <h1>WebGPU triangle</h1>
+  <h5>WebGPU triangle</h5>
+
+ambientColor  
+  R <input type="number" id="ambient-r" min="0" max="100" value="50" style="width: 3em;" />
+  G <input type="number" id="ambient-g" min="0" max="100" value="50" style="width: 3em;" />
+  B <input type="number" id="ambient-b" min="0" max="100" value="50" style="width: 3em;" />
+<br/>
+directionalColor  
+  R <input type="number" id="directional-r" min="0" max="100" value="50" style="width: 3em;" />
+  G <input type="number" id="directional-g" min="0" max="100" value="50" style="width: 3em;" />
+  B <input type="number" id="directional-b" min="0" max="100" value="50" style="width: 3em;" />
+<br/>
 
   <button onclick="start(webgputs.asyncBodyOnLoadMulti)">Multi</button>
   <button onclick="start(webgputs.asyncBodyOnLoadCone)">Cone</button>
@@ -45,7 +56,7 @@
   <button onclick="start(webgputs.asyncBodyOnLoadTex)">Texture</button>
 <br/>
 <input type="checkbox" id="auto-rotate" checked /> <label for="auto-rotatate">auto rotate</label>
-<input type="checkbox" id="is-instance" checked /> <label for="is-instance">instance</label>
+<input type="checkbox" id="is-instance"  /> <label for="is-instance">instance</label>
 <br/>
   <canvas id="world" width="800" height="800"></canvas>
 </body>

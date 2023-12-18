@@ -14,6 +14,17 @@ export async function fetchText(fileURL: string) {
     return text;
 }
 
+export function getColor(name : string){
+    const rgb : number[] = [];
+
+    for(const c of ["r", "g", "b"]){
+        const input = document.getElementById(`${name}-${c}`) as HTMLInputElement;
+        rgb.push( parseInt(input.value) / 100.0 );
+    }
+
+    return glMatrix.vec4.fromValues(rgb[0], rgb[1], rgb[2], 1.0);
+}
+
 export async function fetchModule(shader_name: string) : Promise<GPUShaderModule> {
     const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
 
