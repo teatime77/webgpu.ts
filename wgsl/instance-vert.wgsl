@@ -3,8 +3,8 @@ struct Uniforms {
     viewMatrix        : mat4x4<f32>,
     normMatrix        : mat3x3<f32>,
 
-    ambientColor      : vec3<f32>,
-    directionalColor  : vec3<f32>,
+    ambientColor      : vec4<f32>,
+    directionalColor  : vec4<f32>,
     lightingDirection : vec3<f32>
 }
 
@@ -25,7 +25,10 @@ fn main(
     var output : VertexOutput;
 
     output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(pos.x, pos.y, 0, 1));
-    output.fragColor = vec4<f32>(norm, 1.0);
+
+    var transformedNormal = uniforms.normMatrix * norm;
+    var directionalLightWeighting = max(dot(transformedNormal, uniforms.lightingDirection), 0.0);
+    output.fragColor = uniforms.ambientColor + directionalLightWeighting * uniforms.directionalColor;
     
     return output;
 }
