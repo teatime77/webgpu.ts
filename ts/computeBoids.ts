@@ -4,7 +4,6 @@ const particleDim = 8;
 
 export async function asyncBodyOnLoadBoi() {
     const spriteWGSL = await fetchText('../wgsl/sprite.wgsl');
-    const updateSpritesWGSL = await fetchText('../wgsl/updateSprites.wgsl');
 
     const canvas = document.getElementById('world') as HTMLCanvasElement;
 
@@ -74,15 +73,9 @@ export async function asyncBodyOnLoadBoi() {
         },
     });
 
-    const computePipeline = g_device.createComputePipeline({
-        layout: 'auto',
-        compute: {
-            module: g_device.createShaderModule({
-                code: updateSpritesWGSL,
-            }),
-            entryPoint: 'main',
-        },
-    });
+    const comp = new Compute();
+
+    await comp.makePipeline("updateSprites");
 
     const renderPassDescriptor = {
         colorAttachments: [
@@ -152,40 +145,28 @@ export async function asyncBodyOnLoadBoi() {
     console.log("write sim param");
 
     const numParticles = 320;
-    const initialParticleData = new Float32Array(numParticles * particleDim);
+    const initial_update_Data = new Float32Array(numParticles * particleDim);
     let base = 0;
     for (let i = 0; i < numParticles; ++i) {
-        initialParticleData[base + 0] = 0.0;// 2 * (Math.random() - 0.5);
-        initialParticleData[base + 1] = 0.0;// 2 * (Math.random() - 0.5);
-        initialParticleData[base + 2] = 3.0;// 2 * (Math.random() - 0.5);
-        initialParticleData[base + 3] = 0.0;
+        initial_update_Data[base + 0] = 0.0;// 2 * (Math.random() - 0.5);
+        initial_update_Data[base + 1] = 0.0;// 2 * (Math.random() - 0.5);
+        initial_update_Data[base + 2] = 3.0;// 2 * (Math.random() - 0.5);
+        initial_update_Data[base + 3] = 0.0;
 
         const speed = 5.0;
-        initialParticleData[base + 4] = speed * (Math.random() - 0.5);
-        initialParticleData[base + 5] = speed * (Math.random() - 0.5);
-        initialParticleData[base + 6] = speed * (Math.random() - 0.5);
-        initialParticleData[base + 7] = 0.0;
+        initial_update_Data[base + 4] = speed * (Math.random() - 0.5);
+        initial_update_Data[base + 5] = speed * (Math.random() - 0.5);
+        initial_update_Data[base + 6] = speed * (Math.random() - 0.5);
+        initial_update_Data[base + 7] = 0.0;
 
         base += particleDim;
     }
 
-    const particleBuffers: GPUBuffer[] = new Array(2);
-    for (let i = 0; i < 2; ++i) {
-        particleBuffers[i] = g_device.createBuffer({
-            size: initialParticleData.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
-            mappedAtCreation: true,
-        });
-        new Float32Array(particleBuffers[i].getMappedRange()).set(
-            initialParticleData
-        );
-        particleBuffers[i].unmap();
-    }
+    comp.makeUpdateBuffers(initial_update_Data);
 
-    const computeBindGroups: GPUBindGroup[] = new Array(2);
     for (let i = 0; i < 2; ++i) {
-        computeBindGroups[i] = g_device.createBindGroup({
-            layout: computePipeline.getBindGroupLayout(0),
+        comp.bindGroups[i] = g_device.createBindGroup({
+            layout: comp.pipeline.getBindGroupLayout(0),
             entries: [
                 {
                     binding: 0,
@@ -196,24 +177,27 @@ export async function asyncBodyOnLoadBoi() {
                 {
                     binding: 1,
                     resource: {
-                        buffer: particleBuffers[i],
+                        buffer: comp.updateBuffers[i],
                         offset: 0,
-                        size: initialParticleData.byteLength,
+                        size: initial_update_Data.byteLength,
                     },
                 },
                 {
                     binding: 2,
                     resource: {
-                        buffer: particleBuffers[(i + 1) % 2],
+                        buffer: comp.updateBuffers[(i + 1) % 2],
                         offset: 0,
-                        size: initialParticleData.byteLength,
+                        size: initial_update_Data.byteLength,
                     },
                 },
             ],
         });
     }
 
-    const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, renderPipeline, 4 * (4 * 4 + 4));
+    const mesh = new Mesh();
+    mesh.pipeline = renderPipeline;
+    mesh.makeUniformBufferAndBindGroup();
+
 
     const lightDir = makeLightDir();
 
@@ -222,7 +206,7 @@ export async function asyncBodyOnLoadBoi() {
 
         const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
         g_device.queue.writeBuffer(
-            uniformBuffer,
+            mesh.uniformBuffer,
             0,
             pvw.buffer,
             pvw.byteOffset,
@@ -231,7 +215,7 @@ export async function asyncBodyOnLoadBoi() {
 
         console.assert(pvw.byteLength == 4 * (4 * 4));
         g_device.queue.writeBuffer(
-            uniformBuffer,
+            mesh.uniformBuffer,
             pvw.byteLength,
             lightDir.buffer,
             lightDir.byteOffset,
@@ -245,8 +229,8 @@ export async function asyncBodyOnLoadBoi() {
         const commandEncoder = g_device.createCommandEncoder();
         {
             const passEncoder = commandEncoder.beginComputePass();
-            passEncoder.setPipeline(computePipeline);
-            passEncoder.setBindGroup(0, computeBindGroups[t % 2]);
+            passEncoder.setPipeline(comp.pipeline);
+            passEncoder.setBindGroup(0, comp.bindGroups[t % 2]);
             passEncoder.dispatchWorkgroups(numParticles);
             passEncoder.end();
         }
@@ -254,10 +238,10 @@ export async function asyncBodyOnLoadBoi() {
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
             passEncoder.setPipeline(renderPipeline);
 
-            passEncoder.setVertexBuffer(0, particleBuffers[(t + 1) % 2]);
+            passEncoder.setVertexBuffer(0, comp.updateBuffers[(t + 1) % 2]);
             passEncoder.setVertexBuffer(1, spriteVertexBuffer);
 
-            passEncoder.setBindGroup(0, uniformBindGroup);
+            passEncoder.setBindGroup(0, mesh.uniformBindGroup);
 
             passEncoder.draw(vertexBufferData.length / (3 + 3), numParticles, 0, 0);
             passEncoder.end();

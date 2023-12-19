@@ -153,7 +153,18 @@ class Triangle {
     }
 }
 
-export abstract class Mesh {
+export abstract class Pipeline {
+    uniformBuffer!: GPUBuffer;
+
+    makeUniformBuffer(uniform_buffer_size : number){
+        this.uniformBuffer = g_device.createBuffer({
+            size: uniform_buffer_size,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });    
+    }
+}
+
+export class Mesh extends Pipeline {
     cube_vertex_count!: number;
     cubeVertexArray!: Float32Array;
     topology!: GPUPrimitiveTopology;
@@ -164,27 +175,29 @@ export abstract class Mesh {
 
     verticesBuffer!: GPUBuffer;
     uniformBindGroup!: GPUBindGroup;
-    uniformBuffer!: GPUBuffer;
 
     instancePositions : Float32Array | undefined;
     instanceBuffer: GPUBuffer | undefined;
     isInstance! : boolean;
 
-    // constructor(cube_vertex_count : number , cubeVertexArray : Float32Array, topology : GPUPrimitiveTopology){
-    //     this.cube_vertex_count = cube_vertex_count;
-    //     this.cubeVertexArray   = cubeVertexArray;
-    //     this.topology          = topology;
-    // }
-
-
-    makeUniformBuffer(){
+    makeUniformBufferAndBindGroup(){
         // @uniform
         const uniform_size = mat4x4_size + mat3x3_size + 2 * vec4_size + vec3_size;
-        const uniformBufferSize = Math.max(minimum_binding_size, uniform_size);
+        const uniform_buffer_size = Math.max(minimum_binding_size, uniform_size);
 
-        const [uniformBuffer, uniformBindGroup] = makeUniformBufferAndBindGroup(g_device, this.pipeline, uniformBufferSize);
-        this.uniformBuffer    = uniformBuffer;
-        this.uniformBindGroup = uniformBindGroup;
+        this.makeUniformBuffer(uniform_buffer_size);
+
+        this.uniformBindGroup = g_device.createBindGroup({
+            layout: this.pipeline.getBindGroupLayout(0),
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.uniformBuffer,
+                    },
+                },
+            ],
+        });
     }
 
     makeVertexBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){

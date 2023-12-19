@@ -127,26 +127,4 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
     return context;
 }
 
-export function makeUniformBufferAndBindGroup(g_device : GPUDevice, pipeline : GPURenderPipeline, uniformBufferSize : number) : [GPUBuffer, GPUBindGroup] {
-
-    const uniformBuffer = g_device.createBuffer({
-        size: uniformBufferSize,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    const uniformBindGroup = g_device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-            {
-                binding: 0,
-                resource: {
-                    buffer: uniformBuffer,
-                },
-            },
-        ],
-    });
-
-    return [uniformBuffer, uniformBindGroup];
-}
-
 }

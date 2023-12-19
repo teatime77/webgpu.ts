@@ -35,17 +35,14 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
+    const comp = new Compute();
+
+    await comp.makePipeline("compute");
+
     // ComputePipelineを生成
-    const computePipeline = g_device.createComputePipeline({
-        layout: 'auto',
-        compute: {
-            module: shaderModule,
-            entryPoint: 'main'
-        }
-    });
 
     const bindGroup = g_device.createBindGroup({
-        layout: computePipeline.getBindGroupLayout(0),
+        layout: comp.pipeline.getBindGroupLayout(0),
         entries: [
             {
                 binding: 0,
@@ -70,7 +67,7 @@ export async function asyncBodyOnLoadCom() {
     const passEncoder = commandEncoder.beginComputePass();
 
     // 7: Issue commands
-    passEncoder.setPipeline(computePipeline);
+    passEncoder.setPipeline(comp.pipeline);
     passEncoder.setBindGroup(0, bindGroup);
     const workgroupSize = 4;
     passEncoder.dispatchWorkgroups(inputArray.length / workgroupSize);
@@ -109,6 +106,38 @@ export async function asyncBodyOnLoadCom() {
     stagingBuffer.unmap();
     console.log(new Float32Array(data));  // [2, 4, 6, 8]
 
+}
+
+export class Compute extends Pipeline {
+    pipeline! : GPUComputePipeline;
+    updateBuffers: GPUBuffer[] = new Array(2);
+    bindGroups: GPUBindGroup[] = new Array(2)
+
+    async makePipeline(shader_name: string){
+        const shader_module = await fetchModule(shader_name);
+
+        this.pipeline = g_device.createComputePipeline({
+            layout: 'auto',
+            compute: {
+                module: shader_module,
+                entryPoint: 'main'
+            }
+        });
+    }
+
+    makeUpdateBuffers(initial_update_Data : Float32Array){
+        for (let i = 0; i < 2; ++i) {
+            this.updateBuffers[i] = g_device.createBuffer({
+                size: initial_update_Data.byteLength,
+                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+                mappedAtCreation: true,
+            });
+            new Float32Array(this.updateBuffers[i].getMappedRange()).set(
+                initial_update_Data
+            );
+            this.updateBuffers[i].unmap();
+        }    
+    }
 }
 
 }

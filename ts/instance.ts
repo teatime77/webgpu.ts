@@ -33,7 +33,7 @@ class Run {
             // create a render pipeline
             await mesh.makePipeline(vert_name, 'depth-frag', mesh.topology, is_instance);
 
-            mesh.makeUniformBuffer();
+            mesh.makeUniformBufferAndBindGroup();
 
             mesh.makeVertexBuffer(mesh.cube_vertex_count, mesh.cubeVertexArray);
 
