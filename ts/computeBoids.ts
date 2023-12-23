@@ -88,13 +88,6 @@ export async function asyncBodyOnLoadBoi() {
         ],
     };
 
-    // prettier-ignore
-    const vertexBufferDataOld = new Float32Array([
-        -0.01, -0.02, 0.0, 
-         0.01, -0.02, 0.0,
-         0.0 ,  0.02, 0.0
-    ]);
-
     const vertexBufferData = makeConeSub3(true);
 
     const spriteVertexBuffer = g_device.createBuffer({

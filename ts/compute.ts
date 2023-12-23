@@ -10,7 +10,7 @@ export async function asyncBodyOnLoadCom() {
     });
 
     // 入力配列を作成
-    const inputArray = new Float32Array([1, 2, 3, 4]);
+    const inputArray = new Float32Array(Array.from(range(16)));
 
     // Compute Shader用のバッファーを作成
     // 入力用バッファ
@@ -31,7 +31,7 @@ export async function asyncBodyOnLoadCom() {
     // Get a GPU buffer for reading in an unmapped state.
     const stagingBuffer = g_device.createBuffer({
         mappedAtCreation: false,
-        size: 16,
+        size: outputBuffer.size,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
@@ -82,7 +82,7 @@ export async function asyncBodyOnLoadCom() {
         0, //source offset,
         stagingBuffer, //destination buffer,
         0, //destination offset,
-        16 //size
+        outputBuffer.size
     );
 
     // 8: End frame by passing array of command buffers to command queue for execution

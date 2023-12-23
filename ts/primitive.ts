@@ -337,8 +337,9 @@ export class Cube extends Mesh {
     constructor(){
         super();
 
+        // position: vec3<f32>, norm: vec3<f32>
+        // prettier-ignore
         this.cubeVertexArray = new Float32Array([
-            // position: vec3<f32>, norm: vec3<f32>
              1, -1,  1,   0, -1,  0,
             -1, -1,  1,   0, -1,  0,
             -1, -1, -1,   0, -1,  0,

@@ -7,6 +7,12 @@ export function range(n: number) : number[]{
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
 
+
+export function error(msg : string){
+    console.log(`error [${msg}]`)
+    throw new Error(msg);
+}
+
 export async function fetchText(fileURL: string) {
     const response = await fetch(fileURL);
     const text = await response!.text();
@@ -99,6 +105,8 @@ export async function asyncBodyOnLoad(){
     console.log("device is ready\n");
 
     g_presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+
+    await parseAll();
 }
 
 let g_context : GPUCanvasContext | null = null;
