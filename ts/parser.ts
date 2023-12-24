@@ -84,6 +84,7 @@ const TypeName : string[] = [
     "vec3",
     "vec2",
     "texture_2d",
+    "array",
 
     "vec3u",
     "f32",
@@ -122,7 +123,7 @@ export class Token{
     charPos:number;
 
     public constructor(type : TokenType, sub_type : TokenSubType, text : string, char_pos : number){
-        //console.log("" + TokenType[type] + " " + TokenSubType[sub_type] + " " + text + " " + char_pos);
+        //msg("" + TokenType[type] + " " + TokenSubType[sub_type] + " " + text + " " + char_pos);
         this.typeTkn = type;
         this.subType = sub_type;
         this.text = text;
@@ -134,6 +135,13 @@ class Module {
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Function[] = [];
+
+    dump(){
+        this.structs.forEach(x => x.dump());
+        this.vars.forEach(x => msg(`${x.str()};`))
+        this.fns.forEach(x => msg(`${x.str()}`))
+    }
+
 }
 
 export function lexicalAnalysis(text : string) : Token[] {
@@ -243,7 +251,7 @@ export function lexicalAnalysis(text : string) : Token[] {
             const s = text.substring(start_pos, pos);
             if(! unknownToken.has(s)){
                 unknownToken.add(s);
-                console.log(`不明 [${s}]`);
+                msg(`不明 [${s}]`);
             }
         }
 
@@ -260,6 +268,73 @@ export function lexicalAnalysis(text : string) : Token[] {
     return tokens;
 }
 
+
+class Modifier {
+    group : number | undefined;
+    binding : number | undefined;
+    location : number | undefined;
+    workgroup_size : number[] | undefined;
+    builtin : string | undefined;
+    fnType : string | undefined; 
+
+    str() : string {
+        let s = "";
+
+        if(this.group != undefined){
+
+            s += ` group(${this.group})`
+        }
+
+        if(this.binding != undefined){
+
+            s += ` binding(${this.binding})`
+        }
+
+        if(this.location != undefined){
+
+            s += ` location(${this.location})`
+        }
+
+        if(this.workgroup_size != undefined){
+
+            s += ` workgroup_size(${this.workgroup_size})`
+        }
+
+        if(this.builtin != undefined){
+
+            s += ` builtin(${this.builtin})`
+        }
+
+        if(this.fnType != undefined){
+
+            s += ` ${this.fnType}`
+        }
+
+        return s;
+    }
+}
+
+class Type {
+    mod : Modifier;
+    aggregate : string | undefined;
+    primitive : string;
+
+    constructor(mod : Modifier, aggregate : string | undefined, primitive : string){
+        this.mod = mod;
+        this.aggregate = aggregate;
+        this.primitive = primitive;
+    }
+
+    str() : string {
+        if(this.aggregate != undefined){
+            return `${this.mod.str()} ${this.aggregate}<${this.primitive}>`;
+        }
+        else{
+            return `${this.mod.str()} ${this.primitive}`;
+        }
+    }
+}
+
 class Struct {
     mod : Modifier;
     name : string;
@@ -269,30 +344,15 @@ class Struct {
         this.mod = mod;
         this.name = name;
     }
-}
 
-
-class Modifier {
-    group : number | undefined;
-    binding : number | undefined;
-    location : number | undefined;
-    workgroup_size : number[] | undefined;
-    builtin : string | undefined;
-    fnType : string | undefined; 
-}
-
-class Type {
-    mod : Modifier | undefined;
-    aggregate : string | undefined;
-    primitive : string;
-
-    constructor(mod : Modifier | undefined, aggregate : string | undefined, primitive : string){
-        this.mod = mod;
-        this.aggregate = aggregate;
-        this.primitive = primitive;
+    dump(){
+        msg(`${this.mod.str()} struct ${this.name}{`);
+        for(const va of this.members){
+            msg(`    ${va.str()};`);
+        }
+        msg("}")
     }
 }
-
 
 class Variable {
     mod : Modifier;
@@ -303,6 +363,10 @@ class Variable {
         this.mod = mod;
         this.name = name;
         this.type = type;
+    }
+
+    str() : string {
+        return `${this.mod.str()} ${this.name} : ${this.type.str()}`
     }
 }
 
@@ -315,6 +379,13 @@ class Function {
     constructor(mod : Modifier, name : string){
         this.mod = mod;
         this.name = name;
+    }
+
+    str() : string {
+        const vars_s = this.args.map(x => x.str()).join(", ");
+        const type_s = this.type == undefined ? "" : `-> ${this.type.str()}`;
+        
+        return `${this.mod.str()} fn ${this.name}(${vars_s}) ${type_s}`;
     }
 }
 
@@ -421,7 +492,8 @@ export class Parser {
         }
     }
 
-    readType(mod : Modifier | undefined = undefined) : Type {
+    readType() : Type {
+        const mod = this.readModifiers();
 
         switch(this.currentToken.text){
             case "mat4x4":
@@ -431,8 +503,7 @@ export class Parser {
             case "vec2":
             case "array":
             case "texture_2d":
-                this.advance();
-                const aggregate = this.currentToken.text;
+                const aggregate = this.readToken(TokenType.type);
                 this.readText("<");
                 const primitive = this.readToken(TokenType.type);
                 this.readText(">");
@@ -596,8 +667,7 @@ export class Parser {
 
             this.readText("->");
 
-            const mod2 = this.readModifiers();
-            fn.type = this.readType(mod2);
+            fn.type = this.readType();
         }
 
         this.readText("{");
@@ -619,7 +689,7 @@ export class Parser {
         return fn;
     }
 
-    parse(){
+    parse() : Module{
         const module = new Module();
 
         while(this.currentToken != eotToken){
@@ -645,6 +715,8 @@ export class Parser {
                     error(`parse error [${this.currentToken.text}]`)
             }
         }
+
+        return module;
     }
 
 
@@ -688,15 +760,16 @@ export async function parseAll(){
     ];
 
     for(const shader_name of shader_names){
-        console.log(`\n------------------------------ ${shader_name}`)
+        msg(`\n------------------------------ ${shader_name}`)
         const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
         const tokens = lexicalAnalysis(text);
         for(const t of tokens){
-            // console.log(`${t.text} ${t.typeTkn}`)
+            // msg(`${t.text} ${t.typeTkn}`)
         }
 
         const parser = new Parser(tokens);
-        parser.parse();
+        const mod = parser.parse();
+        mod.dump();
     }
 }
 

@@ -7,10 +7,13 @@ export function range(n: number) : number[]{
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
 
-
 export function error(msg : string){
     console.log(`error [${msg}]`)
     throw new Error(msg);
+}
+
+export function msg(s : string){
+    console.log(s);
 }
 
 export async function fetchText(fileURL: string) {
