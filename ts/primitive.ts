@@ -228,17 +228,17 @@ export class Mesh extends Pipeline {
         const vert_module = await fetchModule(vert_name);
         const frag_module = await fetchModule(frag_name);
     
-        const vertex_buffer_layouts = makeVertexBufferLayouts(is_instance);
+        const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(is_instance);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
             vertex: {
-                module: vert_module,
+                module: vert_module.module,
                 entryPoint: 'main',
                 buffers: vertex_buffer_layouts,
             },
             fragment: {
-                module: frag_module,
+                module: frag_module.module,
                 entryPoint: 'main',
                 targets: [
                     // 0

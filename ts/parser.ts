@@ -131,16 +131,76 @@ export class Token{
     }
 }
 
-class Module {
+function makeGPUVertexAttributes(vars : Variable[]) : GPUVertexAttribute[] {
+    const attributes : GPUVertexAttribute[] = [];
+    let offset : number = 0;
+    for(const va of vars){
+        const fmt = va.type.format() as GPUVertexFormat;
+
+        const attr : GPUVertexAttribute = {
+            shaderLocation: va.mod.location!,
+            offset: offset,
+            format: fmt
+        };
+        attributes.push(attr);
+
+        offset += va.type.size();
+    }
+
+    return attributes;
+}
+
+export class Module {
+    module : GPUShaderModule;
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Function[] = [];
+    instances : number[] = [];
+
+    constructor(text : string){
+        this.module = g_device.createShaderModule({ code: text });
+
+        const tokens = lexicalAnalysis(text);
+
+        const parser = new Parser(tokens);
+        parser.parse(this);
+    }
 
     dump(){
         this.structs.forEach(x => x.dump());
         this.vars.forEach(x => msg(`${x.str()};`))
         this.fns.forEach(x => msg(`${x.str()}`))
     }
+
+
+    makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
+        console.assert(this.fns.length == 1);
+        const main = this.fns[0];
+
+        const instance_vars = main.args.filter(x => x.name == "pos" );
+        const vertex_vars   = main.args.filter(x => ! instance_vars.includes(x) );
+        
+        const vertex_buffer_layouts : GPUVertexBufferLayout[] = [
+            {
+                arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
+                stepMode: 'vertex',
+                attributes: makeGPUVertexAttributes(vertex_vars)
+            }            
+        ];
+    
+        if(is_instance){
+    
+            vertex_buffer_layouts.push({
+                arrayStride: sum( instance_vars.map(x => x.type.size()) ),    
+                stepMode: 'instance',    
+                attributes: makeGPUVertexAttributes(instance_vars)
+            });
+        }
+    
+        return vertex_buffer_layouts;
+    }
+
+
 
 }
 
@@ -314,6 +374,18 @@ class Modifier {
     }
 }
 
+function primitiveTypeSize(primitive : string) : number{
+    switch(primitive){
+    case "vec3u": return 3 * 4;
+    case "f32"  : return 4;
+    case "u32"  : return 4;
+    case "sampler":
+    default:
+        error(`unknown type size ${primitive}`);
+        return NaN;
+    }
+}
+
 class Type {
     mod : Modifier;
     aggregate : string | undefined;
@@ -332,6 +404,50 @@ class Type {
         else{
             return `${this.mod.str()} ${this.primitive}`;
         }
+    }
+
+    size() : number {
+        const primitive_size = primitiveTypeSize(this.primitive);
+        if(this.aggregate == undefined){
+            return primitive_size;
+        }
+        else{
+            switch(this.aggregate){
+            case "mat4x4" : return 4 * 4 * primitive_size;
+            case "mat3x3" : return 3 * 3 * primitive_size;
+            case "vec4"   : return     4 * primitive_size;
+            case "vec3"   : return     3 * primitive_size;
+            case "vec2"   : return     2 * primitive_size;
+
+            case "texture_2d":
+            case "array" :
+            default:
+                error(`unknown aggregate size ${this.aggregate}`);
+                return NaN;
+            }
+        }
+    }
+
+    format() : string {
+        let fmt : string;
+
+        switch(this.primitive){
+            case "f32"  : fmt = "float32"; break;
+            case "u32"  : fmt = "uint32"; break;
+            default:
+                error(`unknown type format ${this.primitive}`);
+                return "";
+        }
+
+        switch(this.aggregate){
+        case undefined: return fmt;
+        case "vec2"   : return fmt + "x2";
+        case "vec3"   : return fmt + "x3";
+        case "vec4"   : return fmt + "x4";
+        }
+        
+        error(`unknown type format ${this.aggregate}`);
+        return "";
     }
 }
 
@@ -689,9 +805,7 @@ export class Parser {
         return fn;
     }
 
-    parse() : Module{
-        const module = new Module();
-
+    parse(module : Module){
         while(this.currentToken != eotToken){
             const mod = this.readModifiers();
 
@@ -715,8 +829,6 @@ export class Parser {
                     error(`parse error [${this.currentToken.text}]`)
             }
         }
-
-        return module;
     }
 
 
@@ -762,13 +874,7 @@ export async function parseAll(){
     for(const shader_name of shader_names){
         msg(`\n------------------------------ ${shader_name}`)
         const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
-        const tokens = lexicalAnalysis(text);
-        for(const t of tokens){
-            // msg(`${t.text} ${t.typeTkn}`)
-        }
-
-        const parser = new Parser(tokens);
-        const mod = parser.parse();
+        const mod = new Module(text);
         mod.dump();
     }
 }

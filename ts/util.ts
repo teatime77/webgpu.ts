@@ -16,6 +16,10 @@ export function msg(s : string){
     console.log(s);
 }
 
+export function sum(v : number[]) : number {
+    return v.reduce((acc, val) => acc + val, 0);
+}
+
 export async function fetchText(fileURL: string) {
     const response = await fetch(fileURL);
     const text = await response!.text();
@@ -34,62 +38,13 @@ export function getColor(name : string){
     return glMatrix.vec4.fromValues(rgb[0], rgb[1], rgb[2], 1.0);
 }
 
-export async function fetchModule(shader_name: string) : Promise<GPUShaderModule> {
+export async function fetchModule(shader_name: string) : Promise<Module> {
     const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
+    const module = new Module(text);
 
-    return g_device.createShaderModule({ code: text });
+    return module;
 }
 
-export function makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
-    const cubeVertexSize = 2 * vec3_size; // Byte size of one vertex.
-    const cubePositionOffset = 0;
-    const cubeNormOffset = vec3_size; // Byte offset of cube vertex norm attribute.
-
-    const vertex_buffer_layouts : GPUVertexBufferLayout[] = [
-        {
-            // 配列の要素間の距離をバイト単位で指定します。
-            arrayStride: cubeVertexSize,
-
-            // バッファを頂点ごとに参照することを意味します。
-            stepMode: 'vertex',
-
-            // 頂点バッファの属性を指定します。
-            attributes: [
-                {
-                    // position
-                    shaderLocation: 0, // @location(0) in vertex shader
-                    offset: cubePositionOffset,
-                    format: 'float32x3',
-                },
-                {
-                    // norm
-                    shaderLocation: 1, // @location(1) in vertex shader
-                    offset: cubeNormOffset,
-                    format: 'float32x3',
-                },
-            ],
-        }            
-    ];
-
-    if(is_instance){
-        vertex_buffer_layouts.push({
-            arrayStride: 4 * 2,
-
-            // バッファをインスタンスごとに参照することを意味します。
-            stepMode: 'instance',
-
-            attributes: [
-                {
-                    shaderLocation: 2,
-                    offset: 0,
-                    format: 'float32x2'
-                }
-            ]
-        });
-    }
-
-    return vertex_buffer_layouts;
-}
 
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");

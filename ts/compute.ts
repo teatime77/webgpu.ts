@@ -119,7 +119,7 @@ export class Compute extends Pipeline {
         this.pipeline = g_device.createComputePipeline({
             layout: 'auto',
             compute: {
-                module: shader_module,
+                module: shader_module.module,
                 entryPoint: 'main'
             }
         });
