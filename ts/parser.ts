@@ -173,31 +173,39 @@ export class Module {
     }
 
 
-    makeVertexBufferLayouts(is_instance : boolean) : GPUVertexBufferLayout[] {
-        console.assert(this.fns.length == 1);
-        const main = this.fns[0];
+    makeVertexBufferLayouts(instance_var_names : string[]) : GPUVertexBufferLayout[] {
+        const main = this.fns.find(x => x.mod.fnType == "@vertex");
+        if(main == undefined){
+            throw new Error(`no vert main `);
+        }
 
-        const instance_vars = main.args.filter(x => x.name == "pos" );
+        const instance_vars = main.args.filter(x => instance_var_names.includes(x.name) );
         const vertex_vars   = main.args.filter(x => ! instance_vars.includes(x) );
         
-        const vertex_buffer_layouts : GPUVertexBufferLayout[] = [
-            {
-                arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
-                stepMode: 'vertex',
-                attributes: makeGPUVertexAttributes(vertex_vars)
-            }            
-        ];
+        const vertex_step_layout : GPUVertexBufferLayout = {
+            arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
+            stepMode: 'vertex',
+            attributes: makeGPUVertexAttributes(vertex_vars)
+        };
     
-        if(is_instance){
+        if(instance_var_names.length == 0){
+            return [ vertex_step_layout ];
+        }
+        else{
     
-            vertex_buffer_layouts.push({
+            const instance_step_layout  : GPUVertexBufferLayout = {
                 arrayStride: sum( instance_vars.map(x => x.type.size()) ),    
                 stepMode: 'instance',    
                 attributes: makeGPUVertexAttributes(instance_vars)
-            });
+            };
+
+            if(vertex_vars[0].mod.location == 0){
+                return [ vertex_step_layout, instance_step_layout ];
+            }
+            else{
+                return [ instance_step_layout, vertex_step_layout ];
+            }
         }
-    
-        return vertex_buffer_layouts;
     }
 
 

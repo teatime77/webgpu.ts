@@ -3,64 +3,25 @@ namespace webgputs {
 const particleDim = 8;
 
 export async function asyncBodyOnLoadBoi() {
-    const spriteWGSL = await fetchText('../wgsl/sprite.wgsl');
-
     const canvas = document.getElementById('world') as HTMLCanvasElement;
 
     initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -5));
 
     const context = initContext(canvas, 'premultiplied');
     
-    const spriteShaderModule = g_device.createShaderModule({ code: spriteWGSL });
+    const render_module = await fetchModule("sprite");
+
+    const vertex_buffer_layouts = render_module.makeVertexBufferLayouts(["a_particlePos", "a_particleVel"]);
+
     const renderPipeline = g_device.createRenderPipeline({
         layout: 'auto',
         vertex: {
-            module: spriteShaderModule,
+            module: render_module.module,
             entryPoint: 'vert_main',
-            buffers: [
-                {
-                    // instanced particles buffer
-                    arrayStride: 4 * particleDim,
-                    stepMode: 'instance',
-                    attributes: [
-                        {
-                            // instance position
-                            shaderLocation: 0,
-                            offset: 0,
-                            format: 'float32x4',
-                        },
-                        {
-                            // instance velocity
-                            shaderLocation: 1,
-                            offset: 4 * 4,
-                            format: 'float32x4',
-                        },
-                    ],
-                },
-                {
-                    // vertex buffer
-                    arrayStride: 4 * (3 + 3),
-                    stepMode: 'vertex',
-                    attributes: [
-                        {
-                            // vertex positions
-                            shaderLocation: 2,
-                            offset: 0,
-                            format: 'float32x3',
-                        }
-                        ,
-                        {
-                            // vertex norms
-                            shaderLocation: 3,
-                            offset: 4 * 3,
-                            format: 'float32x3',
-                        }
-                    ],
-                },
-            ],
+            buffers: vertex_buffer_layouts
         },
         fragment: {
-            module: spriteShaderModule,
+            module: render_module.module,
             entryPoint: 'frag_main',
             targets: [
                 {
@@ -127,9 +88,6 @@ export async function asyncBodyOnLoadBoi() {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // function updateSimParams() {
-    // }
-    // updateSimParams();
     g_device.queue.writeBuffer(
         simParamBuffer,
         0,
