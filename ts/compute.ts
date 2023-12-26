@@ -105,7 +105,6 @@ export async function asyncBodyOnLoadCom() {
     const data = copyArrayBuffer.slice(0);
     stagingBuffer.unmap();
     console.log(new Float32Array(data));  // [2, 4, 6, 8]
-
 }
 
 export class Compute extends Pipeline {

@@ -164,6 +164,54 @@ export abstract class Pipeline {
     }
 }
 
+export class Instance {
+    varNames : string[];
+    array : Float32Array;
+    instanceCount : number;
+    buffer!: GPUBuffer;
+
+    constructor(){
+        this.varNames = ["pos"];
+        this.array = new Float32Array([
+            // x, y
+            -5, -5,
+            -5, 0,
+            -5, 5,
+            0, -5,
+            0, 0,
+            0, 5,
+            5, -5,
+            5, 0,
+            5, 5
+        ]);
+
+        for(let i = 0; i < this.array.length; i++){
+            this.array[i] += 4 * Math.random() - 2;
+        }
+
+        this.instanceCount = Math.floor(this.array.length / 2);
+    }
+
+    makeInstanceBuffer(){
+        // Create a instances buffer
+        this.buffer = g_device.createBuffer({
+            size: this.array.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            // mappedAtCreation: true,
+        });
+        // new Float32Array(this.buffer.getMappedRange()).set(this.array);
+        // this.buffer.unmap();
+    }
+
+    async update(){
+        for(let i = 0; i < this.array.length; i++){
+            this.array[i] += 0.5 * Math.random() - 0.25;
+        }
+
+        g_device.queue.writeBuffer(this.buffer, 0, this.array);
+    }
+}
+
 export class Mesh extends Pipeline {
     cube_vertex_count!: number;
     cubeVertexArray!: Float32Array;
@@ -176,9 +224,16 @@ export class Mesh extends Pipeline {
     verticesBuffer!: GPUBuffer;
     uniformBindGroup!: GPUBindGroup;
 
-    instancePositions : Float32Array | undefined;
-    instanceBuffer: GPUBuffer | undefined;
-    isInstance! : boolean;
+    instance : Instance | null;
+    
+    get isInstance() : boolean {
+        return this.instance != null;
+    }
+
+    constructor(inst : Instance | null){
+        super();
+        this.instance = inst;
+    }
 
     makeUniformBufferAndBindGroup(){
         // @uniform
@@ -213,23 +268,11 @@ export class Mesh extends Pipeline {
         this.verticesBuffer.unmap();
     }
 
-    makeInstanceBuffer(){
-        // Create a instances buffer
-        this.instanceBuffer = g_device.createBuffer({
-            size: this.instancePositions!.byteLength,
-            usage: GPUBufferUsage.VERTEX,
-            mappedAtCreation: true,
-        });
-        new Float32Array(this.instanceBuffer.getMappedRange()).set(this.instancePositions!);
-        this.instanceBuffer.unmap();
-    }
-
-    async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology, is_instance : boolean) {
+    async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology) {
         const vert_module = await fetchModule(vert_name);
         const frag_module = await fetchModule(frag_name);
     
-        const instance_var_names : string[] = is_instance ? ["pos"] : [];
-        const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(instance_var_names);
+        const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(this.isInstance ? this.instance!.varNames : []);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
@@ -258,28 +301,6 @@ export class Mesh extends Pipeline {
             },
         };
     
-        this.isInstance = is_instance;
-    
-        if(is_instance){
-    
-            this.instancePositions = new Float32Array([
-                // x, y
-                -5, -5,
-                -5, 0,
-                -5, 5,
-                0, -5,
-                0, 0,
-                0, 5,
-                5, -5,
-                5, 0,
-                5, 5
-            ]);
-    
-            for(let i = 0; i < this.instancePositions.length; i++){
-                this.instancePositions[i] += 4 * Math.random() - 2;
-            }
-        }
-    
         this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
     }
 
@@ -297,8 +318,8 @@ export class Mesh extends Pipeline {
         passEncoder.setVertexBuffer(0, this.verticesBuffer);
         if(this.isInstance){
 
-            passEncoder.setVertexBuffer(1, this.instanceBuffer!);
-            passEncoder.draw(this.cubeVertexCount, Math.floor(this.instancePositions!.length / 2));
+            passEncoder.setVertexBuffer(1, this.instance!.buffer);
+            passEncoder.draw(this.cubeVertexCount, this.instance?.instanceCount);
         }
         else{
 
@@ -308,8 +329,8 @@ export class Mesh extends Pipeline {
 }
 
 export class Tube extends Mesh {
-    constructor(){
-        super();
+    constructor(inst : Instance | null){
+        super(inst);
         const num_division = 16;
         
         this.cube_vertex_count = (num_division + 1) * 2;
@@ -335,8 +356,8 @@ export class Tube extends Mesh {
 }
 
 export class Cube extends Mesh {
-    constructor(){
-        super();
+    constructor(inst : Instance | null){
+        super(inst);
 
         // position: vec3<f32>, norm: vec3<f32>
         // prettier-ignore
@@ -390,8 +411,8 @@ export class Cube extends Mesh {
 }
 
 export class Cone extends Mesh {
-    constructor(){
-        super();
+    constructor(inst : Instance | null){
+        super(inst);
 
         const num_division = 16;
 
@@ -457,8 +478,8 @@ export class Cone extends Mesh {
 }
 
 export class GeodesicPolyhedron extends Mesh {
-    constructor(){
-        super();
+    constructor(inst : Instance | null){
+        super(inst);
 
         this.topology = 'triangle-list';
 

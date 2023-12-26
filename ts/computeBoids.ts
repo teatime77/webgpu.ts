@@ -145,7 +145,7 @@ export async function asyncBodyOnLoadBoi() {
         });
     }
 
-    const mesh = new Mesh();
+    const mesh = new Mesh(null);
     mesh.pipeline = renderPipeline;
     mesh.makeUniformBufferAndBindGroup();
 
@@ -156,22 +156,10 @@ export async function asyncBodyOnLoadBoi() {
     function frame() {
 
         const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
-        g_device.queue.writeBuffer(
-            mesh.uniformBuffer,
-            0,
-            pvw.buffer,
-            pvw.byteOffset,
-            pvw.byteLength
-        );
 
-        console.assert(pvw.byteLength == 4 * (4 * 4));
-        g_device.queue.writeBuffer(
-            mesh.uniformBuffer,
-            pvw.byteLength,
-            lightDir.buffer,
-            lightDir.byteOffset,
-            lightDir.byteLength
-        );
+        let offset = 0;
+        offset = mesh.writeUniformBuffer(pvw, offset);
+        offset = mesh.writeUniformBuffer(lightDir, offset);
 
         renderPassDescriptor.colorAttachments[0].view = context
             .getCurrentTexture()

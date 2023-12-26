@@ -12,7 +12,7 @@ class Run {
     async init(meshes: Mesh[]){
         this.meshes = meshes.splice(0);
 
-        const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
+        const is_instance = this.meshes.some(x => x.isInstance);
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
     
@@ -31,14 +31,14 @@ class Run {
 
         for(let mesh of this.meshes){
             // create a render pipeline
-            await mesh.makePipeline(vert_name, 'depth-frag', mesh.topology, is_instance);
+            await mesh.makePipeline(vert_name, 'depth-frag', mesh.topology);
 
             mesh.makeUniformBufferAndBindGroup();
 
             mesh.makeVertexBuffer(mesh.cube_vertex_count, mesh.cubeVertexArray);
 
             if(mesh.isInstance){
-                mesh.makeInstanceBuffer();
+                mesh.instance!.makeInstanceBuffer();
             }
         }
 
@@ -50,7 +50,7 @@ class Run {
 
     }
 
-    frame(): void {
+    async frame() {
         if(!validFrame){
             return;
         }
@@ -88,6 +88,11 @@ class Run {
         glMatrix.vec3.normalize( lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
 
         for(const mesh of this.meshes){
+            if(mesh.isInstance){
+                await mesh.instance!.update();
+            }
+
+
             let offset = 0;
 
             offset = mesh.writeUniformBuffer(pvw, offset);
@@ -121,24 +126,35 @@ export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
     requestAnimationFrame(run.frame.bind(run));
 }
 
+function inst() : Instance | null {
+    const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
+
+    if(is_instance){
+        return new Instance();
+    }
+    else{
+        return null;
+    }
+}
+
 export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([ new Cone(), new Cube(), new Tube(), new GeodesicPolyhedron() ]);
+    asyncBodyOnLoadIns([ new Cone(inst()), new Cube(inst()), new Tube(inst()), new GeodesicPolyhedron(inst()) ]);
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([new Cone()]);
+    asyncBodyOnLoadIns([new Cone(inst())]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([new Cube()]);
+    asyncBodyOnLoadIns([new Cube(inst())]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([new GeodesicPolyhedron()]);
+    asyncBodyOnLoadIns([new GeodesicPolyhedron(inst())]);
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns([new Tube()]);
+    asyncBodyOnLoadIns([new Tube(inst())]);
 }
 
 
