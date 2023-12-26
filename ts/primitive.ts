@@ -153,17 +153,6 @@ class Triangle {
     }
 }
 
-export abstract class Pipeline {
-    uniformBuffer!: GPUBuffer;
-
-    makeUniformBuffer(uniform_buffer_size : number){
-        this.uniformBuffer = g_device.createBuffer({
-            size: uniform_buffer_size,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });    
-    }
-}
-
 export class Instance {
     varNames : string[];
     array : Float32Array;
@@ -212,7 +201,9 @@ export class Instance {
     }
 }
 
-export class Mesh extends Pipeline {
+export class RenderPipeline {
+    renderUniformBuffer!: GPUBuffer;
+
     cube_vertex_count!: number;
     cubeVertexArray!: Float32Array;
     topology!: GPUPrimitiveTopology;
@@ -231,8 +222,14 @@ export class Mesh extends Pipeline {
     }
 
     constructor(inst : Instance | null){
-        super();
         this.instance = inst;
+    }
+
+    makeUniformBuffer(uniform_buffer_size : number){
+        this.renderUniformBuffer = g_device.createBuffer({
+            size: uniform_buffer_size,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });    
     }
 
     makeUniformBufferAndBindGroup(){
@@ -248,7 +245,7 @@ export class Mesh extends Pipeline {
                 {
                     binding: 0,
                     resource: {
-                        buffer: this.uniformBuffer,
+                        buffer: this.renderUniformBuffer,
                     },
                 },
             ],
@@ -306,7 +303,7 @@ export class Mesh extends Pipeline {
 
     writeUniformBuffer(pvw : any, offset : number){
         g_device.queue.writeBuffer(
-            this.uniformBuffer, offset, pvw.buffer
+            this.renderUniformBuffer, offset, pvw.buffer
         );
 
         return offset + pvw.byteLength;
@@ -328,7 +325,7 @@ export class Mesh extends Pipeline {
     }
 }
 
-export class Tube extends Mesh {
+export class Tube extends RenderPipeline {
     constructor(inst : Instance | null){
         super(inst);
         const num_division = 16;
@@ -355,7 +352,7 @@ export class Tube extends Mesh {
     }
 }
 
-export class Cube extends Mesh {
+export class Cube extends RenderPipeline {
     constructor(inst : Instance | null){
         super(inst);
 
@@ -410,7 +407,7 @@ export class Cube extends Mesh {
     }
 }
 
-export class Cone extends Mesh {
+export class Cone extends RenderPipeline {
     constructor(inst : Instance | null){
         super(inst);
 
@@ -477,7 +474,7 @@ export class Cone extends Mesh {
     }
 }
 
-export class GeodesicPolyhedron extends Mesh {
+export class GeodesicPolyhedron extends RenderPipeline {
     constructor(inst : Instance | null){
         super(inst);
 

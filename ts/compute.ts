@@ -35,7 +35,7 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const comp = new Compute();
+    const comp = new ComputePipeline();
 
     await comp.makePipeline("compute");
 
@@ -107,8 +107,9 @@ export async function asyncBodyOnLoadCom() {
     console.log(new Float32Array(data));  // [2, 4, 6, 8]
 }
 
-export class Compute extends Pipeline {
+export class ComputePipeline {
     pipeline! : GPUComputePipeline;
+    computeUniformBuffer! : GPUBuffer;
     updateBuffers: GPUBuffer[] = new Array(2);
     bindGroups: GPUBindGroup[] = new Array(2)
 
@@ -124,7 +125,14 @@ export class Compute extends Pipeline {
         });
     }
 
-    makeUpdateBuffers(initial_update_Data : Float32Array){
+    makeUpdateBuffers(simParamData : Float32Array, initial_update_Data : Float32Array){
+        this.computeUniformBuffer = g_device.createBuffer({
+            size: simParamData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+    
+        g_device.queue.writeBuffer(this.computeUniformBuffer, 0, simParamData);
+    
         for (let i = 0; i < 2; ++i) {
             this.updateBuffers[i] = g_device.createBuffer({
                 size: initial_update_Data.byteLength,
@@ -135,7 +143,41 @@ export class Compute extends Pipeline {
                 initial_update_Data
             );
             this.updateBuffers[i].unmap();
-        }    
+        }
+
+        for (let i = 0; i < 2; ++i) {
+            this.bindGroups[i] = g_device.createBindGroup({
+                layout: this.pipeline.getBindGroupLayout(0),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: this.computeUniformBuffer,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: {
+                            buffer: this.updateBuffers[i],
+                            offset: 0,
+                            size: initial_update_Data.byteLength,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        resource: {
+                            buffer: this.updateBuffers[(i + 1) % 2],
+                            offset: 0,
+                            size: initial_update_Data.byteLength,
+                        },
+                    },
+                ],
+            });
+        }
+    
+
+
+
     }
 }
 

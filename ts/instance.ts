@@ -6,10 +6,11 @@ let validFrame : boolean = false;
 
 class Run {
     context!: GPUCanvasContext;
-    meshes: Mesh[] = [];
+    meshes: RenderPipeline[] = [];
     depthTexture!: GPUTexture;
+    useCompute : boolean = false;
 
-    async init(meshes: Mesh[]){
+    async init(meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
         const is_instance = this.meshes.some(x => x.isInstance);
@@ -19,6 +20,8 @@ class Run {
         let vert_name : string;
         if(is_instance){
             vert_name = "instance-vert";
+
+            this.useCompute = true;
         }
         else{
             vert_name = "shape-vert";
@@ -118,7 +121,7 @@ class Run {
     }
 }
 
-export async function asyncBodyOnLoadIns(meshes: Mesh[]) {
+export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
     validFrame = false;
     const run = new Run();
     await run.init(meshes);

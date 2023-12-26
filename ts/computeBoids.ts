@@ -34,7 +34,7 @@ export async function asyncBodyOnLoadBoi() {
         },
     });
 
-    const comp = new Compute();
+    const comp = new ComputePipeline();
 
     await comp.makePipeline("updateSprites");
 
@@ -78,23 +78,7 @@ export async function asyncBodyOnLoadBoi() {
         simParams.rule2Scale,
         simParams.rule3Scale,
     ]);
-    
-
-    const simParamBufferSize = 7 * Float32Array.BYTES_PER_ELEMENT;
-    console.assert(simParamData.byteLength == simParamBufferSize);
-    
-    const simParamBuffer = g_device.createBuffer({
-        size: simParamBufferSize,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    g_device.queue.writeBuffer(
-        simParamBuffer,
-        0,
-        simParamData
-    );
-    console.log("write sim param");
-
+        
     const numParticles = 320;
     const initial_update_Data = new Float32Array(numParticles * particleDim);
     let base = 0;
@@ -113,39 +97,9 @@ export async function asyncBodyOnLoadBoi() {
         base += particleDim;
     }
 
-    comp.makeUpdateBuffers(initial_update_Data);
+    comp.makeUpdateBuffers(simParamData, initial_update_Data);
 
-    for (let i = 0; i < 2; ++i) {
-        comp.bindGroups[i] = g_device.createBindGroup({
-            layout: comp.pipeline.getBindGroupLayout(0),
-            entries: [
-                {
-                    binding: 0,
-                    resource: {
-                        buffer: simParamBuffer,
-                    },
-                },
-                {
-                    binding: 1,
-                    resource: {
-                        buffer: comp.updateBuffers[i],
-                        offset: 0,
-                        size: initial_update_Data.byteLength,
-                    },
-                },
-                {
-                    binding: 2,
-                    resource: {
-                        buffer: comp.updateBuffers[(i + 1) % 2],
-                        offset: 0,
-                        size: initial_update_Data.byteLength,
-                    },
-                },
-            ],
-        });
-    }
-
-    const mesh = new Mesh(null);
+    const mesh = new RenderPipeline(null);
     mesh.pipeline = renderPipeline;
     mesh.makeUniformBufferAndBindGroup();
 
