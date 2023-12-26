@@ -19,12 +19,13 @@ struct VertexOutput {
 fn main(
     @location(0) position: vec3<f32>,
     @location(1) norm: vec3<f32>,
-    @location(2) pos: vec2<f32>
+    @location(2) a_particlePos : vec4<f32>,
+    @location(3) a_particleVel : vec4<f32>
 ) -> VertexOutput {
 
     var output : VertexOutput;
 
-    output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(pos.x, pos.y, 0, 1));
+    output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(a_particlePos.xyz, 1));
 
     var transformedNormal = uniforms.normMatrix * norm;
     var directionalLightWeighting = max(dot(transformedNormal, uniforms.lightingDirection), 0.0);

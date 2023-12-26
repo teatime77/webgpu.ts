@@ -1,11 +1,5 @@
 namespace webgputs {
 
-export const mat3x3_size = 3 * 3 * 4;
-export const mat4x4_size = 4 * 4 * 4;
-export const vec3_size   = 3 * 4;
-export const vec4_size   = 4 * 4;
-const minimum_binding_size = 160;
-
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
 }
@@ -160,25 +154,10 @@ export class Instance {
     buffer!: GPUBuffer;
 
     constructor(){
-        this.varNames = ["pos"];
-        this.array = new Float32Array([
-            // x, y
-            -5, -5,
-            -5, 0,
-            -5, 5,
-            0, -5,
-            0, 0,
-            0, 5,
-            5, -5,
-            5, 0,
-            5, 5
-        ]);
+        this.varNames = [ "a_particlePos", "a_particleVel" ];
+        this.array = makeInitialInstanceArray();
 
-        for(let i = 0; i < this.array.length; i++){
-            this.array[i] += 4 * Math.random() - 2;
-        }
-
-        this.instanceCount = Math.floor(this.array.length / 2);
+        this.instanceCount = this.array.length / particleDim;   // Math.floor(this.array.length / 2);
     }
 
     makeInstanceBuffer(){
@@ -254,9 +233,7 @@ export class RenderPipeline {
     makeUniformBufferAndBindGroup(){
         // @uniform
         const uniform_size  = uniformSize(this.vertModule);
-        const uniform_size2 = mat4x4_size + mat3x3_size + 2 * vec4_size + vec3_size;
-        console.assert(uniform_size == uniform_size2);
-        const uniform_buffer_size = Math.max(minimum_binding_size, uniform_size);
+        const uniform_buffer_size = Math.ceil(uniform_size / 32) * 32;
 
         this.makeUniformBuffer(uniform_buffer_size);
 

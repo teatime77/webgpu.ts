@@ -10,7 +10,6 @@ export async function updateVertexUniformBuffer(meshes : RenderPipeline[]){
 
     let normalMatrix = glMatrix.mat3.create();
     glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
-    console.assert(normalMatrix.byteLength == mat3x3_size);
 
     const ambientColor      = getColor("ambient");
     const directionalColor  = getColor("directional");
