@@ -4,6 +4,39 @@ namespace webgputs {
 
 let validFrame : boolean = false;
 
+export async function updateVertexUniformBuffer(meshes : RenderPipeline[]){
+    // @uniform
+    const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
+
+    let normalMatrix = glMatrix.mat3.create();
+    glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
+    console.assert(normalMatrix.byteLength == mat3x3_size);
+
+    const ambientColor      = getColor("ambient");
+    const directionalColor  = getColor("directional");
+    const lightingDirection = glMatrix.vec3.create();
+    glMatrix.vec3.normalize( lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
+
+    for(const mesh of meshes){
+        if(mesh.isInstance){
+            await mesh.instance!.update();
+        }
+
+        let offset = 0;
+
+        offset = mesh.writeUniformBuffer(pvw, offset);
+        offset = mesh.writeUniformBuffer(normalMatrix, offset);
+
+        // vec4 align is 16
+        // https://www.w3.org/TR/WGSL/#alignment-and-size
+        offset += 12;
+
+        offset = mesh.writeUniformBuffer(ambientColor     , offset);
+        offset = mesh.writeUniformBuffer(directionalColor , offset);
+        offset = mesh.writeUniformBuffer(lightingDirection, offset);
+    }
+}
+
 class Run {
     context!: GPUCanvasContext;
     meshes: RenderPipeline[] = [];
@@ -50,7 +83,6 @@ class Run {
             format: 'depth24plus',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         });
-
     }
 
     async frame() {
@@ -78,37 +110,7 @@ class Run {
             },
         };
 
-        // @uniform
-        const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
-
-        let normalMatrix = glMatrix.mat3.create();
-        glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
-        console.assert(normalMatrix.byteLength == mat3x3_size);
-
-        const ambientColor      = getColor("ambient");
-        const directionalColor  = getColor("directional");
-        const lightingDirection = glMatrix.vec3.create();
-        glMatrix.vec3.normalize( lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
-
-        for(const mesh of this.meshes){
-            if(mesh.isInstance){
-                await mesh.instance!.update();
-            }
-
-
-            let offset = 0;
-
-            offset = mesh.writeUniformBuffer(pvw, offset);
-            offset = mesh.writeUniformBuffer(normalMatrix, offset);
-
-            // vec4 align is 16
-            // https://www.w3.org/TR/WGSL/#alignment-and-size
-            offset += 12;
-
-            offset = mesh.writeUniformBuffer(ambientColor     , offset);
-            offset = mesh.writeUniformBuffer(directionalColor , offset);
-            offset = mesh.writeUniformBuffer(lightingDirection, offset);
-        }
+        await updateVertexUniformBuffer(this.meshes);
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 

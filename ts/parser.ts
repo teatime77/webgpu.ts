@@ -343,7 +343,8 @@ class Modifier {
     location : number | undefined;
     workgroup_size : number[] | undefined;
     builtin : string | undefined;
-    fnType : string | undefined; 
+    fnType : string | undefined;
+    uniform : boolean = false;
 
     str() : string {
         let s = "";
@@ -403,6 +404,15 @@ class Type {
         this.mod = mod;
         this.aggregate = aggregate;
         this.primitive = primitive;
+    }
+
+    name() : string {
+        if(this.aggregate != undefined){
+            return `${this.aggregate}<${this.primitive}>`;
+        }
+        else{
+            return this.primitive;
+        }
     }
 
     str() : string {
@@ -475,6 +485,10 @@ class Struct {
             msg(`    ${va.str()};`);
         }
         msg("}")
+    }
+
+    size() : number {
+        return sum( this.members.map(x => x.type.size()) );
     }
 }
 
@@ -688,6 +702,9 @@ export class Parser {
             this.readText("<");
             while(true){
                 const buf_attr = this.readReserved();
+                if(buf_attr == "uniform"){
+                    mod.uniform = true;
+                }
 
                 if(this.currentText() == ","){
                     this.readText(",");

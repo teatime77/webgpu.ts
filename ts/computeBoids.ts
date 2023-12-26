@@ -101,19 +101,12 @@ export async function asyncBodyOnLoadBoi() {
 
     const mesh = new RenderPipeline(null);
     mesh.pipeline = renderPipeline;
+    mesh.vertModule = render_module;
     mesh.makeUniformBufferAndBindGroup();
 
-
-    const lightDir = makeLightDir();
-
     let t = 0;
-    function frame() {
-
-        const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
-
-        let offset = 0;
-        offset = mesh.writeUniformBuffer(pvw, offset);
-        offset = mesh.writeUniformBuffer(lightDir, offset);
+    async function frame() {
+        await updateVertexUniformBuffer([mesh]);
 
         renderPassDescriptor.colorAttachments[0].view = context
             .getCurrentTexture()

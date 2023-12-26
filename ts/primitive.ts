@@ -201,7 +201,26 @@ export class Instance {
     }
 }
 
+function uniformSize(module : Module) : number {
+    const uniform_var = module.vars.find(x => x.mod.uniform);
+    if(uniform_var == undefined){
+        throw new Error("no uniform var");
+    }
+    else{
+        const struct_name = uniform_var.type.name();
+        const uniform_struct = module.structs.find(x => x.name == struct_name);
+        if(uniform_struct == undefined){
+            throw new Error("no uniform type");
+        }
+
+        return uniform_struct.size();
+    }
+}
+
 export class RenderPipeline {
+    vertModule! : Module;
+    fragModule! : Module;
+
     renderUniformBuffer!: GPUBuffer;
 
     cube_vertex_count!: number;
@@ -234,7 +253,9 @@ export class RenderPipeline {
 
     makeUniformBufferAndBindGroup(){
         // @uniform
-        const uniform_size = mat4x4_size + mat3x3_size + 2 * vec4_size + vec3_size;
+        const uniform_size  = uniformSize(this.vertModule);
+        const uniform_size2 = mat4x4_size + mat3x3_size + 2 * vec4_size + vec3_size;
+        console.assert(uniform_size == uniform_size2);
         const uniform_buffer_size = Math.max(minimum_binding_size, uniform_size);
 
         this.makeUniformBuffer(uniform_buffer_size);
@@ -266,20 +287,20 @@ export class RenderPipeline {
     }
 
     async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology) {
-        const vert_module = await fetchModule(vert_name);
-        const frag_module = await fetchModule(frag_name);
+        this.vertModule = await fetchModule(vert_name);
+        this.fragModule = await fetchModule(frag_name);
     
-        const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(this.isInstance ? this.instance!.varNames : []);
+        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.isInstance ? this.instance!.varNames : []);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
             vertex: {
-                module: vert_module.module,
+                module: this.vertModule.module,
                 entryPoint: 'main',
                 buffers: vertex_buffer_layouts,
             },
             fragment: {
-                module: frag_module.module,
+                module: this.fragModule.module,
                 entryPoint: 'main',
                 targets: [
                     // 0
