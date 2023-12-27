@@ -214,6 +214,7 @@ export class RenderPipeline {
     uniformBindGroup!: GPUBindGroup;
 
     instance : Instance | null;
+    compute  : ComputePipeline | undefined;
     
     get isInstance() : boolean {
         return this.instance != null;
@@ -307,11 +308,16 @@ export class RenderPipeline {
         return offset + pvw.byteLength;
     }
     
-    render(passEncoder : GPURenderPassEncoder){
+    render(tick : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.uniformBindGroup);
         passEncoder.setVertexBuffer(0, this.verticesBuffer);
-        if(this.isInstance){
+        if(this.compute != undefined){
+
+            passEncoder.setVertexBuffer(1, this.compute.updateBuffers[(tick + 1) % 2]);
+            passEncoder.draw(this.cubeVertexCount, this.compute.instanceCount);
+        }
+        else if(this.isInstance){
 
             passEncoder.setVertexBuffer(1, this.instance!.buffer);
             passEncoder.draw(this.cubeVertexCount, this.instance?.instanceCount);

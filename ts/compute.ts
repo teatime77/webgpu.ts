@@ -1,5 +1,28 @@
 namespace webgputs {
 
+export function makeComputeUniformArray() : Float32Array {
+    const compute_uniform_object = {
+        deltaT: 0.04,
+        rule1Distance: 0.1,
+        rule2Distance: 0.025,
+        rule3Distance: 0.025,
+        rule1Scale: 0.02,
+        rule2Scale: 0.05,
+        rule3Scale: 0.005,
+    };
+
+    const compute_uniform_array = new Float32Array([
+        compute_uniform_object.deltaT,
+        compute_uniform_object.rule1Distance,
+        compute_uniform_object.rule2Distance,
+        compute_uniform_object.rule3Distance,
+        compute_uniform_object.rule1Scale,
+        compute_uniform_object.rule2Scale,
+        compute_uniform_object.rule3Scale,
+    ]);
+
+    return compute_uniform_array;
+}
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');
@@ -111,6 +134,7 @@ export class ComputePipeline {
     pipeline! : GPUComputePipeline;
     computeUniformBuffer! : GPUBuffer;
     updateBuffers: GPUBuffer[] = new Array(2);
+    instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2)
 
     async makePipeline(shader_name: string){
@@ -125,13 +149,16 @@ export class ComputePipeline {
         });
     }
 
-    makeUpdateBuffers(simParamData : Float32Array, initial_update_Data : Float32Array){
+    makeUniformBuffer(compute_uniform_array : Float32Array){
         this.computeUniformBuffer = g_device.createBuffer({
-            size: simParamData.byteLength,
+            size: compute_uniform_array.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
     
-        g_device.queue.writeBuffer(this.computeUniformBuffer, 0, simParamData);
+        g_device.queue.writeBuffer(this.computeUniformBuffer, 0, compute_uniform_array);
+    }
+
+    makeUpdateBuffers(initial_update_Data : Float32Array){
     
         for (let i = 0; i < 2; ++i) {
             this.updateBuffers[i] = g_device.createBuffer({

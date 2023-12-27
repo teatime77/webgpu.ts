@@ -41,6 +41,8 @@ class Run {
     meshes: RenderPipeline[] = [];
     depthTexture!: GPUTexture;
     useCompute : boolean = false;
+    comp : ComputePipeline | undefined;
+    tick : number = 0;
 
     async init(meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
@@ -54,6 +56,17 @@ class Run {
             vert_name = "instance-vert";
 
             this.useCompute = true;
+
+            this.comp = new ComputePipeline();
+            await this.comp.makePipeline("updateSprites");
+            const compute_uniform_array = makeComputeUniformArray();
+            this.comp.makeUniformBuffer(compute_uniform_array);
+        
+            const initial_instance_array = makeInitialInstanceArray();
+            this.comp.instanceCount = initial_instance_array.length / particleDim;
+            this.comp.makeUpdateBuffers(initial_instance_array);
+        
+            this.meshes.forEach(x => x.compute = this.comp);
         }
         else{
             vert_name = "shape-vert";
@@ -90,6 +103,7 @@ class Run {
         }
 
         const commandEncoder = g_device.createCommandEncoder();
+
         const textureView = this.context.getCurrentTexture().createView();
 
         const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -111,13 +125,25 @@ class Run {
 
         await updateVertexUniformBuffer(this.meshes);
 
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+        if(this.useCompute){
 
-        this.meshes.forEach(mesh => mesh.render(passEncoder));
+            const passEncoder = commandEncoder.beginComputePass();
+            passEncoder.setPipeline(this.comp!.pipeline);
+            passEncoder.setBindGroup(0, this.comp!.bindGroups[this.tick % 2]);
+            passEncoder.dispatchWorkgroups(this.comp!.instanceCount!);
+            passEncoder.end();
+        }
+        {
+            const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-        passEncoder.end();
+            this.meshes.forEach(mesh => mesh.render(this.tick, passEncoder));
+
+            passEncoder.end();
+        }
 
         g_device.queue.submit([commandEncoder.finish()]);
+        ++this.tick;
+
         requestAnimationFrame(this.frame.bind(this));
     }
 }

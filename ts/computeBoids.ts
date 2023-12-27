@@ -56,10 +56,6 @@ export async function asyncBodyOnLoadBoi() {
         },
     });
 
-    const comp = new ComputePipeline();
-
-    await comp.makePipeline("updateSprites");
-
     const renderPassDescriptor = {
         colorAttachments: [
             {
@@ -80,38 +76,27 @@ export async function asyncBodyOnLoadBoi() {
     });
     new Float32Array(spriteVertexBuffer.getMappedRange()).set(vertexBufferData);
     spriteVertexBuffer.unmap();
-
-    const simParams = {
-        deltaT: 0.04,
-        rule1Distance: 0.1,
-        rule2Distance: 0.025,
-        rule3Distance: 0.025,
-        rule1Scale: 0.02,
-        rule2Scale: 0.05,
-        rule3Scale: 0.005,
-    };
-
-    const simParamData = new Float32Array([
-        simParams.deltaT,
-        simParams.rule1Distance,
-        simParams.rule2Distance,
-        simParams.rule3Distance,
-        simParams.rule1Scale,
-        simParams.rule2Scale,
-        simParams.rule3Scale,
-    ]);
         
-    const initial_instance_array = makeInitialInstanceArray();
-    const numParticles = initial_instance_array.length / particleDim;
-
-    comp.makeUpdateBuffers(simParamData, initial_instance_array);
 
     const mesh = new RenderPipeline(null);
     mesh.pipeline = renderPipeline;
     mesh.vertModule = render_module;
     mesh.makeUniformBufferAndBindGroup();
 
-    let t = 0;
+    //-------------------------------------------------- Compute Pipeline
+    const comp = new ComputePipeline();
+    await comp.makePipeline("updateSprites");
+    const compute_uniform_array = makeComputeUniformArray();
+    comp.makeUniformBuffer(compute_uniform_array);
+
+    const initial_instance_array = makeInitialInstanceArray();
+    comp.instanceCount = initial_instance_array.length / particleDim;
+    comp.makeUpdateBuffers(initial_instance_array);
+
+
+    let tick = 0;
+
+    //-------------------------------------------------- frame
     async function frame() {
         await updateVertexUniformBuffer([mesh]);
 
@@ -123,25 +108,25 @@ export async function asyncBodyOnLoadBoi() {
         {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(comp.pipeline);
-            passEncoder.setBindGroup(0, comp.bindGroups[t % 2]);
-            passEncoder.dispatchWorkgroups(numParticles);
+            passEncoder.setBindGroup(0, comp.bindGroups[tick % 2]);
+            passEncoder.dispatchWorkgroups(comp.instanceCount);
             passEncoder.end();
         }
         {
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
             passEncoder.setPipeline(renderPipeline);
 
-            passEncoder.setVertexBuffer(0, comp.updateBuffers[(t + 1) % 2]);
+            passEncoder.setVertexBuffer(0, comp.updateBuffers[(tick + 1) % 2]);
             passEncoder.setVertexBuffer(1, spriteVertexBuffer);
 
             passEncoder.setBindGroup(0, mesh.uniformBindGroup);
 
-            passEncoder.draw(vertexBufferData.length / (3 + 3), numParticles, 0, 0);
+            passEncoder.draw(vertexBufferData.length / (3 + 3), comp.instanceCount, 0, 0);
             passEncoder.end();
         }
         g_device.queue.submit([commandEncoder.finish()]);
 
-        ++t;
+        ++tick;
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
