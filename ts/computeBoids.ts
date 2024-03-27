@@ -31,20 +31,21 @@ export async function asyncBodyOnLoadBoi() {
 
     const context = initContext(canvas, 'premultiplied');
     
-    const render_module = await fetchModule("sprite");
+    const vert_module = await fetchModule("sprite");
+    const frag_module = await fetchModule("depth-frag");
 
-    const vertex_buffer_layouts = render_module.makeVertexBufferLayouts(["a_particlePos", "a_particleVel"]);
+    const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(["a_particlePos", "a_particleVel"]);
 
     const renderPipeline = g_device.createRenderPipeline({
         layout: 'auto',
         vertex: {
-            module: render_module.module,
+            module: vert_module.module,
             entryPoint: 'vert_main',
             buffers: vertex_buffer_layouts
         },
         fragment: {
-            module: render_module.module,
-            entryPoint: 'frag_main',
+            module: frag_module.module,
+            entryPoint: 'main',
             targets: [
                 {
                     format: g_presentationFormat,
@@ -80,19 +81,15 @@ export async function asyncBodyOnLoadBoi() {
 
     const mesh = new RenderPipeline();
     mesh.pipeline = renderPipeline;
-    mesh.vertModule = render_module;
+    mesh.vertModule = vert_module;
     mesh.makeUniformBufferAndBindGroup();
 
     //-------------------------------------------------- Compute Pipeline
+    const inst = makeInstance()!;
+    const info = new ComputeInfo("updateSprites", makeComputeUniformArray());
+
     const comp = new ComputePipeline();
-    await comp.makePipeline("updateSprites");
-    const compute_uniform_array = makeComputeUniformArray();
-    comp.makeUniformBuffer(compute_uniform_array);
-
-    const initial_instance_array = makeInitialInstanceArray();
-    comp.instanceCount = initial_instance_array.length / particleDim;
-    comp.makeUpdateBuffers(initial_instance_array);
-
+    await comp.initCompute(inst, info);
 
     let tick = 0;
 
@@ -114,12 +111,13 @@ export async function asyncBodyOnLoadBoi() {
         }
         {
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-            passEncoder.setPipeline(renderPipeline);
 
-            passEncoder.setVertexBuffer(0, comp.updateBuffers[(tick + 1) % 2]);
-            passEncoder.setVertexBuffer(1, spriteVertexBuffer);
-
+            passEncoder.setPipeline(mesh.pipeline);
             passEncoder.setBindGroup(0, mesh.uniformBindGroup);
+            passEncoder.setVertexBuffer(mesh.vertModule.instanceSlot, comp.updateBuffers[(tick + 1) % 2]);
+
+            passEncoder.setVertexBuffer(mesh.vertModule.vertexSlot, spriteVertexBuffer);
+
 
             passEncoder.draw(vertexBufferData.length / (3 + 3), comp.instanceCount, 0, 0);
             passEncoder.end();

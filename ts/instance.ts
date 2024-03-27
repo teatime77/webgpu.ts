@@ -42,7 +42,7 @@ class Run {
     comp : ComputePipeline | undefined;
     tick : number = 0;
 
-    async init(info : ComputeInfo, meshes: RenderPipeline[]){
+    async init(inst : Instance | null, info : ComputeInfo, meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
         const is_instance = this.meshes.some(x => x.isInstance);
@@ -56,13 +56,7 @@ class Run {
             this.useCompute = true;
 
             this.comp = new ComputePipeline();
-            await this.comp.makePipeline(info.shaderName);
-            const compute_uniform_array = info.uniformArray;
-            this.comp.makeUniformBuffer(compute_uniform_array);
-        
-            const initial_instance_array = info.initialInstanceArray;
-            this.comp.instanceCount = initial_instance_array.length / particleDim;
-            this.comp.makeUpdateBuffers(initial_instance_array);
+            await this.comp.initCompute(inst!, info);
         
             this.meshes.forEach(x => x.compute = this.comp);
         }
@@ -146,16 +140,13 @@ class Run {
     }
 }
 
-class ComputeInfo {
+export class ComputeInfo {
     shaderName : string;
     uniformArray : Float32Array;
-    initialInstanceArray : Float32Array;
 
-    constructor(shader_name : string, uniform_array : Float32Array, initial_instance_array : Float32Array){
+    constructor(shader_name : string, uniform_array : Float32Array){
         this.shaderName = shader_name;
         this.uniformArray = uniform_array;
-        this.initialInstanceArray = initial_instance_array;
-
     }
 }
 
@@ -173,15 +164,15 @@ export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
 
     stopAnimation();
 
-    const info = new ComputeInfo("updateSprites", makeComputeUniformArray(), makeInitialInstanceArray());
+    const info = new ComputeInfo("updateSprites", makeComputeUniformArray());
     validFrame = false;
     const run = new Run();
-    await run.init(info, meshes);
+    await run.init(inst, info, meshes);
     validFrame = true;
     requestId = requestAnimationFrame(run.frame.bind(run));
 }
 
-function makeInstance() : Instance | null {
+export function makeInstance() : Instance | null {
     const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
 
     if(is_instance){

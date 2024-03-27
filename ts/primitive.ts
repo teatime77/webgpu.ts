@@ -302,16 +302,11 @@ export class RenderPipeline {
     render(tick : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.uniformBindGroup);
-        passEncoder.setVertexBuffer(0, this.verticesBuffer);
+        passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.verticesBuffer);
         if(this.compute != undefined){
 
-            passEncoder.setVertexBuffer(1, this.compute.updateBuffers[(tick + 1) % 2]);
+            passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
             passEncoder.draw(this.cubeVertexCount, this.compute.instanceCount);
-        }
-        else if(this.isInstance){
-
-            passEncoder.setVertexBuffer(1, this.instance!.buffer);
-            passEncoder.draw(this.cubeVertexCount, this.instance?.instanceCount);
         }
         else{
 

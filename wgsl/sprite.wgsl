@@ -12,7 +12,7 @@ struct Uniforms {
 
 struct VertexOutput {
   @builtin(position) position : vec4<f32>,
-  @location(3) color : vec4<f32>,
+  @location(0) color : vec4<f32>,
 }
 
 @vertex
@@ -35,7 +35,3 @@ fn vert_main(
   return output;
 }
 
-@fragment
-fn frag_main(@location(3) color : vec4<f32>) -> @location(0) vec4<f32> {
-  return color;
-}

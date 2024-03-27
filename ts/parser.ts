@@ -156,6 +156,8 @@ export class Module {
     vars : Variable[] = [];
     fns : Function[] = [];
     instances : number[] = [];
+    vertexSlot : number = -1;
+    instanceSlot : number = -1;
 
     constructor(text : string){
         this.module = g_device.createShaderModule({ code: text });
@@ -189,6 +191,7 @@ export class Module {
         };
     
         if(instance_var_names.length == 0){
+            this.vertexSlot = 0;
             return [ vertex_step_layout ];
         }
         else{
@@ -200,16 +203,17 @@ export class Module {
             };
 
             if(vertex_vars[0].mod.location == 0){
+                this.vertexSlot = 0;
+                this.instanceSlot = 1;
                 return [ vertex_step_layout, instance_step_layout ];
             }
             else{
+                this.instanceSlot = 0;
+                this.vertexSlot = 1;
                 return [ instance_step_layout, vertex_step_layout ];
             }
         }
     }
-
-
-
 }
 
 export function lexicalAnalysis(text : string) : Token[] {

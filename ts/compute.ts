@@ -137,6 +137,13 @@ export class ComputePipeline {
     instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2)
 
+    async initCompute(inst : Instance, info : ComputeInfo){
+        await this.makePipeline(info.shaderName);
+        this.makeUniformBuffer(info.uniformArray);
+        this.instanceCount = inst!.array.length / particleDim;
+        this.makeUpdateBuffers(inst!.array);
+    }
+
     async makePipeline(shader_name: string){
         const shader_module = await fetchModule(shader_name);
 
