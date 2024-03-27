@@ -140,8 +140,8 @@ export class ComputePipeline {
     async initCompute(inst : Instance, info : ComputeInfo){
         await this.makePipeline(info.shaderName);
         this.makeUniformBuffer(info.uniformArray);
-        this.instanceCount = inst!.array.length / particleDim;
-        this.makeUpdateBuffers(inst!.array);
+        this.instanceCount = inst!.instanceArray.length / particleDim;
+        this.makeUpdateBuffers(inst!.instanceArray);
     }
 
     async makePipeline(shader_name: string){

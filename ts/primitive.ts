@@ -149,21 +149,21 @@ class Triangle {
 
 export class Instance {
     varNames : string[];
-    array : Float32Array;
+    instanceArray : Float32Array;
     instanceCount : number;
     buffer!: GPUBuffer;
 
-    constructor(){
-        this.varNames = [ "a_particlePos", "a_particleVel" ];
-        this.array = makeInitialInstanceArray();
+    constructor(var_names : string[], instance_array : Float32Array){
+        this.varNames = var_names;
+        this.instanceArray = instance_array;
 
-        this.instanceCount = this.array.length / particleDim;   // Math.floor(this.array.length / 2);
+        this.instanceCount = this.instanceArray.length / particleDim;   // Math.floor(this.array.length / 2);
     }
 
     makeInstanceBuffer(){
         // Create a instances buffer
         this.buffer = g_device.createBuffer({
-            size: this.array.byteLength,
+            size: this.instanceArray.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             // mappedAtCreation: true,
         });
@@ -194,13 +194,11 @@ export class RenderPipeline {
 
     renderUniformBuffer!: GPUBuffer;
 
-    cube_vertex_count!: number;
+    cubeVertexCount!: number;
     cubeVertexArray!: Float32Array;
     topology!: GPUPrimitiveTopology;
 
     pipeline! : GPURenderPipeline;
-
-    cubeVertexCount! : number;
 
     verticesBuffer!: GPUBuffer;
     uniformBindGroup!: GPUBindGroup;
@@ -242,16 +240,15 @@ export class RenderPipeline {
         });
     }
 
-    makeVertexBuffer(cube_vertex_count : number, cubeVertexArray : Float32Array){
-        this.cubeVertexCount = cube_vertex_count;
+    makeVertexBuffer(){
 
         // Create a vertex buffer from the quad data.
         this.verticesBuffer = g_device.createBuffer({
-            size: cubeVertexArray.byteLength,
+            size: this.cubeVertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
         });
-        new Float32Array(this.verticesBuffer.getMappedRange()).set(cubeVertexArray);
+        new Float32Array(this.verticesBuffer.getMappedRange()).set(this.cubeVertexArray);
         this.verticesBuffer.unmap();
     }
 
@@ -320,10 +317,10 @@ export class Tube extends RenderPipeline {
         super();
         const num_division = 16;
         
-        this.cube_vertex_count = (num_division + 1) * 2;
+        this.cubeVertexCount = (num_division + 1) * 2;
     
         // 位置の配列
-        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3));
+        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3));
 
         let base = 0;
         for(let idx of range(num_division + 1)){
@@ -392,7 +389,7 @@ export class Cube extends RenderPipeline {
             -1,  1, -1,   0,  0, -1,
         ]);
 
-        this.cube_vertex_count = this.cubeVertexArray.length / 6;
+        this.cubeVertexCount = this.cubeVertexArray.length / 6;
         this.topology = 'triangle-list';
     }
 }
@@ -404,8 +401,8 @@ export class Cone extends RenderPipeline {
         const num_division = 16;
 
         this.topology = 'triangle-list';
-        this.cube_vertex_count = num_division * 3;
-        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3));
+        this.cubeVertexCount = num_division * 3;
+        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3));
 
         const xs = new Float32Array(3);
         const ys = new Float32Array(3);
@@ -475,8 +472,8 @@ export class GeodesicPolyhedron extends RenderPipeline {
         const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
         const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
     
-        this.cube_vertex_count = triangles2.length * 3;
-        this.cubeVertexArray = new Float32Array(this.cube_vertex_count * (3 + 3) );
+        this.cubeVertexCount = triangles2.length * 3;
+        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3) );
     
         let idx = 0;
         for(let i = 0; i < triangles2.length; i++){

@@ -24,15 +24,18 @@ export function makeInitialInstanceArray() : Float32Array {
     return initial_instance_array;
 }
 
-export async function asyncBodyOnLoadBoi() {
+export async function asyncBodyOnLoadBoi2() {
+    const inst = makeInstance([ "a_particlePos", "a_particleVel" ], makeInitialInstanceArray())!;
+    const info = new ComputeInfo("updateSprites", "sprite", "depth-frag", makeComputeUniformArray());
+
     const canvas = document.getElementById('world') as HTMLCanvasElement;
 
-    initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -5));
+    initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
     const context = initContext(canvas, 'premultiplied');
     
-    const vert_module = await fetchModule("sprite");
-    const frag_module = await fetchModule("depth-frag");
+    const vert_module = await fetchModule(info.vertName);
+    const frag_module = await fetchModule(info.fragName);
 
     const vertex_buffer_layouts = vert_module.makeVertexBufferLayouts(["a_particlePos", "a_particleVel"]);
 
@@ -40,7 +43,7 @@ export async function asyncBodyOnLoadBoi() {
         layout: 'auto',
         vertex: {
             module: vert_module.module,
-            entryPoint: 'vert_main',
+            entryPoint: 'main',
             buffers: vertex_buffer_layouts
         },
         fragment: {
@@ -68,28 +71,22 @@ export async function asyncBodyOnLoadBoi() {
         ],
     };
 
-    const vertexBufferData = makeConeSub3(true);
-
-    const spriteVertexBuffer = g_device.createBuffer({
-        size: vertexBufferData.byteLength,
-        usage: GPUBufferUsage.VERTEX,
-        mappedAtCreation: true,
-    });
-    new Float32Array(spriteVertexBuffer.getMappedRange()).set(vertexBufferData);
-    spriteVertexBuffer.unmap();
-        
 
     const mesh = new RenderPipeline();
     mesh.pipeline = renderPipeline;
     mesh.vertModule = vert_module;
     mesh.makeUniformBufferAndBindGroup();
 
+    mesh.cubeVertexArray = makeConeSub3(true);
+    mesh.cubeVertexCount = mesh.cubeVertexArray.length / 6;
+    mesh.makeVertexBuffer();
+
     //-------------------------------------------------- Compute Pipeline
-    const inst = makeInstance()!;
-    const info = new ComputeInfo("updateSprites", makeComputeUniformArray());
 
     const comp = new ComputePipeline();
     await comp.initCompute(inst, info);
+
+    mesh.compute = comp;
 
     let tick = 0;
 
@@ -112,14 +109,8 @@ export async function asyncBodyOnLoadBoi() {
         {
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-            passEncoder.setPipeline(mesh.pipeline);
-            passEncoder.setBindGroup(0, mesh.uniformBindGroup);
-            passEncoder.setVertexBuffer(mesh.vertModule.instanceSlot, comp.updateBuffers[(tick + 1) % 2]);
+            mesh.render(tick, passEncoder);
 
-            passEncoder.setVertexBuffer(mesh.vertModule.vertexSlot, spriteVertexBuffer);
-
-
-            passEncoder.draw(vertexBufferData.length / (3 + 3), comp.instanceCount, 0, 0);
             passEncoder.end();
         }
         g_device.queue.submit([commandEncoder.finish()]);

@@ -16,7 +16,7 @@ struct VertexOutput {
 }
 
 @vertex
-fn vert_main(
+fn main(
   @location(0) a_particlePos : vec4<f32>,
   @location(1) a_particleVel : vec4<f32>,
   @location(2) a_pos  : vec3<f32>,
