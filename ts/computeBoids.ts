@@ -78,7 +78,7 @@ export async function asyncBodyOnLoadBoi() {
     spriteVertexBuffer.unmap();
         
 
-    const mesh = new RenderPipeline(null);
+    const mesh = new RenderPipeline();
     mesh.pipeline = renderPipeline;
     mesh.vertModule = render_module;
     mesh.makeUniformBufferAndBindGroup();
@@ -127,9 +127,9 @@ export async function asyncBodyOnLoadBoi() {
         g_device.queue.submit([commandEncoder.finish()]);
 
         ++tick;
-        requestAnimationFrame(frame);
+        requestId = requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
+    requestId = requestAnimationFrame(frame);
 };
 
 }

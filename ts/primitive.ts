@@ -170,14 +170,6 @@ export class Instance {
         // new Float32Array(this.buffer.getMappedRange()).set(this.array);
         // this.buffer.unmap();
     }
-
-    async update(){
-        for(let i = 0; i < this.array.length; i++){
-            this.array[i] += 0.5 * Math.random() - 0.25;
-        }
-
-        g_device.queue.writeBuffer(this.buffer, 0, this.array);
-    }
 }
 
 function uniformSize(module : Module) : number {
@@ -213,15 +205,14 @@ export class RenderPipeline {
     verticesBuffer!: GPUBuffer;
     uniformBindGroup!: GPUBindGroup;
 
-    instance : Instance | null;
+    instance : Instance | null = null;
     compute  : ComputePipeline | undefined;
     
     get isInstance() : boolean {
         return this.instance != null;
     }
 
-    constructor(inst : Instance | null){
-        this.instance = inst;
+    constructor(){
     }
 
     makeUniformBuffer(uniform_buffer_size : number){
@@ -330,8 +321,8 @@ export class RenderPipeline {
 }
 
 export class Tube extends RenderPipeline {
-    constructor(inst : Instance | null){
-        super(inst);
+    constructor(){
+        super();
         const num_division = 16;
         
         this.cube_vertex_count = (num_division + 1) * 2;
@@ -357,8 +348,8 @@ export class Tube extends RenderPipeline {
 }
 
 export class Cube extends RenderPipeline {
-    constructor(inst : Instance | null){
-        super(inst);
+    constructor(){
+        super();
 
         // position: vec3<f32>, norm: vec3<f32>
         // prettier-ignore
@@ -412,8 +403,8 @@ export class Cube extends RenderPipeline {
 }
 
 export class Cone extends RenderPipeline {
-    constructor(inst : Instance | null){
-        super(inst);
+    constructor(){
+        super();
 
         const num_division = 16;
 
@@ -479,8 +470,8 @@ export class Cone extends RenderPipeline {
 }
 
 export class GeodesicPolyhedron extends RenderPipeline {
-    constructor(inst : Instance | null){
-        super(inst);
+    constructor(){
+        super();
 
         this.topology = 'triangle-list';
 

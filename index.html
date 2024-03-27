@@ -5,18 +5,7 @@
   <meta charset="utf-8">
   <title>WebGPU sphere</title>
   <script src="gl-matrix-min.js"></script>
-  <script src="js/util.js"></script>
-  <script src="js/parser.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/primitive.js"></script>
-  <script src="js/texture.js"></script>
-  <script src="js/instance.js"></script>
-  <script src="js/demo.js"></script>
-  <script src="js/compute.js"></script>
-
-  <script src="js/shape.js"></script>
-
-  <script src="js/computeBoids.js"></script>
+  <script src="js/main.js?ver=0"></script>
 
   <script>
     function start(fnc){
@@ -55,6 +44,7 @@ directionalColor
   <button onclick="start(webgputs.asyncBodyOnLoadCom)">Compute</button>
   <button onclick="start(webgputs.asyncBodyOnLoadBoi)">Boids</button>
   <button onclick="start(webgputs.asyncBodyOnLoadTex)">Texture</button>
+  <button onclick="webgputs.stopAnimation()">Stop</button>
 <br/>
 <input type="checkbox" id="auto-rotate" checked /> <label for="auto-rotatate">auto rotate</label>
 <input type="checkbox" id="is-instance" checked /> <label for="is-instance">instance</label>

@@ -2,6 +2,8 @@ var glMatrix: any;
 
 namespace webgputs {
 
+export let requestId : number = 0;
+
 let validFrame : boolean = false;
 
 export async function updateVertexUniformBuffer(meshes : RenderPipeline[]){
@@ -17,10 +19,6 @@ export async function updateVertexUniformBuffer(meshes : RenderPipeline[]){
     glMatrix.vec3.normalize( lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
 
     for(const mesh of meshes){
-        if(mesh.isInstance){
-            await mesh.instance!.update();
-        }
-
         let offset = 0;
 
         offset = mesh.writeUniformBuffer(pvw, offset);
@@ -44,7 +42,7 @@ class Run {
     comp : ComputePipeline | undefined;
     tick : number = 0;
 
-    async init(meshes: RenderPipeline[]){
+    async init(info : ComputeInfo, meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
         const is_instance = this.meshes.some(x => x.isInstance);
@@ -58,11 +56,11 @@ class Run {
             this.useCompute = true;
 
             this.comp = new ComputePipeline();
-            await this.comp.makePipeline("updateSprites");
-            const compute_uniform_array = makeComputeUniformArray();
+            await this.comp.makePipeline(info.shaderName);
+            const compute_uniform_array = info.uniformArray;
             this.comp.makeUniformBuffer(compute_uniform_array);
         
-            const initial_instance_array = makeInitialInstanceArray();
+            const initial_instance_array = info.initialInstanceArray;
             this.comp.instanceCount = initial_instance_array.length / particleDim;
             this.comp.makeUpdateBuffers(initial_instance_array);
         
@@ -144,19 +142,46 @@ class Run {
         g_device.queue.submit([commandEncoder.finish()]);
         ++this.tick;
 
-        requestAnimationFrame(this.frame.bind(this));
+        requestId = requestAnimationFrame(this.frame.bind(this));
+    }
+}
+
+class ComputeInfo {
+    shaderName : string;
+    uniformArray : Float32Array;
+    initialInstanceArray : Float32Array;
+
+    constructor(shader_name : string, uniform_array : Float32Array, initial_instance_array : Float32Array){
+        this.shaderName = shader_name;
+        this.uniformArray = uniform_array;
+        this.initialInstanceArray = initial_instance_array;
+
+    }
+}
+
+export function stopAnimation(){
+    // validFrame = false;
+    if(requestId != 0){
+        cancelAnimationFrame(requestId);
+        requestId = 0;
     }
 }
 
 export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
+    const inst = makeInstance();
+    meshes.forEach(x => x.instance = inst);
+
+    stopAnimation();
+
+    const info = new ComputeInfo("updateSprites", makeComputeUniformArray(), makeInitialInstanceArray());
     validFrame = false;
     const run = new Run();
-    await run.init(meshes);
+    await run.init(info, meshes);
     validFrame = true;
-    requestAnimationFrame(run.frame.bind(run));
+    requestId = requestAnimationFrame(run.frame.bind(run));
 }
 
-function inst() : Instance | null {
+function makeInstance() : Instance | null {
     const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
 
     if(is_instance){
@@ -168,23 +193,23 @@ function inst() : Instance | null {
 }
 
 export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([ new Cone(inst()), new Cube(inst()), new Tube(inst()), new GeodesicPolyhedron(inst()) ]);
+    asyncBodyOnLoadIns([ new Cone(), new Cube(), new Tube(), new GeodesicPolyhedron() ]);
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([new Cone(inst())]);
+    asyncBodyOnLoadIns([new Cone()]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([new Cube(inst())]);
+    asyncBodyOnLoadIns([new Cube()]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([new GeodesicPolyhedron(inst())]);
+    asyncBodyOnLoadIns([new GeodesicPolyhedron()]);
 }
 
 export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns([new Tube(inst())]);
+    asyncBodyOnLoadIns([new Tube()]);
 }
 
 
