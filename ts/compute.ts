@@ -130,15 +130,25 @@ export async function asyncBodyOnLoadCom() {
     console.log(new Float32Array(data));  // [2, 4, 6, 8]
 }
 
-export class ComputePipeline {
+export abstract class AbstractPipeline {
+    uniformBuffer! : GPUBuffer;
+
+    constructor(){
+    }
+}
+
+export class ComputePipeline extends AbstractPipeline {
     pipeline! : GPUComputePipeline;
-    computeUniformBuffer! : GPUBuffer;
     updateBuffers: GPUBuffer[] = new Array(2);
     instanceCount : number = 0;
-    bindGroups: GPUBindGroup[] = new Array(2)
+    bindGroups: GPUBindGroup[] = new Array(2);
+
+    constructor(){
+        super();
+    }
 
     async initCompute(inst : Instance, info : ComputeInfo){
-        await this.makePipeline(info.shaderName);
+        await this.makePipeline(info.compName);
         this.makeUniformBuffer(info.uniformArray);
         this.instanceCount = inst!.instanceArray.length / particleDim;
         this.makeUpdateBuffers(inst!.instanceArray);
@@ -157,12 +167,12 @@ export class ComputePipeline {
     }
 
     makeUniformBuffer(compute_uniform_array : Float32Array){
-        this.computeUniformBuffer = g_device.createBuffer({
+        this.uniformBuffer = g_device.createBuffer({
             size: compute_uniform_array.byteLength,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
     
-        g_device.queue.writeBuffer(this.computeUniformBuffer, 0, compute_uniform_array);
+        g_device.queue.writeBuffer(this.uniformBuffer, 0, compute_uniform_array);
     }
 
     makeUpdateBuffers(initial_update_Data : Float32Array){
@@ -186,7 +196,7 @@ export class ComputePipeline {
                     {
                         binding: 0,
                         resource: {
-                            buffer: this.computeUniformBuffer,
+                            buffer: this.uniformBuffer,
                         },
                     },
                     {

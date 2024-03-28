@@ -172,36 +172,19 @@ export class Instance {
     }
 }
 
-function uniformSize(module : Module) : number {
-    const uniform_var = module.vars.find(x => x.mod.uniform);
-    if(uniform_var == undefined){
-        throw new Error("no uniform var");
-    }
-    else{
-        const struct_name = uniform_var.type.name();
-        const uniform_struct = module.structs.find(x => x.name == struct_name);
-        if(uniform_struct == undefined){
-            throw new Error("no uniform type");
-        }
-
-        return uniform_struct.size();
-    }
-}
-
-export class RenderPipeline {
+export class RenderPipeline extends AbstractPipeline {
     vertModule! : Module;
     fragModule! : Module;
 
-    renderUniformBuffer!: GPUBuffer;
+    uniformBindGroup!: GPUBindGroup;
 
-    cubeVertexCount!: number;
-    cubeVertexArray!: Float32Array;
+    vertexCount!: number;
+    vertexArray!: Float32Array;
+    vertexBuffer!: GPUBuffer;
+
     topology!: GPUPrimitiveTopology;
 
     pipeline! : GPURenderPipeline;
-
-    verticesBuffer!: GPUBuffer;
-    uniformBindGroup!: GPUBindGroup;
 
     instance : Instance | null = null;
     compute  : ComputePipeline | undefined;
@@ -211,10 +194,11 @@ export class RenderPipeline {
     }
 
     constructor(){
+        super();
     }
 
     makeUniformBuffer(uniform_buffer_size : number){
-        this.renderUniformBuffer = g_device.createBuffer({
+        this.uniformBuffer = g_device.createBuffer({
             size: uniform_buffer_size,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });    
@@ -222,7 +206,7 @@ export class RenderPipeline {
 
     makeUniformBufferAndBindGroup(){
         // @uniform
-        const uniform_size  = uniformSize(this.vertModule);
+        const uniform_size  = this.vertModule.uniformSize();
         const uniform_buffer_size = Math.ceil(uniform_size / 32) * 32;
 
         this.makeUniformBuffer(uniform_buffer_size);
@@ -233,7 +217,7 @@ export class RenderPipeline {
                 {
                     binding: 0,
                     resource: {
-                        buffer: this.renderUniformBuffer,
+                        buffer: this.uniformBuffer,
                     },
                 },
             ],
@@ -243,13 +227,13 @@ export class RenderPipeline {
     makeVertexBuffer(){
 
         // Create a vertex buffer from the quad data.
-        this.verticesBuffer = g_device.createBuffer({
-            size: this.cubeVertexArray.byteLength,
+        this.vertexBuffer = g_device.createBuffer({
+            size: this.vertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
         });
-        new Float32Array(this.verticesBuffer.getMappedRange()).set(this.cubeVertexArray);
-        this.verticesBuffer.unmap();
+        new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertexArray);
+        this.vertexBuffer.unmap();
     }
 
     async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology) {
@@ -290,7 +274,7 @@ export class RenderPipeline {
 
     writeUniformBuffer(pvw : any, offset : number){
         g_device.queue.writeBuffer(
-            this.renderUniformBuffer, offset, pvw.buffer
+            this.uniformBuffer, offset, pvw.buffer
         );
 
         return offset + pvw.byteLength;
@@ -299,15 +283,15 @@ export class RenderPipeline {
     render(tick : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.uniformBindGroup);
-        passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.verticesBuffer);
+        passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.vertexBuffer);
         if(this.compute != undefined){
 
             passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
-            passEncoder.draw(this.cubeVertexCount, this.compute.instanceCount);
+            passEncoder.draw(this.vertexCount, this.compute.instanceCount);
         }
         else{
 
-            passEncoder.draw(this.cubeVertexCount);
+            passEncoder.draw(this.vertexCount);
         }
     }
 }
@@ -317,10 +301,10 @@ export class Tube extends RenderPipeline {
         super();
         const num_division = 16;
         
-        this.cubeVertexCount = (num_division + 1) * 2;
+        this.vertexCount = (num_division + 1) * 2;
     
         // 位置の配列
-        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3));
+        this.vertexArray = new Float32Array(this.vertexCount * (3 + 3));
 
         let base = 0;
         for(let idx of range(num_division + 1)){
@@ -330,7 +314,7 @@ export class Tube extends RenderPipeline {
 
             for(const z of [1, -1]){
 
-                setPosNorm(this.cubeVertexArray, base, x, y, z, x, y, 0);
+                setPosNorm(this.vertexArray, base, x, y, z, x, y, 0);
                 base++;
             }
         }
@@ -345,7 +329,7 @@ export class Cube extends RenderPipeline {
 
         // position: vec3<f32>, norm: vec3<f32>
         // prettier-ignore
-        this.cubeVertexArray = new Float32Array([
+        this.vertexArray = new Float32Array([
              1, -1,  1,   0, -1,  0,
             -1, -1,  1,   0, -1,  0,
             -1, -1, -1,   0, -1,  0,
@@ -389,7 +373,7 @@ export class Cube extends RenderPipeline {
             -1,  1, -1,   0,  0, -1,
         ]);
 
-        this.cubeVertexCount = this.cubeVertexArray.length / 6;
+        this.vertexCount = this.vertexArray.length / 6;
         this.topology = 'triangle-list';
     }
 }
@@ -401,8 +385,8 @@ export class Cone extends RenderPipeline {
         const num_division = 16;
 
         this.topology = 'triangle-list';
-        this.cubeVertexCount = num_division * 3;
-        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3));
+        this.vertexCount = num_division * 3;
+        this.vertexArray = new Float32Array(this.vertexCount * (3 + 3));
 
         const xs = new Float32Array(3);
         const ys = new Float32Array(3);
@@ -449,13 +433,13 @@ export class Cone extends RenderPipeline {
             for(let i = 0; i < 3; i++){
                 const base = (tri_i * 3 + i) * (3 + 3);
 
-                this.cubeVertexArray[base    ] = xs[i];
-                this.cubeVertexArray[base + 1] = ys[i];
-                this.cubeVertexArray[base + 2] = zs[i];
+                this.vertexArray[base    ] = xs[i];
+                this.vertexArray[base + 1] = ys[i];
+                this.vertexArray[base + 2] = zs[i];
 
-                this.cubeVertexArray[base + 3] = nxs[i] / root2;
-                this.cubeVertexArray[base + 4] = nys[i] / root2;
-                this.cubeVertexArray[base + 5] = nzs[i] / root2;
+                this.vertexArray[base + 3] = nxs[i] / root2;
+                this.vertexArray[base + 4] = nys[i] / root2;
+                this.vertexArray[base + 5] = nzs[i] / root2;
             }
         }
     }
@@ -472,8 +456,8 @@ export class GeodesicPolyhedron extends RenderPipeline {
         const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
         const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
     
-        this.cubeVertexCount = triangles2.length * 3;
-        this.cubeVertexArray = new Float32Array(this.cubeVertexCount * (3 + 3) );
+        this.vertexCount = triangles2.length * 3;
+        this.vertexArray = new Float32Array(this.vertexCount * (3 + 3) );
     
         let idx = 0;
         for(let i = 0; i < triangles2.length; i++){
@@ -481,15 +465,15 @@ export class GeodesicPolyhedron extends RenderPipeline {
             for(let j = 0; j < 3; j++){
                 const vert = tri.Vertexes[j];
     
-                this.cubeVertexArray[idx    ] = vert.x;
-                this.cubeVertexArray[idx + 1] = vert.y;
-                this.cubeVertexArray[idx + 2] = vert.z;
+                this.vertexArray[idx    ] = vert.x;
+                this.vertexArray[idx + 1] = vert.y;
+                this.vertexArray[idx + 2] = vert.z;
     
                 const len = vert.len();
     
-                this.cubeVertexArray[idx + 3] = vert.x / len;
-                this.cubeVertexArray[idx + 4] = vert.y / len;
-                this.cubeVertexArray[idx + 5] = vert.z / len;
+                this.vertexArray[idx + 3] = vert.x / len;
+                this.vertexArray[idx + 4] = vert.y / len;
+                this.vertexArray[idx + 5] = vert.z / len;
     
                 idx += 3 + 3;
             }

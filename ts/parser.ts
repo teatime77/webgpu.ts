@@ -174,6 +174,22 @@ export class Module {
         this.fns.forEach(x => msg(`${x.str()}`))
     }
 
+    uniformSize() : number {
+        const uniform_var = this.vars.find(x => x.mod.uniform);
+        if(uniform_var == undefined){
+            throw new Error("no uniform var");
+        }
+        else{
+            const struct_name = uniform_var.type.name();
+            const uniform_struct = this.structs.find(x => x.name == struct_name);
+            if(uniform_struct == undefined){
+                throw new Error("no uniform type");
+            }
+    
+            return uniform_struct.size();
+        }
+    }
+    
 
     makeVertexBufferLayouts(instance_var_names : string[]) : GPUVertexBufferLayout[] {
         const main = this.fns.find(x => x.mod.fnType == "@vertex");

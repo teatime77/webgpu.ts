@@ -6,7 +6,7 @@ export let requestId : number = 0;
 
 let validFrame : boolean = false;
 
-export async function updateVertexUniformBuffer(meshes : RenderPipeline[]){
+export function updateVertexUniformBuffer(meshes : RenderPipeline[]){
     // @uniform
     const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
 
@@ -110,7 +110,7 @@ class Run {
             },
         };
 
-        await updateVertexUniformBuffer(this.meshes);
+        updateVertexUniformBuffer(this.meshes);
 
         if(this.useCompute){
 
@@ -136,13 +136,13 @@ class Run {
 }
 
 export class ComputeInfo {
-    shaderName : string;
+    compName : string;
     vertName : string;
     fragName : string
     uniformArray : Float32Array;
 
-    constructor(shader_name : string, vert_name : string, frag_name : string, uniform_array : Float32Array){
-        this.shaderName = shader_name;
+    constructor(comp_name : string, vert_name : string, frag_name : string, uniform_array : Float32Array){
+        this.compName = comp_name;
         this.vertName   = vert_name;
         this.fragName   = frag_name;
         this.uniformArray = uniform_array;
@@ -184,8 +184,8 @@ export async function asyncBodyOnLoadBoi() {
     const info = new ComputeInfo("updateSprites", vert_name, "depth-frag", makeComputeUniformArray());
 
     const mesh = new RenderPipeline();
-    mesh.cubeVertexArray = makeConeSub3(true);
-    mesh.cubeVertexCount = mesh.cubeVertexArray.length / 6;
+    mesh.vertexArray = makeConeSub3(true);
+    mesh.vertexCount = mesh.vertexArray.length / 6;
 
     const meshes: RenderPipeline[] = [ mesh ];
 
