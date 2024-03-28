@@ -93,4 +93,28 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
     return context;
 }
 
+export const particleDim = 8;
+
+export function makeInitialInstanceArray() : Float32Array {
+    const numParticles = 320;
+    const initial_instance_array = new Float32Array(numParticles * particleDim);
+    let base = 0;
+    for (let i = 0; i < numParticles; ++i) {
+        initial_instance_array[base + 0] = 0.0;// 2 * (Math.random() - 0.5);
+        initial_instance_array[base + 1] = 0.0;// 2 * (Math.random() - 0.5);
+        initial_instance_array[base + 2] = 3.0;// 2 * (Math.random() - 0.5);
+        initial_instance_array[base + 3] = 0.0;
+
+        const speed = 5.0;
+        initial_instance_array[base + 4] = speed * (Math.random() - 0.5);
+        initial_instance_array[base + 5] = speed * (Math.random() - 0.5);
+        initial_instance_array[base + 6] = speed * (Math.random() - 0.5);
+        initial_instance_array[base + 7] = 0.0;
+
+        base += particleDim;
+    }
+
+    return initial_instance_array;
+}
+
 }
