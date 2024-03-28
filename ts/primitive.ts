@@ -184,6 +184,8 @@ export class RenderPipeline extends AbstractPipeline {
 
     topology!: GPUPrimitiveTopology;
 
+    materialColor : Float32Array = new Float32Array([1.0, 1.0, 1.0, 1.0]);
+
     pipeline! : GPURenderPipeline;
 
     instance : Instance | null = null;
@@ -195,6 +197,21 @@ export class RenderPipeline extends AbstractPipeline {
 
     constructor(){
         super();
+    }
+
+    red() : RenderPipeline {
+        this.materialColor = new Float32Array([1.0, 0.0, 0.0, 1.0]);
+        return this;
+    }
+
+    green() : RenderPipeline {
+        this.materialColor = new Float32Array([0.0, 1.0, 0.0, 1.0]);
+        return this;
+    }
+
+    blue() : RenderPipeline {
+        this.materialColor = new Float32Array([0.0, 0.0, 1.0, 1.0]);
+        return this;
     }
 
     makeUniformBuffer(uniform_buffer_size : number){

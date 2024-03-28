@@ -6,12 +6,37 @@ export let requestId : number = 0;
 
 let validFrame : boolean = false;
 
+function mat4fromMat3(m3 : Float32Array){
+    const m4 = glMatrix.mat4.create();
+
+    m4[ 0] = m3[0];
+    m4[ 1] = m3[1];
+    m4[ 2] = m3[2];
+    m4[ 3] = 0;
+    
+    m4[ 4] = m3[3];
+    m4[ 5] = m3[4];
+    m4[ 6] = m3[5];
+    m4[ 7] = 0;
+    
+    m4[ 8] = m3[6];
+    m4[ 9] = m3[7];
+    m4[10] = m3[8];
+    m4[11] = 0;
+    
+    // Set the last row and column to identity values
+    m4[15] = 1;
+
+    return m4;
+}
+
 export function updateVertexUniformBuffer(meshes : RenderPipeline[]){
     // @uniform
     const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
 
     let normalMatrix = glMatrix.mat3.create();
     glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
+    normalMatrix = mat4fromMat3(normalMatrix);
 
     const ambientColor      = getColor("ambient");
     const directionalColor  = getColor("directional");
@@ -26,8 +51,9 @@ export function updateVertexUniformBuffer(meshes : RenderPipeline[]){
 
         // vec4 align is 16
         // https://www.w3.org/TR/WGSL/#alignment-and-size
-        offset += 12;
+        // offset += 12;
 
+        offset = mesh.writeUniformBuffer(mesh.materialColor, offset);
         offset = mesh.writeUniformBuffer(ambientColor     , offset);
         offset = mesh.writeUniformBuffer(directionalColor , offset);
         offset = mesh.writeUniformBuffer(lightingDirection, offset);
@@ -204,19 +230,19 @@ export function makeInstance(var_names : string[], instance_array : Float32Array
 }
 
 export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([ new Cone(), new Cube(), new Tube(), new GeodesicPolyhedron() ]);
+    asyncBodyOnLoadIns([ (new Cone()).red(), (new Cube()).green(), (new Tube()).blue(), new GeodesicPolyhedron() ]);
 }
 
 export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([new Cone()]);
+    asyncBodyOnLoadIns([(new Cone()).red()]);
 }
 
 export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([new Cube()]);
+    asyncBodyOnLoadIns([(new Cube()).green()]);
 }
 
 export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([new GeodesicPolyhedron()]);
+    asyncBodyOnLoadIns([(new GeodesicPolyhedron()).blue()]);
 }
 
 export async function asyncBodyOnLoadTube(){

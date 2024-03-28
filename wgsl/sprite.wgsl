@@ -1,8 +1,9 @@
 struct Uniforms {
     // @uniform
     viewMatrix        : mat4x4<f32>,
-    normMatrix        : mat3x3<f32>,
+    normMatrix        : mat4x4<f32>,
 
+    materialColor     : vec4<f32>,
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
     lightingDirection : vec3<f32>
@@ -26,11 +27,9 @@ fn main(
 
   output.position = uniforms.viewMatrix * vec4(0.2 * a_pos + a_particlePos.xyz, 1.0);
 
-  // let material  = clamp(a_particleVel, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0) );
-  let material  = vec3(1.0, 1.0, 1.0);
   let brightness = max(dot(a_norm, uniforms.lightingDirection), 0.0);
 
-  output.color = vec4(brightness * material, 1.0);
+  output.color = brightness * uniforms.materialColor;
 
   return output;
 }

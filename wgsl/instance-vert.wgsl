@@ -1,8 +1,9 @@
 struct Uniforms {
     // @uniform
     viewMatrix        : mat4x4<f32>,
-    normMatrix        : mat3x3<f32>,
+    normMatrix        : mat4x4<f32>,
 
+    materialColor     : vec4<f32>,
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
     lightingDirection : vec3<f32>
@@ -27,9 +28,9 @@ fn main(
 
     output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(a_particlePos.xyz, 1));
 
-    var transformedNormal = uniforms.normMatrix * norm;
-    var directionalLightWeighting = max(dot(transformedNormal, uniforms.lightingDirection), 0.0);
-    output.fragColor = uniforms.ambientColor + directionalLightWeighting * uniforms.directionalColor;
+    var transformedNormal = uniforms.normMatrix * vec4<f32>(norm, 1.0);
+    var directionalLightWeighting = max(dot(transformedNormal.xyz, uniforms.lightingDirection), 0.0);
+    output.fragColor = uniforms.materialColor * (uniforms.ambientColor + directionalLightWeighting * uniforms.directionalColor);
     
     return output;
 }
