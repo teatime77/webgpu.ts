@@ -36,8 +36,7 @@ class UI3D {
     lastMouseX : number | null = null;
     lastMouseY : number | null = null;
 
-    pvw!               : Float32Array;
-    worldMatrix!       : Float32Array;
+    ProjViewMatrix!               : Float32Array;
     viewMatrix!        : Float32Array;
 
     ambientColor!      : Float32Array;
@@ -86,39 +85,29 @@ class UI3D {
     }
 
     getTransformationMatrix() {
+
         if(this.autoRotate){
-            this.getAutoTransformationMatrix();
+            this.setAutoCameraAngle();
         }
-        else{
-            this.getManualTransformationMatrix();
-        }
+        this.setViewMatrix();
 
         const projectionMatrix = glMatrix.mat4.create();
         glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
 
-        this.pvw = glMatrix.mat4.create();
-        glMatrix.mat4.mul(this.pvw, projectionMatrix, this.viewMatrix);
-        glMatrix.mat4.mul(this.pvw, this.pvw, this.worldMatrix);
-    }    
+        this.ProjViewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.mul(this.ProjViewMatrix, projectionMatrix, this.viewMatrix);
+    }
 
-    getAutoTransformationMatrix() {    
-        this.worldMatrix = glMatrix.mat4.create();
-        
-        const now = Date.now() / 1000;
-        glMatrix.mat4.rotate(
-            this.worldMatrix,
-            this.worldMatrix,
-            1,
-            glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
-        );
-    
-        this.viewMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.translate(this.viewMatrix, this.viewMatrix, this.eye);
+    setAutoCameraAngle() {
+        const seconds = Date.now() / 1000;
+
+        this.camTheta = seconds;
+        this.camPhi   = Math.PI / 3.0;
+
+        this.setViewMatrix();
     }
     
-    getManualTransformationMatrix() {
-        this.worldMatrix = glMatrix.mat4.create();
-
+    setViewMatrix() {
         const camY = this.camDistance * Math.cos(this.camTheta);
         const r = this.camDistance * Math.abs(Math.sin(this.camTheta));
         const camZ = r * Math.cos(this.camPhi);

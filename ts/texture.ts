@@ -227,9 +227,14 @@ export async function asyncBodyOnLoadTex() {
 
         ui3D.getTransformationMatrix();
 
+        let worldMatrix = glMatrix.mat4.create();
+        let pvw = glMatrix.mat4.create();
+
+        glMatrix.mat4.mul(pvw, ui3D.ProjViewMatrix, worldMatrix);
+
         g_device.queue.writeBuffer(
             uniformBuffer, 4 * 16 * 2, 
-            ui3D.pvw.buffer, ui3D.pvw.byteOffset, ui3D.pvw.byteLength
+            pvw.buffer, pvw.byteOffset, pvw.byteLength
         );
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);

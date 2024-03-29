@@ -298,14 +298,18 @@ export class RenderPipeline extends AbstractPipeline {
     }
 
     writeUniform(){
+        let worldMatrix  = glMatrix.mat4.create();
         let normalMatrix = glMatrix.mat3.create();
-        glMatrix.mat3.normalFromMat4(normalMatrix, ui3D.worldMatrix);
+
+        glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
         normalMatrix = mat4fromMat3(normalMatrix);
 
+        let pvw = glMatrix.mat4.create();
+        glMatrix.mat4.mul(pvw, ui3D.ProjViewMatrix, worldMatrix);
 
         let offset = 0;
 
-        offset = this.writeUniformBuffer(ui3D.pvw, offset);
+        offset = this.writeUniformBuffer(pvw, offset);
         offset = this.writeUniformBuffer(normalMatrix, offset);
 
         // vec4 align is 16
@@ -484,6 +488,21 @@ export class Cone extends RenderPipeline {
         }
     }
 }
+
+
+export class CompositeRenderPipeline extends RenderPipeline {
+    constructor(){
+        super();
+    }
+}
+
+export class Axis extends CompositeRenderPipeline {
+    constructor(){
+        super();
+    }
+}
+
+
 
 export class GeodesicPolyhedron extends RenderPipeline {
     constructor(){
