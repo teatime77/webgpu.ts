@@ -126,8 +126,8 @@ class UI3D {
 
         this.ambientColor      = getColor("ambient");
         this.directionalColor  = getColor("directional");
-        this.lightingDirection = glMatrix.vec3.create();
-        glMatrix.vec3.normalize( this.lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
+        this.lightingDirection = glMatrix.vec4.create();
+        glMatrix.vec3.normalize( this.lightingDirection, glMatrix.vec4.fromValues(0.25, 0.25, 1, 0) );
     }
 
 }

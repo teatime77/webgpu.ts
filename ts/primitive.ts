@@ -190,10 +190,6 @@ export class RenderPipeline extends AbstractPipeline {
 
     instance : Instance | null = null;
     compute  : ComputePipeline | undefined;
-    
-    get isInstance() : boolean {
-        return this.instance != null;
-    }
 
     constructor(){
         super();
@@ -212,6 +208,10 @@ export class RenderPipeline extends AbstractPipeline {
     blue() : RenderPipeline {
         this.materialColor = new Float32Array([0.0, 0.0, 1.0, 1.0]);
         return this;
+    }
+
+    getWorldMatrix() : Float32Array {
+        return glMatrix.mat4.create();
     }
 
     makeUniformBuffer(uniform_buffer_size : number){
@@ -257,7 +257,7 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertModule = await fetchModule(vert_name);
         this.fragModule = await fetchModule(frag_name);
     
-        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.isInstance ? this.instance!.varNames : []);
+        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.instance != null ? this.instance.varNames : []);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
@@ -298,7 +298,7 @@ export class RenderPipeline extends AbstractPipeline {
     }
 
     writeUniform(){
-        let worldMatrix  = glMatrix.mat4.create();
+        let worldMatrix  = this.getWorldMatrix();
         let normalMatrix = glMatrix.mat3.create();
 
         glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
@@ -419,6 +419,56 @@ export class Cube extends RenderPipeline {
 
         this.vertexCount = this.vertexArray.length / 6;
         this.topology = 'triangle-list';
+    }
+}
+
+export class Disc extends RenderPipeline {
+    constructor(){
+        super();
+
+        const num_division = 16;
+
+        this.topology = 'triangle-list';
+        this.vertexCount = num_division * 3;
+
+        const v = new Float32Array(this.vertexCount * (3 + 3));
+
+        let idx = 0;
+        for(let tri_i = 0; tri_i < num_division; tri_i++){
+
+            for(let vert_i = 0; vert_i < 3; vert_i++){
+                let x : number, y : number;
+
+                if(vert_i == 0){
+
+                    const phi = 2.0 * Math.PI * tri_i / num_division;
+                    x = Math.cos(phi);
+                    y = Math.sin(phi);
+                }
+                else if(vert_i == 1){
+
+                    const phi = 2.0 * Math.PI * (tri_i + 1) / num_division;
+                    x = Math.cos(phi);
+                    y = Math.sin(phi);                        
+                }
+                else{
+                    x = 0;
+                    y = 0;
+                }
+
+                v[idx + 0] = x;
+                v[idx + 1] = y;
+                v[idx + 2] = 0;
+
+                v[idx + 3] = 0;
+                v[idx + 4] = 0;
+                v[idx + 5] = 1;
+
+                idx += 6;
+            }
+        }        
+
+        this.vertexArray = v;
     }
 }
 

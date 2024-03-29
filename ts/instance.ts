@@ -17,11 +17,9 @@ class Run {
     async init(inst : Instance | null, info : ComputeInfo, meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
-        const is_instance = this.meshes.some(x => x.isInstance);
-
         const canvas = document.getElementById('world') as HTMLCanvasElement;
     
-        if(is_instance){
+        if(inst != null){
 
             this.useCompute = true;
 
@@ -44,8 +42,8 @@ class Run {
 
             mesh.makeVertexBuffer();
 
-            if(mesh.isInstance){
-                mesh.instance!.makeInstanceBuffer();
+            if(mesh.instance != null){
+                mesh.instance.makeInstanceBuffer();
             }
         }
 
@@ -179,6 +177,10 @@ export function makeInstance(var_names : string[], instance_array : Float32Array
 
 export async function asyncBodyOnLoadMulti(){
     asyncBodyOnLoadIns([ (new Cone()).red(), (new Cube()).green(), (new Tube()).blue(), new GeodesicPolyhedron() ]);
+}
+
+export async function asyncBodyOnLoadDisc(){
+    asyncBodyOnLoadIns([(new Disc()).red()]);
 }
 
 export async function asyncBodyOnLoadCone(){

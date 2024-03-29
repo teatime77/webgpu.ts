@@ -6,7 +6,7 @@ struct Uniforms {
     materialColor     : vec4<f32>,
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
-    lightingDirection : vec3<f32>
+    lightingDirection : vec4<f32>
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -27,7 +27,7 @@ fn main(
 
   output.position = uniforms.viewMatrix * vec4(0.2 * a_pos + a_particlePos.xyz, 1.0);
 
-  let brightness = max(dot(a_norm, uniforms.lightingDirection), 0.0);
+  let brightness = max(dot(a_norm, uniforms.lightingDirection.xyz), 0.0);
 
   output.color = brightness * uniforms.materialColor;
 

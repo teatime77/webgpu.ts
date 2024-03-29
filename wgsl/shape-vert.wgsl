@@ -6,7 +6,7 @@ struct Uniforms {
     materialColor     : vec4<f32>,
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
-    lightingDirection : vec3<f32>
+    lightingDirection : vec4<f32>
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -26,7 +26,7 @@ fn main(
     output.Position = uniforms.viewMatrix * vec4<f32>(position, 1.0);
 
     var transformedNormal = uniforms.normMatrix * vec4<f32>(norm, 1.0);
-    var directionalLightWeighting = max(dot(transformedNormal.xyz, uniforms.lightingDirection), 0.0);
+    var directionalLightWeighting = max(dot(transformedNormal.xyz, uniforms.lightingDirection.xyz), 0.0);
     output.fragColor = uniforms.materialColor * (uniforms.ambientColor + directionalLightWeighting * uniforms.directionalColor);
     
     return output;
