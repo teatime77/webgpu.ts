@@ -289,13 +289,36 @@ export class RenderPipeline extends AbstractPipeline {
         this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
     }
 
-    writeUniformBuffer(pvw : any, offset : number){
+    writeUniformBuffer(data : Float32Array, offset : number){
         g_device.queue.writeBuffer(
-            this.uniformBuffer, offset, pvw.buffer
+            this.uniformBuffer, offset, data.buffer
         );
 
-        return offset + pvw.byteLength;
+        return offset + data.byteLength;
     }
+
+    writeUniform(){
+        let normalMatrix = glMatrix.mat3.create();
+        glMatrix.mat3.normalFromMat4(normalMatrix, ui3D.worldMatrix);
+        normalMatrix = mat4fromMat3(normalMatrix);
+
+
+        let offset = 0;
+
+        offset = this.writeUniformBuffer(ui3D.pvw, offset);
+        offset = this.writeUniformBuffer(normalMatrix, offset);
+
+        // vec4 align is 16
+        // https://www.w3.org/TR/WGSL/#alignment-and-size
+        // offset += 12;
+
+        offset = this.writeUniformBuffer(this.materialColor, offset);
+        offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
+        offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
+        offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
+    }
+
+
     
     render(tick : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);

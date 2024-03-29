@@ -1,5 +1,29 @@
 namespace webgputs {
 
+export function mat4fromMat3(m3 : Float32Array){
+    const m4 = glMatrix.mat4.create();
+
+    m4[ 0] = m3[0];
+    m4[ 1] = m3[1];
+    m4[ 2] = m3[2];
+    m4[ 3] = 0;
+    
+    m4[ 4] = m3[3];
+    m4[ 5] = m3[4];
+    m4[ 6] = m3[5];
+    m4[ 7] = 0;
+    
+    m4[ 8] = m3[6];
+    m4[ 9] = m3[7];
+    m4[10] = m3[8];
+    m4[11] = 0;
+    
+    // Set the last row and column to identity values
+    m4[15] = 1;
+
+    return m4;
+}
+
 class UI3D {
     autoRotate : boolean = false;
 
@@ -11,6 +35,14 @@ class UI3D {
 
     lastMouseX : number | null = null;
     lastMouseY : number | null = null;
+
+    pvw!               : Float32Array;
+    worldMatrix!       : Float32Array;
+    viewMatrix!        : Float32Array;
+
+    ambientColor!      : Float32Array;
+    directionalColor!  : Float32Array;
+    lightingDirection! : Float32Array;
 
 
     constructor(canvas : HTMLCanvasElement, eye : any){
@@ -54,58 +86,59 @@ class UI3D {
     }
 
     getTransformationMatrix() {
-        let worldMatrix : any;
-        let viewMatrix : any;
-
         if(this.autoRotate){
-            [worldMatrix, viewMatrix] = this.getAutoTransformationMatrix();
+            this.getAutoTransformationMatrix();
         }
         else{
-            [worldMatrix, viewMatrix] = this.getManualTransformationMatrix();
+            this.getManualTransformationMatrix();
         }
 
         const projectionMatrix = glMatrix.mat4.create();
         glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
 
-
-        const pvw = glMatrix.mat4.create();
-        glMatrix.mat4.mul(pvw, projectionMatrix, viewMatrix);
-        glMatrix.mat4.mul(pvw, pvw, worldMatrix);
-    
-        return [pvw, worldMatrix];
+        this.pvw = glMatrix.mat4.create();
+        glMatrix.mat4.mul(this.pvw, projectionMatrix, this.viewMatrix);
+        glMatrix.mat4.mul(this.pvw, this.pvw, this.worldMatrix);
     }    
 
     getAutoTransformationMatrix() {    
-        const worldMatrix = glMatrix.mat4.create();
+        this.worldMatrix = glMatrix.mat4.create();
+        
         const now = Date.now() / 1000;
         glMatrix.mat4.rotate(
-            worldMatrix,
-            worldMatrix,
+            this.worldMatrix,
+            this.worldMatrix,
             1,
             glMatrix.vec3.fromValues(Math.sin(now), Math.cos(now), 0)
         );
     
-        const viewMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.translate(viewMatrix, viewMatrix, this.eye);
-
-        return [ worldMatrix , viewMatrix ];
+        this.viewMatrix = glMatrix.mat4.create();
+        glMatrix.mat4.translate(this.viewMatrix, this.viewMatrix, this.eye);
     }
     
     getManualTransformationMatrix() {
-        const worldMatrix = glMatrix.mat4.create();
+        this.worldMatrix = glMatrix.mat4.create();
 
         const camY = this.camDistance * Math.cos(this.camTheta);
         const r = this.camDistance * Math.abs(Math.sin(this.camTheta));
         const camZ = r * Math.cos(this.camPhi);
         const camX = r * Math.sin(this.camPhi);
 
-        const viewMatrix = glMatrix.mat4.create();
+        this.viewMatrix = glMatrix.mat4.create();
         const cameraPosition = [camX, camY, camZ];
         const lookAtPosition = [0, 0, 0];
         const upDirection    = [0, 1, 0];
-        glMatrix.mat4.lookAt(viewMatrix, cameraPosition, lookAtPosition, upDirection);
+        glMatrix.mat4.lookAt(this.viewMatrix, cameraPosition, lookAtPosition, upDirection);
+    }
 
-        return [ worldMatrix , viewMatrix ];
+    setTransformationMatrixAndLighting(){
+        // @uniform
+        this.getTransformationMatrix();
+
+        this.ambientColor      = getColor("ambient");
+        this.directionalColor  = getColor("directional");
+        this.lightingDirection = glMatrix.vec3.create();
+        glMatrix.vec3.normalize( this.lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
     }
 
 }

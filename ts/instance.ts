@@ -6,60 +6,6 @@ export let requestId : number = 0;
 
 let validFrame : boolean = false;
 
-function mat4fromMat3(m3 : Float32Array){
-    const m4 = glMatrix.mat4.create();
-
-    m4[ 0] = m3[0];
-    m4[ 1] = m3[1];
-    m4[ 2] = m3[2];
-    m4[ 3] = 0;
-    
-    m4[ 4] = m3[3];
-    m4[ 5] = m3[4];
-    m4[ 6] = m3[5];
-    m4[ 7] = 0;
-    
-    m4[ 8] = m3[6];
-    m4[ 9] = m3[7];
-    m4[10] = m3[8];
-    m4[11] = 0;
-    
-    // Set the last row and column to identity values
-    m4[15] = 1;
-
-    return m4;
-}
-
-export function updateVertexUniformBuffer(meshes : RenderPipeline[]){
-    // @uniform
-    const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
-
-    let normalMatrix = glMatrix.mat3.create();
-    glMatrix.mat3.normalFromMat4(normalMatrix, worldMatrix);
-    normalMatrix = mat4fromMat3(normalMatrix);
-
-    const ambientColor      = getColor("ambient");
-    const directionalColor  = getColor("directional");
-    const lightingDirection = glMatrix.vec3.create();
-    glMatrix.vec3.normalize( lightingDirection, glMatrix.vec3.fromValues(0.25, 0.25, 1) );
-
-    for(const mesh of meshes){
-        let offset = 0;
-
-        offset = mesh.writeUniformBuffer(pvw, offset);
-        offset = mesh.writeUniformBuffer(normalMatrix, offset);
-
-        // vec4 align is 16
-        // https://www.w3.org/TR/WGSL/#alignment-and-size
-        // offset += 12;
-
-        offset = mesh.writeUniformBuffer(mesh.materialColor, offset);
-        offset = mesh.writeUniformBuffer(ambientColor     , offset);
-        offset = mesh.writeUniformBuffer(directionalColor , offset);
-        offset = mesh.writeUniformBuffer(lightingDirection, offset);
-    }
-}
-
 class Run {
     context!: GPUCanvasContext;
     meshes: RenderPipeline[] = [];
@@ -136,8 +82,6 @@ class Run {
             },
         };
 
-        updateVertexUniformBuffer(this.meshes);
-
         if(this.useCompute){
 
             const passEncoder = commandEncoder.beginComputePass();
@@ -147,6 +91,10 @@ class Run {
             passEncoder.end();
         }
         {
+            ui3D.setTransformationMatrixAndLighting();
+
+            this.meshes.forEach(mesh => mesh.writeUniform());
+
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
             this.meshes.forEach(mesh => mesh.render(this.tick, passEncoder));

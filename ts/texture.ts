@@ -225,11 +225,11 @@ export async function asyncBodyOnLoadTex() {
             },
         };
 
-        const [pvw, worldMatrix] = ui3D.getTransformationMatrix();
+        ui3D.getTransformationMatrix();
 
         g_device.queue.writeBuffer(
             uniformBuffer, 4 * 16 * 2, 
-            pvw.buffer, pvw.byteOffset, pvw.byteLength
+            ui3D.pvw.buffer, ui3D.pvw.byteOffset, ui3D.pvw.byteLength
         );
 
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
