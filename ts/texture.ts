@@ -69,9 +69,7 @@ export async function asyncBodyOnLoadTex() {
         const pipeline = g_device.createRenderPipeline({
             layout: 'auto',
             vertex: {
-                module: g_device.createShaderModule({
-                    code: vertWGSL,
-                }),
+                module: makeShaderModule(vertWGSL),
                 entryPoint: 'main',
                 buffers: [
                     {
@@ -103,9 +101,7 @@ export async function asyncBodyOnLoadTex() {
                 ],
             },
             fragment: {
-                module: g_device.createShaderModule({
-                    code: fragWGSL,
-                }),
+                module: makeShaderModule(fragWGSL),
                 entryPoint: 'main',
                 targets: [
                     // 0

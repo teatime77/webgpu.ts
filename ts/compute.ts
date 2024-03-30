@@ -28,9 +28,7 @@ export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');
 
     // シェーダーコードを準備
-    const shaderModule = g_device.createShaderModule({
-        code: shader
-    });
+    const shaderModule = makeShaderModule(shader);
 
     // 入力配列を作成
     const inputArray = new Float32Array(Array.from(range(16)));

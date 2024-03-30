@@ -99,10 +99,13 @@ class UI3D {
     }
 
     setAutoCameraAngle() {
-        const seconds = Date.now() / 1000;
+        const cnt = 3000;
 
-        this.camTheta = seconds;
-        this.camPhi   = Math.PI / 3.0;
+        // i changes from 0 to 2999 in 3000 milliseconds.
+        const i = Math.round(Date.now()) % cnt;
+
+        this.camPhi     = 2.0 * Math.PI * i / cnt;
+        this.camTheta   = Math.PI / 3.0;
 
         this.setViewMatrix();
     }

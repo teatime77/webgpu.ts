@@ -24,22 +24,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
   var vPos = particlesA[index].pos;
   var vVel = particlesA[index].vel;
 
-  // Wrap around boundary
-  if (3.0 < abs(vPos.x)) {
-    vVel.x  = - sign(vPos.x) * abs(vVel.x);
-  }
-  if (3.0 < abs(vPos.y)) {
-    vVel.y  = - sign(vPos.y) * abs(vVel.y);
-  }
-  if (vPos.z < 3.0) {
-    vVel.z  = abs(vVel.z);
-  }
-  else if (6.0 < vPos.z) {
-    vVel.z  = - abs(vVel.z);
-  }
-
-  // kinematic update
   vPos = vPos + (vVel * params.deltaT);
+  vVel = vVel * params.deltaT;
 
   // Write back
   particlesB[index].pos = vPos;

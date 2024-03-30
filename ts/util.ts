@@ -96,17 +96,17 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
 export const particleDim = 8;
 
 export function makeInitialInstanceArray() : Float32Array {
-    const theta_cnt = 10;
-    const phi_cnt   = 32;
+    const theta_cnt = 5;
+    const phi_cnt   = 10;
     const numParticles = theta_cnt * phi_cnt;
     const initial_instance_array = new Float32Array(numParticles * particleDim);
 
-    const c = 3.0;
+    const c = 6.0;
     let base = 0;
     for(let theta_i = 0; theta_i < theta_cnt; theta_i++){
         const theta = Math.PI * theta_i / theta_cnt;
-        const z = c * Math.cos(theta);
-        const r = c * Math.sin(theta);
+        const z = Math.cos(theta);
+        const r = Math.sin(theta);
 
         for(let phi_i = 0; phi_i < phi_cnt; phi_i++){
             const phi = 2 * Math.PI * phi_i / phi_cnt;
@@ -114,15 +114,14 @@ export function makeInitialInstanceArray() : Float32Array {
             const x = r * Math.cos(phi);
             const y = r * Math.sin(phi);
 
-            initial_instance_array[base + 0] = x; // 0.0;// 2 * (Math.random() - 0.5);
-            initial_instance_array[base + 1] = y; // 0.0;// 2 * (Math.random() - 0.5);
-            initial_instance_array[base + 2] = z; // 3.0;// 2 * (Math.random() - 0.5);
+            initial_instance_array[base + 0] = c * x;
+            initial_instance_array[base + 1] = c * y;
+            initial_instance_array[base + 2] = c * z;
             initial_instance_array[base + 3] = 0.0;
 
-            const speed = 0.0;// 5.0;
-            initial_instance_array[base + 4] = speed * (Math.random() - 0.5);
-            initial_instance_array[base + 5] = speed * (Math.random() - 0.5);
-            initial_instance_array[base + 6] = speed * (Math.random() - 0.5);
+            initial_instance_array[base + 4] = x;
+            initial_instance_array[base + 5] = y;
+            initial_instance_array[base + 6] = z;
             initial_instance_array[base + 7] = 0.0;
 
             base += particleDim;
@@ -133,5 +132,19 @@ export function makeInitialInstanceArray() : Float32Array {
     return initial_instance_array;
 }
 
+export function makeShaderModule( text : string) : GPUShaderModule {
+    g_device.pushErrorScope("validation");
+
+    const module = g_device.createShaderModule({ code: text });
+
+    g_device.popErrorScope().then((error) => {
+        if (error) {
+          console.error(`shader error:${error.message}\n${text}`);
+          throw new Error(`shader error:${error.message}`);
+        }
+    });
+
+    return module;
+}
 
 }

@@ -19,17 +19,23 @@ struct VertexOutput {
 
 @vertex
 fn main(
-    @location(0) position: vec3<f32>,
-    @location(1) norm: vec3<f32>,
-    @location(2) a_particlePos : vec4<f32>,
-    @location(3) a_particleVel : vec4<f32>
+    @location(0) vertPos: vec3<f32>,
+    @location(1) vertNorm: vec3<f32>,
+    @location(2) meshPos : vec4<f32>,
+    @location(3) meshVec : vec4<f32>
 ) -> VertexOutput {
 
     var output : VertexOutput;
 
-    output.Position = uniforms.viewMatrix * (vec4<f32>(position, 1.0) + vec4<f32>(a_particlePos.xyz, 1));
+    output.Position = uniforms.viewMatrix * (vec4<f32>(vertPos, 1.0) + vec4<f32>(meshPos.xyz, 1));
 
-    var transformedNormal = uniforms.normMatrix * vec4<f32>(norm, 1.0);
+    if(uniforms.info.x == 1.0){
+        if(uniforms.info.y == 2.0 || uniforms.info.y == 3.0){
+            output.Position += meshVec;
+        }
+    }
+
+    var transformedNormal = uniforms.normMatrix * vec4<f32>(vertNorm, 1.0);
     var directionalLightWeighting = max(dot(transformedNormal.xyz, uniforms.lightingDirection.xyz), 0.0);
     output.fragColor = uniforms.materialColor * (uniforms.ambientColor + directionalLightWeighting * uniforms.directionalColor);
     

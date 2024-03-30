@@ -19,14 +19,14 @@ struct VertexOutput {
 
 @vertex
 fn main(
-  @location(0) a_particlePos : vec4<f32>,
-  @location(1) a_particleVel : vec4<f32>,
+  @location(0) meshPos : vec4<f32>,
+  @location(1) meshVec : vec4<f32>,
   @location(2) a_pos  : vec3<f32>,
   @location(3) a_norm : vec3<f32>
 ) -> VertexOutput {
   var output : VertexOutput;
 
-  output.position = uniforms.viewMatrix * vec4(0.2 * a_pos + a_particlePos.xyz, 1.0);
+  output.position = uniforms.viewMatrix * vec4(0.2 * a_pos + meshPos.xyz, 1.0);
 
   let brightness = max(dot(a_norm, uniforms.lightingDirection.xyz), 0.0);
 

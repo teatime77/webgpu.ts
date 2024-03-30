@@ -111,11 +111,6 @@ export enum TokenSubType {
     double,
 }
 
-// export enum Builtin {
-//     global_invocation_id,
-//     position
-// }
-
 export class Token{
     typeTkn:TokenType;
     subType:TokenSubType;
@@ -160,7 +155,7 @@ export class Module {
     instanceSlot : number = -1;
 
     constructor(text : string){
-        this.module = g_device.createShaderModule({ code: text });
+        this.module = makeShaderModule(text);
 
         const tokens = lexicalAnalysis(text);
 

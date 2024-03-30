@@ -141,7 +141,7 @@ async function startAnimation(inst : Instance | null, info : ComputeInfo, meshes
 }
 
 export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
-    const inst = makeInstance([ "a_particlePos", "a_particleVel" ], makeInitialInstanceArray());
+    const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray());
 
     const vert_name = (inst == null ? "shape-vert": "instance-vert");
     const info = new ComputeInfo("updateSprites", vert_name, "depth-frag", makeComputeUniformArray());
@@ -150,7 +150,7 @@ export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
 }
 
 export async function asyncBodyOnLoadBoi() {
-    const inst = makeInstance([ "a_particlePos", "a_particleVel" ], makeInitialInstanceArray())!;
+    const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
 
     const vert_name = (inst == null ? "shape-vert": "sprite");
     const info = new ComputeInfo("updateSprites", vert_name, "depth-frag", makeComputeUniformArray());
@@ -162,6 +162,10 @@ export async function asyncBodyOnLoadBoi() {
     const meshes: RenderPipeline[] = [ mesh ];
 
     startAnimation(inst, info, meshes);
+}
+
+export async function asyncBodyOnLoadArrow(){
+    asyncBodyOnLoadIns(makeArrow());
 }
 
 export function makeInstance(var_names : string[], instance_array : Float32Array) : Instance | null {

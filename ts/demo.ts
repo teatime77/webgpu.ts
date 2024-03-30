@@ -11,9 +11,7 @@ export async function asyncBodyOnLoadDemo() {
     const shader = await fetchText('../wgsl/demo.wgsl');
 
     // 2: Create a shader module from the shader template literal
-    const shaderModule = g_device.createShaderModule({
-        code: shader
-    });
+    const shaderModule = makeShaderModule(shader);
 
     // 3: Create an output buffer to read GPU calculations to, and a staging buffer to be mapped for JavaScript access
 

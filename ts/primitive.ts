@@ -185,6 +185,7 @@ export class RenderPipeline extends AbstractPipeline {
     topology!: GPUPrimitiveTopology;
 
     materialColor : Float32Array = new Float32Array([1.0, 1.0, 1.0, 1.0]);
+    info          = new Float32Array([0,0,0,0]);
 
     pipeline! : GPURenderPipeline;
 
@@ -212,10 +213,6 @@ export class RenderPipeline extends AbstractPipeline {
 
     getWorldMatrix() : Float32Array {
         return glMatrix.mat4.create();
-    }
-
-    getInfo() : Float32Array {
-        return new Float32Array([0,0,0,0]);
     }
 
     makeUniformBuffer(uniform_buffer_size : number){
@@ -324,7 +321,7 @@ export class RenderPipeline extends AbstractPipeline {
         offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
         offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
         offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
-        offset = this.writeUniformBuffer(this.getInfo()        , offset);
+        offset = this.writeUniformBuffer(this.info             , offset);
     }
 
 
@@ -554,13 +551,24 @@ export class CompositeRenderPipeline extends RenderPipeline {
 export class Axis extends CompositeRenderPipeline {
     constructor(){
         super();
-
-        const disc1 = new Disc();
-        const disc2 = new Disc();
-        const tube  = new Tube();
-        const cone  = new Cone();
-
     }
+}
+
+export function makeArrow() : RenderPipeline[] {
+
+    const disc1 = new Disc();
+    disc1.info  = new Float32Array([ 1, 1, 0, 0]);
+
+    const disc2 = new Disc();
+    disc2.info  = new Float32Array([ 1, 2, 0, 0]);
+    
+    const tube  = new Tube();
+    tube.info   = new Float32Array([ 1, 3, 0, 0]);
+    
+    const cone  = new Cone();
+    cone.info   = new Float32Array([ 1, 4, 0, 0]);
+
+    return [ disc1, disc2, tube, cone ];
 }
 
 
