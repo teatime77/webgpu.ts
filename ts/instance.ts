@@ -17,6 +17,10 @@ class Run {
         this.meshes = meshes.splice(0);
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
+            
+        this.context = initContext(canvas, 'opaque');
+
+        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
     
         if(inst != null){
 
@@ -25,11 +29,6 @@ class Run {
         
             this.meshes.forEach(x => x.compute = this.comp);
         }
-            
-        const context = initContext(canvas, 'opaque');
-        this.context = context;
-
-        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
 
         for(let mesh of this.meshes){
             // create a render pipeline
@@ -80,7 +79,7 @@ class Run {
         ui3D.setEnv();
 
         if(this.comp != null){
-            this.comp.writeUniformBuffer(this.comp.uniformArray, 0);
+            this.comp.writeUniformBuffer(ui3D.env, 0);
 
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.comp!.pipeline);
@@ -111,13 +110,11 @@ export class ComputeInfo {
     compName : string;
     vertName : string;
     fragName : string
-    uniformArray : Float32Array;
 
-    constructor(comp_name : string, vert_name : string, frag_name : string, uniform_array : Float32Array){
+    constructor(comp_name : string, vert_name : string, frag_name : string){
         this.compName = comp_name;
         this.vertName   = vert_name;
         this.fragName   = frag_name;
-        this.uniformArray = uniform_array;
     }
 }
 
@@ -144,7 +141,7 @@ export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
     const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray());
 
     const vert_name = (inst == null ? "shape-vert": "instance-vert");
-    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag", makeComputeUniformArray());
+    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag");
 
     startAnimation(inst, info, meshes);
 }
@@ -153,7 +150,7 @@ export async function asyncBodyOnLoadBoi() {
     const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
 
     const vert_name = (inst == null ? "shape-vert": "sprite");
-    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag", makeComputeUniformArray());
+    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag");
 
     const mesh = new RenderPipeline();
     mesh.vertexArray = makeConeSub3(true);

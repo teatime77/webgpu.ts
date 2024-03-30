@@ -44,8 +44,7 @@ class UI3D {
     lightingDirection! : Float32Array;
 
     startTime          : number;
-    env!               : Float32Array;
-
+    env                : Float32Array = new Float32Array([0,0,0,0]);
 
     constructor(canvas : HTMLCanvasElement, eye : any){
         this.startTime = Date.now();
@@ -129,7 +128,7 @@ class UI3D {
 
     setEnv(){
         const elapsed_time = Math.round(Date.now() - this.startTime);
-        this.env = new Float32Array([ elapsed_time, 0, 0, 0 ]);
+        this.env[0] = elapsed_time;
     }
 
     setTransformationMatrixAndLighting(){

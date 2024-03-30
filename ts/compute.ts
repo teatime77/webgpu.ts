@@ -1,29 +1,5 @@
 namespace webgputs {
 
-export function makeComputeUniformArray() : Float32Array {
-    const compute_uniform_object = {
-        deltaT: 0.0,// 0.04,
-        rule1Distance: 0.1,
-        rule2Distance: 0.025,
-        rule3Distance: 0.025,
-        rule1Scale: 0.02,
-        rule2Scale: 0.05,
-        rule3Scale: 0.005,
-    };
-
-    const compute_uniform_array = new Float32Array([
-        compute_uniform_object.deltaT,
-        compute_uniform_object.rule1Distance,
-        compute_uniform_object.rule2Distance,
-        compute_uniform_object.rule3Distance,
-        compute_uniform_object.rule1Scale,
-        compute_uniform_object.rule2Scale,
-        compute_uniform_object.rule3Scale,
-    ]);
-
-    return compute_uniform_array;
-}
-
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');
 
@@ -153,17 +129,14 @@ export class ComputePipeline extends AbstractPipeline {
     updateBuffers: GPUBuffer[] = new Array(2);
     instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2);
-    uniformArray! : Float32Array;
 
     constructor(){
         super();
     }
 
     async initCompute(inst : Instance, info : ComputeInfo){
-        this.uniformArray = info.uniformArray;
-
         await this.makePipeline(info.compName);
-        this.makeUniformBuffer(this.uniformArray.byteLength);
+        this.makeUniformBuffer(ui3D.env.byteLength);
         this.instanceCount = inst!.instanceArray.length / particleDim;
         this.makeUpdateBuffers(inst!.instanceArray);
     }
