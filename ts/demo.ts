@@ -98,6 +98,4 @@ export async function asyncBodyOnLoadDemo() {
     console.log(new Float32Array(data));
 }
 
-// asyncBodyOnLoadDemo();
-
 }

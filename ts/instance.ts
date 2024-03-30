@@ -10,8 +10,7 @@ class Run {
     context!: GPUCanvasContext;
     meshes: RenderPipeline[] = [];
     depthTexture!: GPUTexture;
-    useCompute : boolean = false;
-    comp : ComputePipeline | undefined;
+    comp : ComputePipeline | null = null;
     tick : number = 0;
 
     async init(inst : Instance | null, info : ComputeInfo, meshes: RenderPipeline[]){
@@ -20,8 +19,6 @@ class Run {
         const canvas = document.getElementById('world') as HTMLCanvasElement;
     
         if(inst != null){
-
-            this.useCompute = true;
 
             this.comp = new ComputePipeline();
             await this.comp.initCompute(inst!, info);
@@ -80,7 +77,10 @@ class Run {
             },
         };
 
-        if(this.useCompute){
+        ui3D.setEnv();
+
+        if(this.comp != null){
+            this.comp.writeUniformBuffer(this.comp.uniformArray, 0);
 
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.comp!.pipeline);

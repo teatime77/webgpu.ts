@@ -133,6 +133,19 @@ export abstract class AbstractPipeline {
 
     constructor(){
     }
+
+    makeUniformBuffer(uniform_buffer_size : number){
+        this.uniformBuffer = g_device.createBuffer({
+            size: uniform_buffer_size,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });    
+    }
+
+    writeUniformBuffer(data : Float32Array, offset : number){
+        g_device.queue.writeBuffer(this.uniformBuffer, offset, data);
+
+        return offset + data.byteLength;
+    }
 }
 
 export class ComputePipeline extends AbstractPipeline {
@@ -140,14 +153,17 @@ export class ComputePipeline extends AbstractPipeline {
     updateBuffers: GPUBuffer[] = new Array(2);
     instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2);
+    uniformArray! : Float32Array;
 
     constructor(){
         super();
     }
 
     async initCompute(inst : Instance, info : ComputeInfo){
+        this.uniformArray = info.uniformArray;
+
         await this.makePipeline(info.compName);
-        this.makeUniformBuffer(info.uniformArray);
+        this.makeUniformBuffer(this.uniformArray.byteLength);
         this.instanceCount = inst!.instanceArray.length / particleDim;
         this.makeUpdateBuffers(inst!.instanceArray);
     }
@@ -162,15 +178,6 @@ export class ComputePipeline extends AbstractPipeline {
                 entryPoint: 'main'
             }
         });
-    }
-
-    makeUniformBuffer(compute_uniform_array : Float32Array){
-        this.uniformBuffer = g_device.createBuffer({
-            size: compute_uniform_array.byteLength,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-    
-        g_device.queue.writeBuffer(this.uniformBuffer, 0, compute_uniform_array);
     }
 
     makeUpdateBuffers(initial_update_Data : Float32Array){

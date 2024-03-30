@@ -43,8 +43,12 @@ class UI3D {
     directionalColor!  : Float32Array;
     lightingDirection! : Float32Array;
 
+    startTime          : number;
+    env!               : Float32Array;
+
 
     constructor(canvas : HTMLCanvasElement, eye : any){
+        this.startTime = Date.now();
         this.eye = eye;
         this.camDistance = eye[2];
 
@@ -102,7 +106,7 @@ class UI3D {
         const cnt = 3000;
 
         // i changes from 0 to 2999 in 3000 milliseconds.
-        const i = Math.round(Date.now()) % cnt;
+        const i = Math.round(Date.now() - this.startTime) % cnt;
 
         this.camPhi     = 2.0 * Math.PI * i / cnt;
         this.camTheta   = Math.PI / 3.0;
@@ -121,6 +125,11 @@ class UI3D {
         const lookAtPosition = [0, 0, 0];
         const upDirection    = [0, 1, 0];
         glMatrix.mat4.lookAt(this.viewMatrix, cameraPosition, lookAtPosition, upDirection);
+    }
+
+    setEnv(){
+        const elapsed_time = Math.round(Date.now() - this.startTime);
+        this.env = new Float32Array([ elapsed_time, 0, 0, 0 ]);
     }
 
     setTransformationMatrixAndLighting(){

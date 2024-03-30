@@ -190,7 +190,7 @@ export class RenderPipeline extends AbstractPipeline {
     pipeline! : GPURenderPipeline;
 
     instance : Instance | null = null;
-    compute  : ComputePipeline | undefined;
+    compute  : ComputePipeline | null = null;
 
     constructor(){
         super();
@@ -213,13 +213,6 @@ export class RenderPipeline extends AbstractPipeline {
 
     getWorldMatrix() : Float32Array {
         return glMatrix.mat4.create();
-    }
-
-    makeUniformBuffer(uniform_buffer_size : number){
-        this.uniformBuffer = g_device.createBuffer({
-            size: uniform_buffer_size,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });    
     }
 
     makeUniformBufferAndBindGroup(){
@@ -290,14 +283,6 @@ export class RenderPipeline extends AbstractPipeline {
         this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
     }
 
-    writeUniformBuffer(data : Float32Array, offset : number){
-        g_device.queue.writeBuffer(
-            this.uniformBuffer, offset, data.buffer
-        );
-
-        return offset + data.byteLength;
-    }
-
     writeUniform(){
         let worldMatrix  = this.getWorldMatrix();
         let normalMatrix = glMatrix.mat3.create();
@@ -321,6 +306,7 @@ export class RenderPipeline extends AbstractPipeline {
         offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
         offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
         offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
+        offset = this.writeUniformBuffer(ui3D.env              , offset);
         offset = this.writeUniformBuffer(this.shapeInfo        , offset);
     }
 
@@ -330,7 +316,7 @@ export class RenderPipeline extends AbstractPipeline {
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.uniformBindGroup);
         passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.vertexBuffer);
-        if(this.compute != undefined){
+        if(this.compute != null){
 
             passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
             passEncoder.draw(this.vertexCount, this.compute.instanceCount);
