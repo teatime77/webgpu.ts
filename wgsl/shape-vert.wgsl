@@ -7,7 +7,7 @@ struct Uniforms {
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
     lightingDirection : vec4<f32>,
-    info              : vec4<f32>
+    shapeInfo              : vec4<f32>
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
