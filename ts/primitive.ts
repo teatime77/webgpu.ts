@@ -214,6 +214,10 @@ export class RenderPipeline extends AbstractPipeline {
         return glMatrix.mat4.create();
     }
 
+    getInfo() : Float32Array {
+        return new Float32Array([0,0,0,0]);
+    }
+
     makeUniformBuffer(uniform_buffer_size : number){
         this.uniformBuffer = g_device.createBuffer({
             size: uniform_buffer_size,
@@ -320,6 +324,7 @@ export class RenderPipeline extends AbstractPipeline {
         offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
         offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
         offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
+        offset = this.writeUniformBuffer(this.getInfo()        , offset);
     }
 
 
@@ -498,7 +503,7 @@ export class Cone extends RenderPipeline {
             const phi1 = 2.0 * Math.PI * tri_i / num_division;
             xs[0] = Math.cos(phi1);
             ys[0] = Math.sin(phi1);
-            zs[0] = 0;
+            zs[0] = -1;
 
             nxs[0] = xs[0];
             nys[0] = ys[0];
@@ -508,7 +513,7 @@ export class Cone extends RenderPipeline {
             const phi2 = 2.0 * Math.PI * (tri_i + 1) / num_division;
             xs[1] = Math.cos(phi2);
             ys[1] = Math.sin(phi2);
-            zs[1] = 0;
+            zs[1] = -1;
 
             nxs[1] = xs[1];
             nys[1] = ys[1];
@@ -518,7 +523,7 @@ export class Cone extends RenderPipeline {
             const phi3 = 2.0 * Math.PI * (tri_i + 0.5) / num_division;
             xs[2] = 0;
             ys[2] = 0;
-            zs[2] = 1;
+            zs[2] = 0;
 
             nxs[2] = Math.cos(phi3);
             nys[2] = Math.sin(phi3);
@@ -549,6 +554,12 @@ export class CompositeRenderPipeline extends RenderPipeline {
 export class Axis extends CompositeRenderPipeline {
     constructor(){
         super();
+
+        const disc1 = new Disc();
+        const disc2 = new Disc();
+        const tube  = new Tube();
+        const cone  = new Cone();
+
     }
 }
 

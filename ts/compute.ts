@@ -2,7 +2,7 @@ namespace webgputs {
 
 export function makeComputeUniformArray() : Float32Array {
     const compute_uniform_object = {
-        deltaT: 0.04,
+        deltaT: 0.0,// 0.04,
         rule1Distance: 0.1,
         rule2Distance: 0.025,
         rule3Distance: 0.025,
