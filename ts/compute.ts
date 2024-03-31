@@ -32,9 +32,9 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const comp = new ComputePipeline();
+    const comp = new ComputePipeline("compute");
 
-    await comp.makePipeline("compute");
+    await comp.makeComputePipeline();
 
     // ComputePipelineを生成
 
@@ -125,24 +125,26 @@ export abstract class AbstractPipeline {
 }
 
 export class ComputePipeline extends AbstractPipeline {
+    compName : string;
     pipeline! : GPUComputePipeline;
     updateBuffers: GPUBuffer[] = new Array(2);
     instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2);
 
-    constructor(){
+    constructor(comp_name : string){
         super();
+        this.compName = comp_name;
     }
 
-    async initCompute(inst : Instance, info : ComputeInfo){
-        await this.makePipeline(info.compName);
+    async initCompute(inst : Instance){
+        await this.makeComputePipeline();
         this.makeUniformBuffer(ui3D.env.byteLength);
         this.instanceCount = inst!.instanceArray.length / particleDim;
         this.makeUpdateBuffers(inst!.instanceArray);
     }
 
-    async makePipeline(shader_name: string){
-        const shader_module = await fetchModule(shader_name);
+    async makeComputePipeline(){
+        const shader_module = await fetchModule(this.compName);
 
         this.pipeline = g_device.createComputePipeline({
             layout: 'auto',

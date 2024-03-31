@@ -1,5 +1,21 @@
 namespace webgputs {
 
+const $dic = new Map<string, HTMLElement>();
+
+export function $(id : string) : HTMLElement {
+    let ele = $dic.get(id);
+    if(ele == undefined){
+        ele = document.getElementById(id)!;
+        $dic.set(id, ele);
+    }
+
+    return ele;
+}
+
+export function isInstance() : boolean {
+    return ($("is-instance") as HTMLInputElement).checked;
+}
+
 export function mat4fromMat3(m3 : Float32Array){
     const m4 = glMatrix.mat4.create();
 

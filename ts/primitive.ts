@@ -173,6 +173,9 @@ export class Instance {
 }
 
 export class RenderPipeline extends AbstractPipeline {
+    vertName : string;
+    fragName : string
+
     vertModule! : Module;
     fragModule! : Module;
 
@@ -194,6 +197,15 @@ export class RenderPipeline extends AbstractPipeline {
 
     constructor(){
         super();
+
+        if(isInstance()){
+
+            this.vertName = "instance-vert";
+        }
+        else{
+            this.vertName = "shape-vert";
+        }
+        this.fragName = "depth-frag";
     }
 
     red() : RenderPipeline {
@@ -247,9 +259,9 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertexBuffer.unmap();
     }
 
-    async makePipeline(vert_name : string, frag_name : string, topology : GPUPrimitiveTopology) {
-        this.vertModule = await fetchModule(vert_name);
-        this.fragModule = await fetchModule(frag_name);
+    async makeRenderPipeline(){
+        this.vertModule = await fetchModule(this.vertName);
+        this.fragModule = await fetchModule(this.fragName);
     
         const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.instance != null ? this.instance.varNames : []);
     
@@ -271,7 +283,7 @@ export class RenderPipeline extends AbstractPipeline {
                 ],
             },
             primitive: {
-                topology: topology,
+                topology: this.topology,
             },
             depthStencil: {
                 depthWriteEnabled: true,
@@ -554,7 +566,7 @@ export function makeArrow() : RenderPipeline[] {
     const cone  = new Cone();
     cone.shapeInfo   = new Float32Array([ 1, 4, 0, 0]);
 
-    return [ disc1, disc2, tube, cone ];
+    return [ disc1, disc2 ];
 }
 
 

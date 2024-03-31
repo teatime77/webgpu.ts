@@ -96,8 +96,8 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
 export const particleDim = 8;
 
 export function makeInitialInstanceArray() : Float32Array {
-    const theta_cnt = 5;
-    const phi_cnt   = 10;
+    const theta_cnt = 3;
+    const phi_cnt   = 6;
     const numParticles = theta_cnt * phi_cnt;
     const initial_instance_array = new Float32Array(numParticles * particleDim);
 

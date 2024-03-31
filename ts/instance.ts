@@ -13,7 +13,7 @@ class Run {
     comp : ComputePipeline | null = null;
     tick : number = 0;
 
-    async init(inst : Instance | null, info : ComputeInfo, meshes: RenderPipeline[]){
+    async init(inst : Instance | null, meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -24,15 +24,15 @@ class Run {
     
         if(inst != null){
 
-            this.comp = new ComputePipeline();
-            await this.comp.initCompute(inst!, info);
+            this.comp = new ComputePipeline("updateSprites");
+            await this.comp.initCompute(inst!);
         
             this.meshes.forEach(x => x.compute = this.comp);
         }
 
         for(let mesh of this.meshes){
             // create a render pipeline
-            await mesh.makePipeline(info.vertName, info.fragName, mesh.topology);
+            await mesh.makeRenderPipeline();
 
             mesh.makeUniformBufferAndBindGroup();
 
@@ -106,17 +106,6 @@ class Run {
     }
 }
 
-export class ComputeInfo {
-    compName : string;
-    vertName : string;
-    fragName : string
-
-    constructor(comp_name : string, vert_name : string, frag_name : string){
-        this.compName = comp_name;
-        this.vertName   = vert_name;
-        this.fragName   = frag_name;
-    }
-}
 
 export function stopAnimation(){
     // validFrame = false;
@@ -126,13 +115,13 @@ export function stopAnimation(){
     }
 }
 
-async function startAnimation(inst : Instance | null, info : ComputeInfo, meshes: RenderPipeline[]){
+async function startAnimation(inst : Instance | null, meshes: RenderPipeline[]){
     stopAnimation();
     validFrame = false;
 
     meshes.forEach(x => x.instance = inst);
     const run = new Run();
-    await run.init(inst, info, meshes);
+    await run.init(inst, meshes);
     validFrame = true;
     requestId = requestAnimationFrame(run.frame.bind(run));
 }
@@ -140,25 +129,27 @@ async function startAnimation(inst : Instance | null, info : ComputeInfo, meshes
 export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
     const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray());
 
-    const vert_name = (inst == null ? "shape-vert": "instance-vert");
-    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag");
-
-    startAnimation(inst, info, meshes);
+    startAnimation(inst, meshes);
 }
 
 export async function asyncBodyOnLoadBoi() {
     const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
 
-    const vert_name = (inst == null ? "shape-vert": "sprite");
-    const info = new ComputeInfo("updateSprites", vert_name, "depth-frag");
-
     const mesh = new RenderPipeline();
+    if(isInstance()){
+
+        mesh.vertName    = "sprite";
+    }
+    else{
+
+        mesh.vertName    = "shape-vert";
+    }
     mesh.vertexArray = makeConeSub3(true);
     mesh.vertexCount = mesh.vertexArray.length / 6;
 
     const meshes: RenderPipeline[] = [ mesh ];
 
-    startAnimation(inst, info, meshes);
+    startAnimation(inst, meshes);
 }
 
 export async function asyncBodyOnLoadArrow(){
@@ -166,9 +157,7 @@ export async function asyncBodyOnLoadArrow(){
 }
 
 export function makeInstance(var_names : string[], instance_array : Float32Array) : Instance | null {
-    const is_instance = (document.getElementById("is-instance") as HTMLInputElement).checked;
-
-    if(is_instance){
+    if(isInstance()){
         return new Instance(var_names, instance_array);
     }
     else{
