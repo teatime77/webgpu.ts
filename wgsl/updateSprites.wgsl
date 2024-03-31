@@ -1,6 +1,6 @@
 struct Particle {
-  pos : vec4<f32>,
-  vel : vec4<f32>,
+  meshPos : vec4<f32>,
+  meshVec : vec4<f32>,
 }
 struct SimParams {
     env : vec4<f32>
@@ -13,15 +13,15 @@ struct SimParams {
 // https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+  const pi = 3.14159265359;
+
   var index = GlobalInvocationID.x;
 
-  var vPos = particlesA[index].pos;
-  var vVel = particlesA[index].vel;
+  var pos = particlesA[index].meshPos;
 
-  vPos = vPos + (vVel * params.env.y);
-  vVel = vVel * params.env.y;
+  var theta : f32 = 2.0 * pi * f32(i32(params.env.x) % 4096) / 4096.0;
 
   // Write back
-  particlesB[index].pos = vPos;
-  particlesB[index].vel = vVel;
+  particlesB[index].meshPos = pos;
+  particlesB[index].meshVec = sin(theta) * vec4<f32>(0.0, 0.0, 1.0, 0.0);
 }
