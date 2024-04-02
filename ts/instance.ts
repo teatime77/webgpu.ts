@@ -27,7 +27,7 @@ class Run {
             this.comp = new ComputePipeline("updateSprites");
             await this.comp.initCompute(inst!);
         
-            this.meshes.forEach(x => x.compute = this.comp);
+            this.meshes.filter(x => !(x instanceof Line)).forEach(x => x.compute = this.comp);
         }
 
         for(let mesh of this.meshes){

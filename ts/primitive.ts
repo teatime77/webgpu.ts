@@ -340,6 +340,22 @@ export class RenderPipeline extends AbstractPipeline {
     }
 }
 
+
+export class Line extends RenderPipeline {
+    constructor(vertex_array : Float32Array){
+        super();
+        this.vertName = "line-vert";
+        
+    
+        // 位置の配列
+        this.vertexArray = vertex_array;
+        this.vertexCount = vertex_array.length / (3 + 3);
+        console.assert(vertex_array.length % (3 + 3) == 0)
+    
+        this.topology = 'line-list';
+    }
+}
+
 export class Tube extends RenderPipeline {
     constructor(){
         super();
@@ -356,7 +372,7 @@ export class Tube extends RenderPipeline {
             let x = Math.cos(theta);
             let y = Math.sin(theta);
 
-            for(const z of [1, -1]){
+            for(const z of [0, 1]){
 
                 setPosNorm(this.vertexArray, base, x, y, z, x, y, 0);
                 base++;
@@ -494,25 +510,34 @@ export class Cone extends RenderPipeline {
 
         for(let tri_i = 0; tri_i < num_division; tri_i++){
 
+            // coneを横から見たら正三角形になるようにする。
+            // 正三角形なので半径が1なら斜辺の長さは2になる。
+            // この正三角形の高さは√3
+            const tri_h = Math.sqrt(3);
+
+            // 正三角形の斜辺の傾きは60°なので、斜辺の法線の傾きは30°
+            // 斜辺の法線の高さはsin(30°)
+            const norm_h = Math.sin(Math.PI / 6);
+
             // 1st vertex
             const phi1 = 2.0 * Math.PI * tri_i / num_division;
             xs[0] = Math.cos(phi1);
             ys[0] = Math.sin(phi1);
-            zs[0] = -1;
+            zs[0] = -tri_h;
 
             nxs[0] = xs[0];
             nys[0] = ys[0];
-            nzs[0] = 1;
+            nzs[0] = norm_h;
 
             // 2nd vertex
             const phi2 = 2.0 * Math.PI * (tri_i + 1) / num_division;
             xs[1] = Math.cos(phi2);
             ys[1] = Math.sin(phi2);
-            zs[1] = -1;
+            zs[1] = -tri_h;
 
             nxs[1] = xs[1];
             nys[1] = ys[1];
-            nzs[1] = 1;
+            nzs[1] = norm_h;
 
             // 3rd vertex
             const phi3 = 2.0 * Math.PI * (tri_i + 0.5) / num_division;
@@ -522,7 +547,7 @@ export class Cone extends RenderPipeline {
 
             nxs[2] = Math.cos(phi3);
             nys[2] = Math.sin(phi3);
-            nzs[2] = 1;
+            nzs[2] = norm_h;
     
             for(let i = 0; i < 3; i++){
                 const base = (tri_i * 3 + i) * (3 + 3);
@@ -566,7 +591,31 @@ export function makeArrow() : RenderPipeline[] {
     const cone  = new Cone();
     cone.shapeInfo   = new Float32Array([ 1, 4, 0, 0]);
 
-    return [ disc1, disc2 ];
+    const th = Math.PI / 3.0;
+    const s = 100 * Math.sin(th);
+    const c = 100 * Math.cos(th);
+
+    const line = new Line(new Float32Array([ 
+        -100,0,0, 1,0,0, 
+         100,0,0, 1,0,0,
+
+        0,-100,0, 0,1,0,
+        0, 100,0, 0,1,0,
+        
+        0,0,-100, 0,0,1,
+        0,0, 100, 0,0,1,
+
+        -c,-s,0, 1,1,0,
+         c, s,0, 1,1,0,
+
+         0,-c,-s, 0,1,1,
+         0, c, s, 0,1,1,
+
+         -s,0,-c, 1,0,1,
+          s,0, c, 1,0,1
+    ]))
+
+    return [ disc1, tube, disc2, cone, line ];
 }
 
 

@@ -13,15 +13,17 @@ struct SimParams {
 // https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-  const pi = 3.14159265359;
+    const pi = 3.14159265359;
 
-  var index = GlobalInvocationID.x;
+    var index = GlobalInvocationID.x;
 
-  var pos = particlesA[index].meshPos;
+    var pos = particlesA[index].meshPos;
+    var v1 : vec3<f32> = normalize(pos.xyz);
 
-  var theta : f32 = 2.0 * pi * f32(i32(params.env.x) % 4096) / 4096.0;
+    var alpha : f32 = 2.0 * pi * f32(i32(params.env.x) % 3000) / 3000.0;
+    var dist = sin(alpha);
 
-  // Write back
-  particlesB[index].meshPos = pos;
-  particlesB[index].meshVec = sin(theta) * vec4<f32>(0.0, 0.0, 1.0, 0.0);
+    // Write back
+    particlesB[index].meshPos = pos;
+    particlesB[index].meshVec = dist * vec4<f32>(v1, 0.0);
 }

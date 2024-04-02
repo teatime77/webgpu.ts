@@ -118,7 +118,7 @@ class UI3D {
     }
 
     setAutoCameraAngle() {
-        const cnt = 3000;
+        const cnt = 10 * 1000;
 
         // i changes from 0 to 2999 in 3000 milliseconds.
         const i = Math.round(Date.now() - this.startTime) % cnt;

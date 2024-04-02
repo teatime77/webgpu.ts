@@ -95,9 +95,53 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
 
 export const particleDim = 8;
 
+function addVertex(v : number[], x : number, y : number , z: number){
+    let c = 4.0;
+
+    v.push(c * x);
+    v.push(c * y);
+    v.push(c * z);
+    v.push(0);
+
+    c = 1 / Math.sqrt(x * x + y * y + z * z);
+    v.push(c * x);
+    v.push(c * y);
+    v.push(c * z);
+    v.push(0);
+
+}
+export function makeInitialInstanceArrayNEW() : Float32Array {
+    const v : number[] = [];
+
+    addVertex(v,  1,0,0);
+    addVertex(v, -1,0,0);
+
+    addVertex(v, 0, 1,0);
+    addVertex(v, 0,-1,0);
+
+    addVertex(v, 0,0, 1);
+    addVertex(v, 0,0,-1);
+
+    const th = Math.PI / 3.0;
+    const s = Math.sin(th);
+    const c = Math.cos(th);
+
+    addVertex(v,-c,-s,0);
+    addVertex(v, c, s,0);
+
+    addVertex(v, 0,-c,-s);
+    addVertex(v, 0, c, s);
+
+    addVertex(v,-s,0,-c);
+    addVertex(v, s,0, c);
+
+    
+    return new Float32Array(v);
+}
+
 export function makeInitialInstanceArray() : Float32Array {
-    const theta_cnt = 3;
-    const phi_cnt   = 6;
+    const theta_cnt = 10;
+    const phi_cnt   = 20;
     const numParticles = theta_cnt * phi_cnt;
     const initial_instance_array = new Float32Array(numParticles * particleDim);
 
