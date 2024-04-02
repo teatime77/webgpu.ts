@@ -156,6 +156,10 @@ export async function asyncBodyOnLoadArrow(){
     asyncBodyOnLoadIns(makeArrow());
 }
 
+export async function asyncBodyOnLoadMaxwell_1D(){
+    
+}
+
 export function makeInstance(var_names : string[], instance_array : Float32Array) : Instance | null {
     if(isInstance()){
         return new Instance(var_names, instance_array);

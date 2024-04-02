@@ -140,6 +140,7 @@ export class ComputePipeline extends AbstractPipeline {
         await this.makeComputePipeline();
         this.makeUniformBuffer(ui3D.env.byteLength);
         this.instanceCount = inst!.instanceArray.length / particleDim;
+        console.assert(this.instanceCount == inst.instanceCount);
         this.makeUpdateBuffers(inst!.instanceArray);
     }
 

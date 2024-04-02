@@ -63,6 +63,7 @@ var SymbolTable : Array<string> = new  Array<string> (
 var KeywordMap : string[] = [
     "struct",
     "var",
+    "const",
     "fn",
     "uniform",
     "read",
@@ -91,6 +92,7 @@ const TypeName : string[] = [
 
     "vec3u",
     "f32",
+    "i32",
     "u32",
     "sampler"
 ]
@@ -405,6 +407,7 @@ function primitiveTypeSize(primitive : string) : number{
     switch(primitive){
     case "vec3u": return 3 * 4;
     case "f32"  : return 4;
+    case "i32"  : return 4;
     case "u32"  : return 4;
     case "sampler":
     default:
@@ -469,6 +472,7 @@ class Type {
 
         switch(this.primitive){
             case "f32"  : fmt = "float32"; break;
+            case "i32"  : fmt = "int32"; break;
             case "u32"  : fmt = "uint32"; break;
             default:
                 error(`unknown type format ${this.primitive}`);
@@ -795,6 +799,14 @@ export class Parser {
 
     }
 
+    readConst(){
+        this.readText("const");
+        while(this.currentToken.text != ";"){
+            this.advance();
+        }
+        this.readText(";");
+    }
+
     readFn(mod : Modifier) : Function {
         this.readText("fn");
 
@@ -863,6 +875,10 @@ export class Parser {
                     module.vars.push(buf_var);
                     break;
 
+                case "const":
+                    this.readConst();
+                    break;
+
                 case "fn":
                     const fn = this.readFn(mod);
                     module.fns.push(fn);
@@ -903,6 +919,7 @@ const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
 
 export async function parseAll(){
     const shader_names = [
+        "maxwell",
         "compute",
         "demo",
         "depth-frag",
