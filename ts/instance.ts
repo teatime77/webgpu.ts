@@ -13,7 +13,7 @@ class Run {
     comp : ComputePipeline | null = null;
     tick : number = 0;
 
-    async init(inst : Instance | null, meshes: RenderPipeline[]){
+    async init(inst : ComputePipeline | null, meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
@@ -24,8 +24,9 @@ class Run {
     
         if(inst != null){
 
-            this.comp = new ComputePipeline(inst);
+            this.comp = inst;
             await this.comp.initCompute();
+            this.comp.makeInstanceBuffer();
         
             this.meshes.filter(x => !(x instanceof Line)).forEach(x => x.compute = this.comp);
         }
@@ -37,10 +38,6 @@ class Run {
             mesh.makeUniformBufferAndBindGroup();
 
             mesh.makeVertexBuffer();
-
-            if(mesh.instance != null){
-                mesh.instance.makeInstanceBuffer();
-            }
         }
 
         this.depthTexture = g_device.createTexture({
@@ -84,9 +81,9 @@ class Run {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.comp!.pipeline);
             passEncoder.setBindGroup(0, this.comp!.bindGroups[this.tick % 2]);
-            if(this.comp.inst.workgroupCounts != null){
+            if(this.comp.workgroupCounts != null){
 
-                passEncoder.dispatchWorkgroups(... this.comp.inst.workgroupCounts);
+                passEncoder.dispatchWorkgroups(... this.comp.workgroupCounts);
             }
             else{
 
@@ -122,11 +119,10 @@ export function stopAnimation(){
     }
 }
 
-async function startAnimation(inst : Instance | null, meshes: RenderPipeline[]){
+async function startAnimation(inst : ComputePipeline | null, meshes: RenderPipeline[]){
     stopAnimation();
     validFrame = false;
 
-    meshes.forEach(x => x.instance = inst);
     const run = new Run();
     await run.init(inst, meshes);
     validFrame = true;
@@ -183,9 +179,9 @@ export async function asyncBodyOnLoadMaxwell_1D(){
     startAnimation(inst, meshes);    
 }
 
-export function makeInstance(comp_name : string, var_names : string[], instance_array : Float32Array) : Instance | null {
+export function makeInstance(comp_name : string, var_names : string[], instance_array : Float32Array) : ComputePipeline | null {
     if(isInstance()){
-        return new Instance(comp_name, var_names, instance_array);
+        return new ComputePipeline(comp_name, var_names, instance_array);
     }
     else{
         return null;

@@ -32,8 +32,7 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const inst = new Instance("compute", [], new Float32Array([]))
-    const comp = new ComputePipeline(inst);
+    const comp = new ComputePipeline("compute", [], new Float32Array([]));
 
     await comp.makeComputePipeline();
 
@@ -126,27 +125,46 @@ export abstract class AbstractPipeline {
 }
 
 export class ComputePipeline extends AbstractPipeline {
-    inst! : Instance;
+    compName : string;
+    varNames : string[];
+    instanceArray : Float32Array;
+    instanceCount : number;
+    buffer!: GPUBuffer;
+    workgroupCounts : [number, number, number] | null = null;
+
+
     pipeline! : GPUComputePipeline;
     updateBuffers: GPUBuffer[] = new Array(2);
-    instanceCount : number = 0;
     bindGroups: GPUBindGroup[] = new Array(2);
 
-    constructor(inst : Instance){
+    constructor(comp_name : string, var_names : string[], instance_array : Float32Array){
         super();
-        this.inst = inst;
+        this.compName = comp_name;
+        this.varNames = var_names;
+        this.instanceArray = instance_array;
+
+        this.instanceCount = this.instanceArray.length / particleDim;   // Math.floor(this.array.length / 2);
     }
 
     async initCompute(){
         await this.makeComputePipeline();
         this.makeUniformBuffer(ui3D.env.byteLength);
-        this.instanceCount = this.inst.instanceArray.length / particleDim;
-        console.assert(this.instanceCount == this.inst.instanceCount);
-        this.makeUpdateBuffers(this.inst.instanceArray);
+        this.makeUpdateBuffers(this.instanceArray);
+    }
+
+    makeInstanceBuffer(){
+        // Create a instances buffer
+        this.buffer = g_device.createBuffer({
+            size: this.instanceArray.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            // mappedAtCreation: true,
+        });
+        // new Float32Array(this.buffer.getMappedRange()).set(this.array);
+        // this.buffer.unmap();
     }
 
     async makeComputePipeline(){
-        const shader_module = await fetchModule(this.inst.compName);
+        const shader_module = await fetchModule(this.compName);
 
         this.pipeline = g_device.createComputePipeline({
             layout: 'auto',

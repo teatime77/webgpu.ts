@@ -147,33 +147,6 @@ class Triangle {
     }
 }
 
-export class Instance {
-    compName : string;
-    varNames : string[];
-    instanceArray : Float32Array;
-    instanceCount : number;
-    buffer!: GPUBuffer;
-    workgroupCounts : [number, number, number] | null = null;
-
-    constructor(comp_name : string, var_names : string[], instance_array : Float32Array){
-        this.compName = comp_name;
-        this.varNames = var_names;
-        this.instanceArray = instance_array;
-
-        this.instanceCount = this.instanceArray.length / particleDim;   // Math.floor(this.array.length / 2);
-    }
-
-    makeInstanceBuffer(){
-        // Create a instances buffer
-        this.buffer = g_device.createBuffer({
-            size: this.instanceArray.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            // mappedAtCreation: true,
-        });
-        // new Float32Array(this.buffer.getMappedRange()).set(this.array);
-        // this.buffer.unmap();
-    }
-}
 
 export class RenderPipeline extends AbstractPipeline {
     vertName : string;
@@ -195,7 +168,6 @@ export class RenderPipeline extends AbstractPipeline {
 
     pipeline! : GPURenderPipeline;
 
-    instance : Instance | null = null;
     compute  : ComputePipeline | null = null;
 
     constructor(){
@@ -266,7 +238,7 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertModule = await fetchModule(this.vertName);
         this.fragModule = await fetchModule(this.fragName);
     
-        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.instance != null ? this.instance.varNames : []);
+        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute != null ? this.compute.varNames : []);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',
