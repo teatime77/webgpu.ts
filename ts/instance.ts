@@ -134,26 +134,6 @@ export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
     startAnimation(inst, meshes);
 }
 
-export async function asyncBodyOnLoadBoi() {
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim)!;
-
-    const mesh = new RenderPipeline();
-    if(isInstance()){
-
-        mesh.vertName    = "sprite";
-    }
-    else{
-
-        mesh.vertName    = "shape-vert";
-    }
-    mesh.vertexArray = makeConeSub3(true);
-    mesh.vertexCount = mesh.vertexArray.length / 6;
-
-    const meshes: RenderPipeline[] = [ mesh ];
-
-    startAnimation(inst, meshes);
-}
-
 export async function asyncBodyOnLoadArrow(){
     const meshes = makeArrow();
 

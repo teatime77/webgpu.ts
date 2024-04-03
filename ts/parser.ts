@@ -925,7 +925,6 @@ export async function parseAll(){
         "depth-frag",
         "instance-vert",
         "shape-vert",
-        "sprite",
         "texture-frag",
         "texture-vert",
         "updateSprites",
