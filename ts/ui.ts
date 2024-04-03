@@ -60,6 +60,7 @@ class UI3D {
     lightingDirection! : Float32Array;
 
     startTime          : number;
+    tick               : number = 0;
     env                : Float32Array = new Float32Array([0,0,0,0]);
 
     constructor(canvas : HTMLCanvasElement, eye : any){
@@ -145,6 +146,9 @@ class UI3D {
     setEnv(){
         const elapsed_time = Math.round(Date.now() - this.startTime);
         this.env[0] = elapsed_time;
+        this.env[1] = this.tick;
+
+        this.tick++;
     }
 
     setTransformationMatrixAndLighting(){

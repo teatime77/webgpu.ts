@@ -148,12 +148,15 @@ class Triangle {
 }
 
 export class Instance {
+    compName : string;
     varNames : string[];
     instanceArray : Float32Array;
     instanceCount : number;
     buffer!: GPUBuffer;
+    workgroupCounts : [number, number, number] | null = null;
 
-    constructor(var_names : string[], instance_array : Float32Array){
+    constructor(comp_name : string, var_names : string[], instance_array : Float32Array){
+        this.compName = comp_name;
         this.varNames = var_names;
         this.instanceArray = instance_array;
 

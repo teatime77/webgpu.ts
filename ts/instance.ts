@@ -24,8 +24,8 @@ class Run {
     
         if(inst != null){
 
-            this.comp = new ComputePipeline("updateSprites");
-            await this.comp.initCompute(inst!);
+            this.comp = new ComputePipeline(inst);
+            await this.comp.initCompute();
         
             this.meshes.filter(x => !(x instanceof Line)).forEach(x => x.compute = this.comp);
         }
@@ -84,7 +84,14 @@ class Run {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.comp!.pipeline);
             passEncoder.setBindGroup(0, this.comp!.bindGroups[this.tick % 2]);
-            passEncoder.dispatchWorkgroups(this.comp!.instanceCount!);
+            if(this.comp.inst.workgroupCounts != null){
+
+                passEncoder.dispatchWorkgroups(... this.comp.inst.workgroupCounts);
+            }
+            else{
+
+                passEncoder.dispatchWorkgroups(this.comp.instanceCount);
+            }
             passEncoder.end();
         }
         {
@@ -127,13 +134,13 @@ async function startAnimation(inst : Instance | null, meshes: RenderPipeline[]){
 }
 
 export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
-    const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray());
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray());
 
     startAnimation(inst, meshes);
 }
 
 export async function asyncBodyOnLoadBoi() {
-    const inst = makeInstance([ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
 
     const mesh = new RenderPipeline();
     if(isInstance()){
@@ -153,16 +160,32 @@ export async function asyncBodyOnLoadBoi() {
 }
 
 export async function asyncBodyOnLoadArrow(){
-    asyncBodyOnLoadIns(makeArrow());
+    const meshes = makeArrow();
+
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray());
+
+    startAnimation(inst, meshes);
+
 }
 
 export async function asyncBodyOnLoadMaxwell_1D(){
-    
+    const meshes = makeArrow();
+
+    const sx = 16;
+    const sy = 16;
+    const sz = 1;
+        const inst = makeInstance("maxwell", [ "meshPos", "meshVec" ], new Float32Array(sx * sy * sz * 2 * particleDim));
+    if(inst != null){
+
+        inst.workgroupCounts = [ sx/8, sy/8, 1 ];
+    }
+
+    startAnimation(inst, meshes);    
 }
 
-export function makeInstance(var_names : string[], instance_array : Float32Array) : Instance | null {
+export function makeInstance(comp_name : string, var_names : string[], instance_array : Float32Array) : Instance | null {
     if(isInstance()){
-        return new Instance(var_names, instance_array);
+        return new Instance(comp_name, var_names, instance_array);
     }
     else{
         return null;

@@ -16,8 +16,8 @@ const PI : f32 = 3.14159265359;
 const mu0 : f32 = 1.25663706212e-06;
 const epsilon0 : f32 = 8.854187812799999e-12;
 
-const sx = 256;
-const sy = 256;
+const sx = 16;
+const sy = 16;
 const sz = 1;
 const K : f32 = 1.0 / 16.0;
 
@@ -88,9 +88,10 @@ fn calcRot(flag : i32, E : vec3<f32>, H : vec3<f32>, i : i32, j : i32, k : i32) 
     }
 }
 
-@compute @workgroup_size(256,256,2)
+@compute @workgroup_size(8,8,2)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
-    var L = 3.2 / f32(max(sx, max(sy,sz)));
+    // var L = 3.2 / f32(max(sx, max(sy,sz)));
+    var L = 10.0 / f32(max(sx, max(sy,sz)));
     // var K = f32(@{K});
 
     var col  = i32(GlobalInvocationID.x);
@@ -104,7 +105,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     var E : vec3<f32>;
     var H : vec3<f32>;
 
-    var tick = i32(params.env.x);
+    var tick = i32(params.env.y);
 
     if(tick == 0){
         E = vec3<f32>(0.0, 0.0, 0.0);
