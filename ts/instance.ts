@@ -26,7 +26,6 @@ class Run {
 
             this.comp = inst;
             await this.comp.initCompute();
-            this.comp.makeInstanceBuffer();
         
             this.meshes.filter(x => !(x instanceof Line)).forEach(x => x.compute = this.comp);
         }
@@ -130,13 +129,13 @@ async function startAnimation(inst : ComputePipeline | null, meshes: RenderPipel
 }
 
 export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray());
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim);
 
     startAnimation(inst, meshes);
 }
 
 export async function asyncBodyOnLoadBoi() {
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray())!;
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim)!;
 
     const mesh = new RenderPipeline();
     if(isInstance()){
@@ -158,7 +157,7 @@ export async function asyncBodyOnLoadBoi() {
 export async function asyncBodyOnLoadArrow(){
     const meshes = makeArrow();
 
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], makeInitialInstanceArray());
+    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim);
 
     startAnimation(inst, meshes);
 
@@ -170,7 +169,7 @@ export async function asyncBodyOnLoadMaxwell_1D(){
     const sx = 16;
     const sy = 16;
     const sz = 1;
-        const inst = makeInstance("maxwell", [ "meshPos", "meshVec" ], new Float32Array(sx * sy * sz * 2 * particleDim));
+        const inst = makeInstance("maxwell", [ "meshPos", "meshVec" ], sx * sy * sz * 2 * particleDim);
     if(inst != null){
 
         inst.workgroupCounts = [ sx/8, sy/8, 1 ];
@@ -179,9 +178,9 @@ export async function asyncBodyOnLoadMaxwell_1D(){
     startAnimation(inst, meshes);    
 }
 
-export function makeInstance(comp_name : string, var_names : string[], instance_array : Float32Array) : ComputePipeline | null {
+export function makeInstance(comp_name : string, var_names : string[], instance_array_length : number) : ComputePipeline | null {
     if(isInstance()){
-        return new ComputePipeline(comp_name, var_names, instance_array);
+        return new ComputePipeline(comp_name, var_names, instance_array_length);
     }
     else{
         return null;

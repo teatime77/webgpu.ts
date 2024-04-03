@@ -139,43 +139,6 @@ export function makeInitialInstanceArrayNEW() : Float32Array {
     return new Float32Array(v);
 }
 
-export function makeInitialInstanceArray() : Float32Array {
-    const theta_cnt = 10;
-    const phi_cnt   = 20;
-    const numParticles = theta_cnt * phi_cnt;
-    const initial_instance_array = new Float32Array(numParticles * particleDim);
-
-    const c = 6.0;
-    let base = 0;
-    for(let theta_i = 0; theta_i < theta_cnt; theta_i++){
-        const theta = Math.PI * theta_i / theta_cnt;
-        const z = Math.cos(theta);
-        const r = Math.sin(theta);
-
-        for(let phi_i = 0; phi_i < phi_cnt; phi_i++){
-            const phi = 2 * Math.PI * phi_i / phi_cnt;
-
-            const x = r * Math.cos(phi);
-            const y = r * Math.sin(phi);
-
-            initial_instance_array[base + 0] = c * x;
-            initial_instance_array[base + 1] = c * y;
-            initial_instance_array[base + 2] = c * z;
-            initial_instance_array[base + 3] = 0.0;
-
-            initial_instance_array[base + 4] = x;
-            initial_instance_array[base + 5] = y;
-            initial_instance_array[base + 6] = z;
-            initial_instance_array[base + 7] = 0.0;
-
-            base += particleDim;
-        }
-    }
-    console.assert(base == initial_instance_array.length);
-
-    return initial_instance_array;
-}
-
 export function makeShaderModule( text : string) : GPUShaderModule {
     g_device.pushErrorScope("validation");
 

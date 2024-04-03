@@ -152,23 +152,21 @@ export class RenderPipeline extends AbstractPipeline {
     vertName : string;
     fragName : string
 
-    vertModule! : Module;
-    fragModule! : Module;
-
-    uniformBindGroup!: GPUBindGroup;
-
     vertexCount!: number;
     vertexArray!: Float32Array;
-    vertexBuffer!: GPUBuffer;
 
     topology!: GPUPrimitiveTopology;
 
-    materialColor : Float32Array = new Float32Array([1.0, 1.0, 1.0, 1.0]);
-    shapeInfo          = new Float32Array([0,0,0,0]);
-
-    pipeline! : GPURenderPipeline;
+    materialColor = new Float32Array([1.0, 1.0, 1.0, 1.0]);
+    shapeInfo     = new Float32Array([0,0,0,0]);
 
     compute  : ComputePipeline | null = null;
+
+    pipeline!         : GPURenderPipeline;
+    vertModule!       : Module;
+    fragModule!       : Module;
+    uniformBindGroup! : GPUBindGroup;
+    vertexBuffer!     : GPUBuffer;
 
     constructor(){
         super();
