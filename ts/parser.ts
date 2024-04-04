@@ -174,19 +174,25 @@ export class Module {
         this.fns.forEach(x => msg(`${x.str()}`))
     }
 
-    uniformSize() : number {
+    getUniformVar() : Variable {
         const uniform_var = this.vars.find(x => x.mod.uniform);
         if(uniform_var == undefined){
             throw new Error("no uniform var");
         }
+
+        return uniform_var;;
+    }
+
+    uniformSize() : number {
+        const uniform_var = this.getUniformVar();
+
+        if(uniform_var.type instanceof Struct){
+
+            return uniform_var.type.size();
+        }
         else{
-            const struct_name = uniform_var.type.name();
-            const uniform_struct = this.structs.find(x => x.name == struct_name);
-            if(uniform_struct == undefined){
-                throw new Error("no uniform type");
-            }
-    
-            return uniform_struct.size();
+
+            throw new Error("no uniform type");
         }
     }
     
@@ -379,6 +385,18 @@ class Modifier {
     fnType : string | undefined;
     uniform : boolean = false;
 
+    empty() : boolean {
+        const v = [
+            this.group,
+            this.binding,
+            this.location,
+            this.workgroup_size,
+            this.builtin,
+            this.fnType
+        ];
+        return v.every(x => x == undefined) && this.uniform == false;
+    }
+
     str() : string {
         let s = "";
 
@@ -432,34 +450,34 @@ function primitiveTypeSize(primitive : string) : number{
 class Type {
     mod : Modifier;
     aggregate : string | undefined;
-    primitive : string;
+    typeName : string;
 
-    constructor(mod : Modifier, aggregate : string | undefined, primitive : string){
+    constructor(mod : Modifier, aggregate : string | undefined, type_name : string){
         this.mod = mod;
         this.aggregate = aggregate;
-        this.primitive = primitive;
+        this.typeName = type_name;
     }
 
     name() : string {
         if(this.aggregate != undefined){
-            return `${this.aggregate}<${this.primitive}>`;
+            return `${this.aggregate}<${this.typeName}>`;
         }
         else{
-            return this.primitive;
+            return this.typeName;
         }
     }
 
     str() : string {
         if(this.aggregate != undefined){
-            return `${this.mod.str()} ${this.aggregate}<${this.primitive}>`;
+            return `${this.mod.str()} ${this.aggregate}<${this.typeName}>`;
         }
         else{
-            return `${this.mod.str()} ${this.primitive}`;
+            return `${this.mod.str()} ${this.typeName}`;
         }
     }
 
     size() : number {
-        const primitive_size = primitiveTypeSize(this.primitive);
+        const primitive_size = primitiveTypeSize(this.typeName);
         if(this.aggregate == undefined){
             return primitive_size;
         }
@@ -483,12 +501,12 @@ class Type {
     format() : string {
         let fmt : string;
 
-        switch(this.primitive){
+        switch(this.typeName){
             case "f32"  : fmt = "float32"; break;
             case "i32"  : fmt = "int32"; break;
             case "u32"  : fmt = "uint32"; break;
             default:
-                error(`unknown type format ${this.primitive}`);
+                error(`unknown type format ${this.typeName}`);
                 return "";
         }
 
@@ -504,18 +522,17 @@ class Type {
     }
 }
 
-class Struct {
-    mod : Modifier;
-    name : string;
+export class Struct extends Type {
     members : Variable[] = [];
 
-    constructor(mod : Modifier, name : string){
+    constructor(mod : Modifier, type_name : string){
+        super(mod, undefined, type_name);
         this.mod = mod;
-        this.name = name;
+        this.typeName = type_name;
     }
 
     dump(){
-        msg(`${this.mod.str()} struct ${this.name}{`);
+        msg(`${this.mod.str()} struct ${this.typeName}{`);
         for(const va of this.members){
             msg(`    ${va.str()};`);
         }
@@ -567,6 +584,7 @@ export class Parser {
     inFn : boolean = false;
 
     tokenList : Token[];
+    structs : Struct[] = [];
 
     constructor(tokens : Token[]){
         this.tokenList = tokens;
@@ -683,9 +701,17 @@ export class Parser {
                 return new Type(mod, aggregate, primitive);
         }
 
-        const primitive = this.readToken(TokenType.type);
-        return new Type(mod, undefined, primitive);
+        const type_name = this.readToken(TokenType.type);
 
+        const struct = this.structs.find(x => x.typeName == type_name);
+        if(struct == undefined){
+
+            return new Type(mod, undefined, type_name);
+        }
+        else{
+            assert(mod.empty());
+            return struct;
+        }
     }
 
     readVariable() : Variable {
@@ -702,7 +728,9 @@ export class Parser {
         this.advance();
 
         const name = this.readId();
+        assert(mod.empty());
         const struct = new Struct(mod, name);
+        this.structs.push(struct);
 
         // change typeTkn
         this.tokenList.filter(x => x.text == name).forEach(x => x.typeTkn = TokenType.type);

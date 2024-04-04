@@ -280,22 +280,42 @@ export class RenderPipeline extends AbstractPipeline {
 
         let offset = 0;
 
-        offset = this.writeUniformBuffer(pvw, offset);
-        offset = this.writeUniformBuffer(normalMatrix, offset);
-
         // vec4 align is 16
         // https://www.w3.org/TR/WGSL/#alignment-and-size
         // offset += 12;
 
-        offset = this.writeUniformBuffer(this.materialColor, offset);
-        offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
-        offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
-        offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
-        offset = this.writeUniformBuffer(ui3D.env              , offset);
-        offset = this.writeUniformBuffer(this.shapeInfo        , offset);
+        const uniform_var_struct = this.vertModule.getUniformVar().type as Struct;
+        for(const member of uniform_var_struct.members){
+            switch(member.name){
+            case "viewMatrix":
+                offset = this.writeUniformBuffer(pvw, offset);
+                break;
+            case "normMatrix":
+                offset = this.writeUniformBuffer(normalMatrix, offset);
+                break;
+            case "materialColor":
+                offset = this.writeUniformBuffer(this.materialColor, offset);
+                break;
+            case "ambientColor":
+                offset = this.writeUniformBuffer(ui3D.ambientColor     , offset);
+                break;
+            case "directionalColor":
+                offset = this.writeUniformBuffer(ui3D.directionalColor , offset);
+                break;
+            case "lightingDirection":
+                offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
+                break;
+            case "env":
+                offset = this.writeUniformBuffer(ui3D.env              , offset);
+                break;
+            case "shapeInfo":
+                offset = this.writeUniformBuffer(this.shapeInfo        , offset);
+                break;
+            default:
+                throw new MyError(`unknown uniform:${member.name}`);
+            }
+        }
     }
-
-
     
     render(tick : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
