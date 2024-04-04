@@ -7,6 +7,18 @@ export function range(n: number) : number[]{
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
 
+export class MyError extends Error {
+    constructor(text : string = ""){
+        super();
+    }
+}
+
+export function assert(b : boolean, msg : string = ""){
+    if(!b){
+        throw new MyError(msg);
+    }
+}    
+
 export function error(msg : string){
     console.log(`error [${msg}]`)
     throw new Error(msg);
@@ -18,6 +30,14 @@ export function msg(s : string){
 
 export function sum(v : number[]) : number {
     return v.reduce((acc, val) => acc + val, 0);
+}
+
+export async function wait(millisec : number) : Promise<null> {
+    return new Promise((resolve) => {
+        setTimeout(()=>{
+            resolve(null);
+        }, millisec);
+    });
 }
 
 export async function fetchText(fileURL: string) {

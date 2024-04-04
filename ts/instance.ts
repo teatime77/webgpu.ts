@@ -128,67 +128,42 @@ async function startAnimation(inst : ComputePipeline | null, meshes: RenderPipel
     requestId = requestAnimationFrame(run.frame.bind(run));
 }
 
-export async function asyncBodyOnLoadIns(meshes: RenderPipeline[]) {
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim);
+async function asyncBodyOnLoadPackage(package_name : string){
+    const test_text = await fetchText(`../package/${package_name}.json`);
+    const test = JSON.parse(test_text) as Package[];
 
-    startAnimation(inst, meshes);
+    for(const pkg of test){
+        for(const info of pkg.computes!){
+            const parser = parseParams(info.params);
+            const array_length = parser.get("@instance_count") * parser.get("@instance_size");
+
+            const comp = new ComputePipeline(info.compName, info.varNames, array_length);
+
+            if(parser.vars.has("@workgroup_counts")){
+
+                comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
+            }
+        
+            const meshes = info.shapes.map(x => makeMesh(x)).flat();
+            meshes.forEach(x => x.compute = comp);
+
+            await startAnimation(comp, meshes);
+
+            await wait(3000);
+        }
+    }
+}
+
+export async function asyncBodyOnLoadTestAll(){
+    await asyncBodyOnLoadPackage("test");
 }
 
 export async function asyncBodyOnLoadArrow(){
-    const meshes = makeArrow();
-
-    const inst = makeInstance("updateSprites", [ "meshPos", "meshVec" ], 10 * 20 * particleDim);
-
-    startAnimation(inst, meshes);
-
+    await asyncBodyOnLoadPackage("arrow");
 }
 
 export async function asyncBodyOnLoadMaxwell_1D(){
-    const meshes = makeArrow();
-
-    const sx = 16;
-    const sy = 16;
-    const sz = 1;
-        const inst = makeInstance("maxwell", [ "meshPos", "meshVec" ], sx * sy * sz * 2 * particleDim);
-    if(inst != null){
-
-        inst.workgroupCounts = [ sx/8, sy/8, 1 ];
-    }
-
-    startAnimation(inst, meshes);    
-}
-
-export function makeInstance(comp_name : string, var_names : string[], instance_array_length : number) : ComputePipeline | null {
-    if(isInstance()){
-        return new ComputePipeline(comp_name, var_names, instance_array_length);
-    }
-    else{
-        return null;
-    }
-}
-
-export async function asyncBodyOnLoadMulti(){
-    asyncBodyOnLoadIns([ (new Cone()).red(), (new Cube()).green(), (new Tube()).blue(), new GeodesicPolyhedron() ]);
-}
-
-export async function asyncBodyOnLoadDisc(){
-    asyncBodyOnLoadIns([(new Disc()).red()]);
-}
-
-export async function asyncBodyOnLoadCone(){
-    asyncBodyOnLoadIns([(new Cone()).red()]);
-}
-
-export async function asyncBodyOnLoadCube(){
-    asyncBodyOnLoadIns([(new Cube()).green()]);
-}
-
-export async function asyncBodyOnLoadGeodesic(){
-    asyncBodyOnLoadIns([(new GeodesicPolyhedron()).blue()]);
-}
-
-export async function asyncBodyOnLoadTube(){
-    asyncBodyOnLoadIns([new Tube()]);
+    await asyncBodyOnLoadPackage("maxwell");
 }
 
 

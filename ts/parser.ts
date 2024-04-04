@@ -316,7 +316,20 @@ export function lexicalAnalysis(text : string) : Token[] {
             // 10進数の終わりを探します。
             for (; pos < text.length && isDigit(text[pos]); pos++);
 
-            sub_type = TokenSubType.integer;
+            if (pos < text.length && text[pos] == '.') {
+                // 小数点の場合
+
+                pos++;
+
+                // 10進数の終わりを探します。
+                for (; pos < text.length && isDigit(text[pos]); pos++);
+
+                sub_type = TokenSubType.float;
+            }
+            else {
+
+                sub_type = TokenSubType.integer;
+            }
         }
         else if (SymbolTable.indexOf("" + ch1 + ch2) != -1) {
             // 2文字の記号の表にある場合
@@ -913,6 +926,193 @@ export class Parser {
 
         return this.currentToken.text == '[' || this.currentToken.text == '{';
     }
+}
+
+export class ParamsParser extends Parser {
+    vars = new Map<string, number | number[]>();
+
+    constructor(tokens : Token[]){
+        super(tokens);
+    }
+
+    PrimaryExpression() : number {
+        if(this.currentToken.typeTkn == TokenType.identifier){
+            const var_name = this.currentText();
+            assert(this.vars.has(var_name));
+            this.advance();
+
+            return this.vars.get(var_name)! as number;
+        }
+        else if(this.currentToken.typeTkn == TokenType.Number){
+            let n = parseFloat(this.currentToken.text);
+            if(isNaN(n)){
+                throw new Error();
+            }
+
+            this.advance();
+            return n;
+        }
+        else if(this.currentToken.text == '('){
+
+            this.readText("(");
+            const n = this.AdditiveExpression();
+
+            this.readText(")");
+
+            return n;
+        }
+        else{
+            throw new Error();
+        }
+    }    
+
+    PowerExpression() : number {
+        const trm1 = this.PrimaryExpression();
+        if(this.currentToken.text == "^"){
+
+            this.readText("^");
+
+            const trm2 = this.PowerExpression();
+
+            return trm1 ** trm2;
+        }
+
+        return trm1;
+    }
+
+    UnaryExpression() : number {
+        if (this.currentToken.text == "-") {
+            // 負号の場合
+
+            this.readText("-");
+
+            // 基本の式を読みます。
+            const t1 = this.PowerExpression();
+
+            // 符号を反転します。
+            return - t1;
+        }
+        else {
+
+            // 基本の式を読みます。
+            return this.PowerExpression();
+        }
+    }
+
+    DivExpression() : number {
+        let trm1 = this.UnaryExpression();
+
+        while(this.currentToken.text == "/"){
+            this.readText("/");
+
+            let trm2 = this.UnaryExpression();
+
+            trm1 /= trm2;
+        }
+    
+        return trm1;
+    }
+
+    
+    MultiplicativeExpression() : number {
+        let trm1 = this.DivExpression();
+
+        while(this.currentToken.text == "*"){
+            this.readText("*");
+
+            let trm2 = this.DivExpression();
+
+            trm1 *= trm2;
+        }
+    
+        return trm1;
+    }
+    
+    AdditiveExpression() : number {
+        let trm1 = this.MultiplicativeExpression();
+
+        while(this.currentToken.text == "+" || this.currentToken.text == "-"){
+            const opr = this.currentToken.text;
+            this.advance();
+
+            const trm2 = this.MultiplicativeExpression();
+            if(opr == "+"){
+                trm1 += trm2;
+            }
+            else{
+                trm1 -= trm2;
+            }
+        }
+
+        return trm1;
+    }
+
+    listExpression() : number[] {
+        const nums : number[] = [];
+
+        this.readText("[");
+        while(true){
+            const n = this.AdditiveExpression();
+            nums.push(n);
+
+            if(this.currentText() != ","){
+                break;
+            }
+            this.readText(",");
+        }
+
+        this.readText("]");
+
+        return nums;
+    }
+
+    parseParams(){
+        while(true){
+            assert(this.currentToken.typeTkn == TokenType.identifier);
+            const var_name = this.currentText();
+            this.advance();
+
+            this.readText("=");
+
+            let value : number | number[];
+            if(this.currentText() == "["){
+
+                value = this.listExpression();
+            }
+            else{
+
+                value = this.AdditiveExpression();
+            }
+
+            this.vars.set(var_name, value);
+
+            if(this.currentText() != ","){
+                break;
+            }    
+            this.readText(",");
+        }
+
+        assert(this.currentToken == eotToken);
+
+        assert(this.vars.has("@instance_count") && this.vars.has("@instance_size"));
+
+        const s = Array.from(this.vars.keys()).map(x => `${x}:${this.vars.get(x)}`).join(", ");
+        msg(`vars: ${s}`);
+    }
+
+    get(var_name : string) : number{
+        assert(this.vars.has(var_name));
+        return this.vars.get(var_name) as number;
+    }
+}
+
+export function parseParams(text : string) : ParamsParser {
+    const tokens = lexicalAnalysis(text);
+
+    const parser = new ParamsParser(tokens);
+    parser.parseParams();
+
+    return parser;
 }
 
 const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
