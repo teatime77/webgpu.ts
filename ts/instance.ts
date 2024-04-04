@@ -10,11 +10,12 @@ class Run {
     context!: GPUCanvasContext;
     meshes: RenderPipeline[] = [];
     depthTexture!: GPUTexture;
-    comp : ComputePipeline | null = null;
+    comps : ComputePipeline[] = [];
     tick : number = 0;
 
-    async init(inst : ComputePipeline | null, meshes: RenderPipeline[]){
+    async init(inst : ComputePipeline[], meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
+        this.comps = inst.splice(0);
 
         const canvas = document.getElementById('world') as HTMLCanvasElement;
             
@@ -22,12 +23,9 @@ class Run {
 
         initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
     
-        if(inst != null){
+        for(const comp of this.comps){
 
-            this.comp = inst;
-            await this.comp.initCompute();
-        
-            this.meshes.filter(x => !(x instanceof Line)).forEach(x => x.compute = this.comp);
+            await comp.initCompute();
         }
 
         for(let mesh of this.meshes){
@@ -74,19 +72,19 @@ class Run {
 
         ui3D.setEnv();
 
-        if(this.comp != null){
-            this.comp.writeUniformBuffer(ui3D.env, 0);
+        for(const comp of this.comps){
+            comp.writeUniformBuffer(ui3D.env, 0);
 
             const passEncoder = commandEncoder.beginComputePass();
-            passEncoder.setPipeline(this.comp!.pipeline);
-            passEncoder.setBindGroup(0, this.comp!.bindGroups[this.tick % 2]);
-            if(this.comp.workgroupCounts != null){
+            passEncoder.setPipeline(comp.pipeline);
+            passEncoder.setBindGroup(0, comp.bindGroups[this.tick % 2]);
+            if(comp.workgroupCounts != null){
 
-                passEncoder.dispatchWorkgroups(... this.comp.workgroupCounts);
+                passEncoder.dispatchWorkgroups(... comp.workgroupCounts);
             }
             else{
 
-                passEncoder.dispatchWorkgroups(this.comp.instanceCount);
+                passEncoder.dispatchWorkgroups(comp.instanceCount);
             }
             passEncoder.end();
         }
@@ -118,12 +116,12 @@ export function stopAnimation(){
     }
 }
 
-async function startAnimation(inst : ComputePipeline | null, meshes: RenderPipeline[]){
+async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[]){
     stopAnimation();
     validFrame = false;
 
     const run = new Run();
-    await run.init(inst, meshes);
+    await run.init(comps, meshes);
     validFrame = true;
     requestId = requestAnimationFrame(run.frame.bind(run));
 }
@@ -133,24 +131,35 @@ async function asyncBodyOnLoadPackage(package_name : string){
     const test = JSON.parse(test_text) as Package[];
 
     for(const pkg of test){
+        const comps : ComputePipeline[] = [];
+        let  meshes : RenderPipeline[] = [];
+
         for(const info of pkg.computes!){
             const parser = parseParams(info.params);
             const array_length = parser.get("@instance_count") * parser.get("@instance_size");
 
             const comp = new ComputePipeline(info.compName, info.varNames, array_length);
+            comps.push(comp);
 
             if(parser.vars.has("@workgroup_counts")){
 
                 comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
             }
         
-            const meshes = info.shapes.map(x => makeMesh(x)).flat();
-            meshes.forEach(x => x.compute = comp);
+            const comp_meshes = info.shapes.map(x => makeMesh(x)).flat();
+            comp_meshes.forEach(x => x.compute = comp);
 
-            await startAnimation(comp, meshes);
-
-            await wait(3000);
+            meshes = meshes.concat(comp_meshes);
         }
+
+        if(pkg.shapes != undefined){
+            const pkg_meshes = pkg.shapes.map(x => makeMesh(x)).flat();
+            meshes = meshes.concat(pkg_meshes);
+        }
+        
+        await startAnimation(comps, meshes);
+
+        await wait(3000);
     }
 }
 

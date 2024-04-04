@@ -564,6 +564,10 @@ export function makeArrow() : RenderPipeline[] {
     const cone  = new Cone();
     cone.shapeInfo   = new Float32Array([ 1, 4, 0, 0]);
 
+    return [ disc1, tube, disc2, cone ];
+}
+
+export function makeLines() : RenderPipeline[] {
     const th = Math.PI / 3.0;
     const s = 100 * Math.sin(th);
     const c = 100 * Math.cos(th);
@@ -586,9 +590,9 @@ export function makeArrow() : RenderPipeline[] {
 
          -s,0,-c, 1,0,1,
           s,0, c, 1,0,1
-    ]))
+    ]));
 
-    return [ disc1, tube, disc2, cone, line ];
+    return [ line ];
 }
 
 

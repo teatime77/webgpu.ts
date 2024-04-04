@@ -19,7 +19,11 @@
                     }
                 ]
             }
-            ,
+        ]
+    }
+        ,
+    {
+        "computes" : [
             {
                 "compName" : "updateSprites",
                 "varNames" : [ "meshPos", "meshVec" ],
@@ -30,7 +34,11 @@
                     }
                 ]
             }
-            ,
+        ]
+    }
+        ,
+    {
+        "computes" : [
             {
                 "compName" : "updateSprites",
                 "varNames" : [ "meshPos", "meshVec" ],
@@ -41,7 +49,11 @@
                     }
                 ]
             }
-            ,
+        ]
+    }
+        ,
+    {
+        "computes" : [
             {
                 "compName" : "updateSprites",
                 "varNames" : [ "meshPos", "meshVec" ],
@@ -52,7 +64,11 @@
                     }
                 ]
             }
-            ,
+        ]
+    }
+        ,
+    {
+        "computes" : [
             {
                 "compName" : "updateSprites",
                 "varNames" : [ "meshPos", "meshVec" ],
@@ -63,7 +79,11 @@
                     }
                 ]
             }
-            ,
+        ]
+    }
+        ,
+    {
+        "computes" : [
             {
                 "compName" : "updateSprites",
                 "varNames" : [ "meshPos", "meshVec" ],

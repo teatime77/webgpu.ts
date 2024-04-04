@@ -15,6 +15,7 @@ class ShapeInfo {
 
 export class Package {
     computes : ComputeInfo[] | undefined;
+    shapes   : ShapeInfo[] | undefined;
 }
 
 export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
@@ -24,9 +25,11 @@ export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
         case "Cube"  : return [new Cube()];
         case "Disc"  : return [new Disc()];
         case "arrow" : return makeArrow();
+        case "lines" : return makeLines();
         case "GeodesicPolyhedron" : return [new GeodesicPolyhedron()];
-        }
-        throw Error("shape info");
+    }
+    
+    throw Error("shape info");
 }
 
 
