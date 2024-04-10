@@ -335,15 +335,23 @@ export class RenderPipeline extends AbstractPipeline {
 
 
 export class Line extends RenderPipeline {
-    constructor(vertex_array : Float32Array){
+    constructor(vertex_array : Float32Array | null = null){
         super();
-        this.vertName = "line-vert-fix";
+        if(vertex_array == null){
+
+            this.vertName    = "line-vert";
+            this.vertexCount = 2;
+            this.vertexArray = new Float32Array(2 * (3 + 3));
+        }
+        else{
+
+            this.vertName = "line-vert-fix";
         
-    
-        // 位置の配列
-        this.vertexArray = vertex_array;
-        this.vertexCount = vertex_array.length / (3 + 3);
-        console.assert(vertex_array.length % (3 + 3) == 0)
+            // 位置の配列
+            this.vertexArray = vertex_array;
+            this.vertexCount = vertex_array.length / (3 + 3);
+            console.assert(vertex_array.length % (3 + 3) == 0)
+        }
     
         this.topology = 'line-list';
     }

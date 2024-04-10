@@ -167,10 +167,6 @@ export async function asyncBodyOnLoadTestAll(){
     await asyncBodyOnLoadPackage("test");
 }
 
-export async function asyncBodyOnLoadArrow(){
-    await asyncBodyOnLoadPackage("arrow");
-}
-
 export async function asyncBodyOnLoadMaxwell_1D(){
     await asyncBodyOnLoadPackage("maxwell");
 }

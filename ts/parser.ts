@@ -203,8 +203,9 @@ export class Module {
             throw new Error(`no vert main `);
         }
 
+        const builtin_var_names = [ "vertex_index" ];
         const instance_vars = main.args.filter(x => instance_var_names.includes(x.name) );
-        const vertex_vars   = main.args.filter(x => ! instance_vars.includes(x) );
+        const vertex_vars   = main.args.filter(x => (! instance_vars.includes(x) && ! builtin_var_names.includes(x.name)) );
         
         const vertex_step_layout : GPUVertexBufferLayout = {
             arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
@@ -1147,6 +1148,9 @@ const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
 
 export async function parseAll(){
     const shader_names = [
+        "line-comp",
+        "line-vert",
+        "line-vert-fix",
         "maxwell",
         "compute",
         "demo",
