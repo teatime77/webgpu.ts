@@ -337,7 +337,7 @@ export class RenderPipeline extends AbstractPipeline {
 export class Line extends RenderPipeline {
     constructor(vertex_array : Float32Array){
         super();
-        this.vertName = "line-vert";
+        this.vertName = "line-vert-fix";
         
     
         // 位置の配列
