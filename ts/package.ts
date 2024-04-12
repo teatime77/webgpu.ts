@@ -24,6 +24,7 @@ export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
         case "Tube"  : return [new Tube()];
         case "Cube"  : return [new Cube()];
         case "Disc"  : return [new Disc()];
+        case "point" : return [new Point()];
         case "line"  : return [new Line()];
         case "arrow" : return makeArrow();
         case "lines" : return makeLines();

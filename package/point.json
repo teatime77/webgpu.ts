@@ -1,0 +1,16 @@
+[
+    {
+        "computes" : [
+            {
+                "compName" : "line-comp",
+                "varNames" : [ "meshPos", "meshVec" ],
+                "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8",
+                "shapes" : [
+                    {
+                        "type" : "point"
+                    }
+                ]
+            }
+        ]
+    }
+]

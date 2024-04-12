@@ -334,6 +334,18 @@ export class RenderPipeline extends AbstractPipeline {
 }
 
 
+export class Point extends RenderPipeline {
+    constructor(){
+        super();
+        this.vertName    = "point-vert";
+        this.vertexCount = 1;
+        this.vertexArray = new Float32Array(1 * (3 + 3));
+
+        this.topology = 'point-list';
+    }
+}
+
+
 export class Line extends RenderPipeline {
     constructor(vertex_array : Float32Array | null = null){
         super();
