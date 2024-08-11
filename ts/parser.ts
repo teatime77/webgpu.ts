@@ -1160,6 +1160,7 @@ export async function parseAll(){
         "texture-frag",
         "texture-vert",
         "updateSprites",
+        "electric-field"
     ];
 
     for(const shader_name of shader_names){

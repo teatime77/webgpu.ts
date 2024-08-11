@@ -146,14 +146,14 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
             }
         
-            const comp_meshes = info.shapes.map(x => makeMesh(x)).flat();
+            const comp_meshes = info.shapes.map(x => makeMesh(x, true)).flat();
             comp_meshes.forEach(x => x.compute = comp);
 
             meshes = meshes.concat(comp_meshes);
         }
 
         if(pkg.shapes != undefined){
-            const pkg_meshes = pkg.shapes.map(x => makeMesh(x)).flat();
+            const pkg_meshes = pkg.shapes.map(x => makeMesh(x, false)).flat();
             meshes = meshes.concat(pkg_meshes);
         }
         

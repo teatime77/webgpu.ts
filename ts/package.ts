@@ -7,8 +7,10 @@ class ComputeInfo {
     params!      : string;
 }
 
-class ShapeInfo {
+export class ShapeInfo {
     type!    : string;
+    scale    : [ number, number, number ] | undefined;
+    position : [ number, number, number ] | undefined;
     // vertName : string | undefined = undefined;
     // fragName : string | undefined = undefined;
 }
@@ -18,7 +20,7 @@ export class Package {
     shapes   : ShapeInfo[] | undefined;
 }
 
-export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
+export function makeMesh(shape : ShapeInfo, is_instance : boolean) : RenderPipeline[] {
     switch(shape.type){
         case "Cone"  : return [new Cone()];
         case "Tube"  : return [new Tube()];
@@ -28,7 +30,7 @@ export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
         case "line"  : return [new Line()];
         case "arrow" : return makeArrow();
         case "lines" : return makeLines();
-        case "GeodesicPolyhedron" : return [new GeodesicPolyhedron()];
+        case "GeodesicPolyhedron" : return [new GeodesicPolyhedron(shape, is_instance)];
     }
     
     throw Error("shape info");

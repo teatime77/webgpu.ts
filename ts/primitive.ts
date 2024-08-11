@@ -638,8 +638,16 @@ export function makeLines() : RenderPipeline[] {
 
 
 export class GeodesicPolyhedron extends RenderPipeline {
-    constructor(){
+    constructor(shape : ShapeInfo, is_instance : boolean){
         super();
+        if(is_instance){
+
+            this.vertName = "instance-vert";
+        }
+        else{
+            this.vertName = "shape-vert";
+        }
+
 
         this.topology = 'triangle-list';
 
@@ -668,6 +676,24 @@ export class GeodesicPolyhedron extends RenderPipeline {
                 this.vertexArray[idx + 5] = vert.z / len;
     
                 idx += 3 + 3;
+            }
+        }
+
+        if(shape.scale != undefined){
+            const [sx, sy, sz] = shape.scale;
+            for(let i = 0; i < this.vertexArray.length; i +=6 ){
+                this.vertexArray[i    ] *= sx;
+                this.vertexArray[i + 1] *= sy;
+                this.vertexArray[i + 2] *= sz;
+            }
+        }
+
+        if(shape.position != undefined){
+            const [dx, dy, dz] = shape.position;
+            for(let i = 0; i < this.vertexArray.length; i +=6 ){
+                this.vertexArray[i    ] += dx;
+                this.vertexArray[i + 1] += dy;
+                this.vertexArray[i + 2] += dz;
             }
         }
     }

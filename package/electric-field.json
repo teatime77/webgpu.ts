@@ -1,0 +1,30 @@
+[
+    {
+        "computes" : [
+            {
+                "compName" : "electric-field",
+                "varNames" : [ "meshPos", "meshVec" ],
+                "params": "sx = 16, sy = 16, sz = 4, @workgroup_counts=[sx/4,sy/4,sz/4], @instance_count = sx * sy * sz, @instance_size = 8",
+                "shapes" : [
+                    {
+                        "type" : "arrow"
+                    }
+                ]
+            }
+        ]
+        ,
+        "shapes" : [
+            {
+                "type" : "GeodesicPolyhedron",
+                "scale" : [ 0.2, 0.2, 0.2],
+                "position" : [ 0, 0, -2 ]
+            }
+            ,
+            {
+                "type" : "GeodesicPolyhedron",
+                "scale" : [ 0.2, 0.2, 0.2],
+                "position" : [ 0, 0, 2 ]
+            }
+        ]
+    }
+]
