@@ -43,15 +43,6 @@ export function mat4fromMat3(m3 : Float32Array){
 class UI3D {
     autoRotate : boolean = false;
 
-    eye : any;
-
-    camPhi : number = 0.0;
-    camTheta : number = 0.5 * Math.PI;
-    camDistance    : number = -5.0;
-
-    lastMouseX : number | null = null;
-    lastMouseY : number | null = null;
-
     ProjViewMatrix!               : Float32Array;
     viewMatrix!        : Float32Array;
 
@@ -63,10 +54,8 @@ class UI3D {
     tick               : number = 0;
     env                : Float32Array = new Float32Array([0,0,0,0]);
 
-    constructor(canvas : HTMLCanvasElement, eye : any){
+    constructor(canvas : HTMLCanvasElement){
         this.startTime = Date.now();
-        this.eye = eye;
-        this.camDistance = eye[2];
 
         canvas.addEventListener('pointermove', this.pointermove.bind(this));
         canvas.addEventListener("wheel", this.wheel.bind(this));
@@ -81,34 +70,18 @@ class UI3D {
     }
 
     pointermove(ev: PointerEvent){
-        // タッチによる画面スクロールを止める
-        // ev.preventDefault(); 
-
-        var newX = ev.clientX;
-        var newY = ev.clientY;
-
-        if (ev.buttons != 0 && this.lastMouseX != null && this.lastMouseY != null) {
-
-            this.camTheta += (newY - this.lastMouseY) / 300;
-            this.camPhi -= (newX - this.lastMouseX) / 300;
-        }
-        // console.log(`phi:${this.camPhi} theta:${this.camTheta}`)
-
-        this.lastMouseX = newX
-        this.lastMouseY = newY;
+        editor.tool.pointermove(ev);
     }
 
     wheel(ev: WheelEvent){
-        this.camDistance += 0.002 * ev.deltaY;
-
-        // ホイール操作によるスクロールを無効化する
-        // ev.preventDefault();
+        editor.tool.wheel(ev);
     }
 
     getTransformationMatrix() {
 
         if(this.autoRotate){
-            this.setAutoCameraAngle();
+            editor.camera.setAutoAngle(Date.now() - this.startTime);
+            this.setViewMatrix();
         }
         this.setViewMatrix();
 
@@ -118,27 +91,11 @@ class UI3D {
         this.ProjViewMatrix = glMatrix.mat4.create();
         glMatrix.mat4.mul(this.ProjViewMatrix, projectionMatrix, this.viewMatrix);
     }
-
-    setAutoCameraAngle() {
-        const cnt = 10 * 1000;
-
-        // i changes from 0 to 2999 in 3000 milliseconds.
-        const i = Math.round(Date.now() - this.startTime) % cnt;
-
-        this.camPhi     = 2.0 * Math.PI * i / cnt;
-        this.camTheta   = Math.PI / 3.0;
-
-        this.setViewMatrix();
-    }
     
     setViewMatrix() {
-        const camY = this.camDistance * Math.cos(this.camTheta);
-        const r = this.camDistance * Math.abs(Math.sin(this.camTheta));
-        const camZ = r * Math.cos(this.camPhi);
-        const camX = r * Math.sin(this.camPhi);
 
         this.viewMatrix = glMatrix.mat4.create();
-        const cameraPosition = [camX, camY, camZ];
+        const cameraPosition = editor.camera.cameraPos();
         const lookAtPosition = [0, 0, 0];
         const upDirection    = [0, 1, 0];
         glMatrix.mat4.lookAt(this.viewMatrix, cameraPosition, lookAtPosition, upDirection);
@@ -166,8 +123,8 @@ class UI3D {
 
 export let ui3D : UI3D;
 
-export function initUI3D(canvas : HTMLCanvasElement, eye : any){
-    ui3D = new UI3D(canvas, eye);
+export function initUI3D(canvas : HTMLCanvasElement){
+    ui3D = new UI3D(canvas);
 }
 
 export function makeLightDir(){

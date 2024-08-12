@@ -21,7 +21,8 @@ class Run {
             
         this.context = initContext(canvas, 'opaque');
 
-        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -12));
+        initUI3D(canvas);
+        editor.camera.camDistance = -12
     
         for(const comp of this.comps){
 

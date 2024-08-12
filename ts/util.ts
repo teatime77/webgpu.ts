@@ -68,6 +68,8 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
 
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");
+
+    editor = new Editor();
     
     if (!navigator.gpu) {
         throw Error('WebGPU not supported.');

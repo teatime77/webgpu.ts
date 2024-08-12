@@ -63,7 +63,8 @@ export async function asyncBodyOnLoadTex() {
 
         const context = initContext(canvas, 'opaque');
 
-        initUI3D(canvas, glMatrix.vec3.fromValues(0, 0, -4));
+        initUI3D(canvas);
+        editor.camera.camDistance = -4;
 
         // create a render pipeline
         const pipeline = g_device.createRenderPipeline({
