@@ -7,15 +7,18 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "Cone"
+                        "type" : "Cone",
+                        "vertName" : "instance-vert"
                     }
                     ,
                     {
-                        "type" : "Tube"
+                        "type" : "Tube",
+                        "vertName" : "instance-vert"
                     }
                     ,
                     {
-                        "type" : "Cube"
+                        "type" : "Cube",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
@@ -30,7 +33,8 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "Cone"
+                        "type" : "Cone",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
@@ -45,7 +49,8 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "Tube"
+                        "type" : "Tube",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
@@ -60,7 +65,8 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "Cube"
+                        "type" : "Cube",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
@@ -75,7 +81,8 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "GeodesicPolyhedron"
+                        "type" : "GeodesicPolyhedron",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
@@ -90,11 +97,11 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "Disc"
+                        "type" : "Disc",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }
-
         ]
     }
 ]

@@ -128,9 +128,9 @@ async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[
 
 export async function asyncBodyOnLoadPackage(package_name : string){
     const test_text = await fetchText(`../package/${package_name}.json`);
-    const test = JSON.parse(test_text) as Package[];
+    const packages = JSON.parse(test_text) as Package[];
 
-    for(const pkg of test){
+    for(const pkg of packages){
         const comps : ComputePipeline[] = [];
         let  meshes : RenderPipeline[] = [];
 
@@ -146,14 +146,14 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
             }
         
-            const comp_meshes = info.shapes.map(x => makeMesh(x, true)).flat();
+            const comp_meshes = info.shapes.map(shape => makeMesh(shape)).flat();
             comp_meshes.forEach(x => x.compute = comp);
 
             meshes = meshes.concat(comp_meshes);
         }
 
         if(pkg.shapes != undefined){
-            const pkg_meshes = pkg.shapes.map(x => makeMesh(x, false)).flat();
+            const pkg_meshes = pkg.shapes.map(shape => makeMesh(shape)).flat();
             meshes = meshes.concat(pkg_meshes);
         }
         

@@ -168,12 +168,12 @@ export class RenderPipeline extends AbstractPipeline {
     uniformBindGroup! : GPUBindGroup;
     vertexBuffer!     : GPUBuffer;
 
-    constructor(){
+    constructor(shape : ShapeInfo){
         super();
 
-        if(isInstance()){
+        if(shape.vertName != undefined){
 
-            this.vertName = "instance-vert";
+            this.vertName = shape.vertName;
         }
         else{
             this.vertName = "shape-vert";
@@ -335,8 +335,8 @@ export class RenderPipeline extends AbstractPipeline {
 
 
 export class Point extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
         this.vertName    = "point-vert";
         this.vertexCount = 1;
         this.vertexArray = new Float32Array(1 * (3 + 3));
@@ -347,8 +347,8 @@ export class Point extends RenderPipeline {
 
 
 export class Line extends RenderPipeline {
-    constructor(vertex_array : Float32Array | null = null){
-        super();
+    constructor(shape : ShapeInfo, vertex_array : Float32Array | null = null){
+        super(shape);
         if(vertex_array == null){
 
             this.vertName    = "line-vert";
@@ -370,8 +370,8 @@ export class Line extends RenderPipeline {
 }
 
 export class Tube extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
         const num_division = 16;
         
         this.vertexCount = (num_division + 1) * 2;
@@ -397,8 +397,8 @@ export class Tube extends RenderPipeline {
 }
 
 export class Cube extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
 
         // position: vec3<f32>, norm: vec3<f32>
         // prettier-ignore
@@ -452,8 +452,8 @@ export class Cube extends RenderPipeline {
 }
 
 export class Disc extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
 
         const num_division = 16;
 
@@ -502,8 +502,8 @@ export class Disc extends RenderPipeline {
 }
 
 export class Cone extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
 
         const num_division = 16;
 
@@ -579,40 +579,40 @@ export class Cone extends RenderPipeline {
 
 
 export class CompositeRenderPipeline extends RenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
     }
 }
 
 export class Axis extends CompositeRenderPipeline {
-    constructor(){
-        super();
+    constructor(shape : ShapeInfo){
+        super(shape);
     }
 }
 
-export function makeArrow() : RenderPipeline[] {
+export function makeArrow(shape : ShapeInfo) : RenderPipeline[] {
 
-    const disc1 = new Disc();
+    const disc1 = new Disc(shape);
     disc1.shapeInfo  = new Float32Array([ 1, 1, 0, 0]);
 
-    const disc2 = new Disc();
+    const disc2 = new Disc(shape);
     disc2.shapeInfo  = new Float32Array([ 1, 2, 0, 0]);
     
-    const tube  = new Tube();
+    const tube  = new Tube(shape);
     tube.shapeInfo   = new Float32Array([ 1, 3, 0, 0]);
     
-    const cone  = new Cone();
+    const cone  = new Cone(shape);
     cone.shapeInfo   = new Float32Array([ 1, 4, 0, 0]);
 
     return [ disc1, tube, disc2, cone ];
 }
 
-export function makeLines() : RenderPipeline[] {
+export function makeLines(shape : ShapeInfo) : RenderPipeline[] {
     const th = Math.PI / 3.0;
     const s = 100 * Math.sin(th);
     const c = 100 * Math.cos(th);
 
-    const line = new Line(new Float32Array([ 
+    const line = new Line(shape, new Float32Array([ 
         -100,0,0, 1,0,0, 
          100,0,0, 1,0,0,
 
@@ -638,16 +638,8 @@ export function makeLines() : RenderPipeline[] {
 
 
 export class GeodesicPolyhedron extends RenderPipeline {
-    constructor(shape : ShapeInfo, is_instance : boolean){
-        super();
-        if(is_instance){
-
-            this.vertName = "instance-vert";
-        }
-        else{
-            this.vertName = "shape-vert";
-        }
-
+    constructor(shape : ShapeInfo){
+        super(shape);
 
         this.topology = 'triangle-list';
 

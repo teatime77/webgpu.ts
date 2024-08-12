@@ -7,7 +7,8 @@
                 "params": "sx = 16, sy = 16, sz = 1, @instance_count = sx * sy * sz * 2, @instance_size = 8, @workgroup_counts = [ sx/8, sy/8, 1 ], K = 1.0 / 16.0",
                 "shapes" : [
                     {
-                        "type" : "arrow"
+                        "type" : "arrow",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }

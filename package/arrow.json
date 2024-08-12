@@ -7,7 +7,8 @@
                 "params": "sx = 10, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8",
                 "shapes" : [
                     {
-                        "type" : "arrow"
+                        "type" : "arrow",
+                        "vertName" : "instance-vert"
                     }
                 ]
             }

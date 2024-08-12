@@ -12,8 +12,8 @@ export function $(id : string) : HTMLElement {
     return ele;
 }
 
-export function isInstance() : boolean {
-    return ($("is-instance") as HTMLInputElement).checked;
+export function $inp(id : string) : HTMLInputElement {    
+    return $(id) as HTMLInputElement;
 }
 
 export function mat4fromMat3(m3 : Float32Array){
@@ -68,40 +68,41 @@ class UI3D {
         this.eye = eye;
         this.camDistance = eye[2];
 
-        canvas.addEventListener('pointermove', (ev: PointerEvent)=> {
+        canvas.addEventListener('pointermove', this.pointermove.bind(this));
+        canvas.addEventListener("wheel", this.wheel.bind(this));
 
-            // タッチによる画面スクロールを止める
-            // ev.preventDefault(); 
+        $inp("auto-rotate").addEventListener("click", this.click.bind(this));
 
-            var newX = ev.clientX;
-            var newY = ev.clientY;
+        this.autoRotate = $inp("auto-rotate").checked;
+    }
 
-            if (ev.buttons != 0 && this.lastMouseX != null && this.lastMouseY != null) {
+    click(ev : MouseEvent){
+        this.autoRotate = $inp("auto-rotate").checked;
+    }
 
-                this.camTheta += (newY - this.lastMouseY) / 300;
-                this.camPhi -= (newX - this.lastMouseX) / 300;
-            }
-            // console.log(`phi:${this.camPhi} theta:${this.camTheta}`)
+    pointermove(ev: PointerEvent){
+        // タッチによる画面スクロールを止める
+        // ev.preventDefault(); 
 
-            this.lastMouseX = newX
-            this.lastMouseY = newY;
-        }, { passive: true });
-    
-    
-        canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
-    
-            this.camDistance += 0.002 * ev.deltaY;
-    
-            // ホイール操作によるスクロールを無効化する
-            // ev.preventDefault();
-        }, { passive: true });
+        var newX = ev.clientX;
+        var newY = ev.clientY;
 
-        const auto_rotate = document.getElementById("auto-rotate") as HTMLInputElement;
-        this.autoRotate = auto_rotate.checked;
+        if (ev.buttons != 0 && this.lastMouseX != null && this.lastMouseY != null) {
 
-        auto_rotate.addEventListener("click", (ev : MouseEvent)=>{
-            this.autoRotate = auto_rotate.checked;            
-        });
+            this.camTheta += (newY - this.lastMouseY) / 300;
+            this.camPhi -= (newX - this.lastMouseX) / 300;
+        }
+        // console.log(`phi:${this.camPhi} theta:${this.camTheta}`)
+
+        this.lastMouseX = newX
+        this.lastMouseY = newY;
+    }
+
+    wheel(ev: WheelEvent){
+        this.camDistance += 0.002 * ev.deltaY;
+
+        // ホイール操作によるスクロールを無効化する
+        // ev.preventDefault();
     }
 
     getTransformationMatrix() {
