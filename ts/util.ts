@@ -68,6 +68,7 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
 
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");
+    bitonic_sort_test();
 
     editor = new Editor();
     
