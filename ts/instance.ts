@@ -128,6 +128,7 @@ async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[
 }
 
 export async function asyncBodyOnLoadPackage(package_name : string){
+    msg(`Load Package:${package_name}`);
     const test_text = await fetchText(`../package/${package_name}.json`);
     const packages = JSON.parse(test_text) as Package[];
 

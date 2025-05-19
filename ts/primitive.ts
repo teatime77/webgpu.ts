@@ -451,6 +451,50 @@ export class Cube extends RenderPipeline {
     }
 }
 
+
+
+export class Rect extends RenderPipeline {
+    constructor(shape : ShapeInfo){
+        super(shape);
+
+        const num_triangles = 2;
+
+        this.topology = 'triangle-list';
+        this.vertexCount = num_triangles * 3;
+
+        const v = new Float32Array(this.vertexCount * (3 + 3));
+
+        const xys = [
+            [ -1, -1 ],
+            [  1,  1 ],
+            [ -1,  1 ],
+
+            [  1,  1 ],
+            [ -1, -1 ],
+            [  1, -1 ],
+        ]
+
+        let idx = 0;
+        for(let vert_i = 0; vert_i < this.vertexCount; vert_i++){
+            const [x, y] = xys[vert_i];
+
+            v[idx + 0] = x;
+            v[idx + 1] = y;
+            v[idx + 2] = 0;
+
+            v[idx + 3] = 0;
+            v[idx + 4] = 0;
+            v[idx + 5] = 1;
+
+            idx += 6;
+        }
+
+        this.vertexArray = v;
+    }
+}
+
+
+
 export class Disc extends RenderPipeline {
     constructor(shape : ShapeInfo){
         super(shape);

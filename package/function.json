@@ -1,0 +1,17 @@
+[
+    {
+        "computes" : [
+            {
+                "compName" : "function-comp",
+                "varNames" : [ "meshPos", "meshVec" ],
+                "params": "sx = 20, sy = 20, sz = 1, @instance_count = sx * sy * sz, @instance_size = 8, K = 1.0 / 16.0",
+                "shapes" : [
+                    {
+                        "type" : "Rect",
+                        "vertName" : "function-vert"
+                    }
+                ]
+            }
+        ]
+    }
+]

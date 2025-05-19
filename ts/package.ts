@@ -22,6 +22,7 @@ export class Package {
 
 export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
     switch(shape.type){
+        case "Rect"  : return [new Rect(shape)];
         case "Cone"  : return [new Cone(shape)];
         case "Tube"  : return [new Tube(shape)];
         case "Cube"  : return [new Cube(shape)];
