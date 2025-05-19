@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);

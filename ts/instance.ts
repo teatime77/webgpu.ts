@@ -1,6 +1,6 @@
 var glMatrix: any;
 
-namespace webgputs {
+namespace webgpu_ts {
 
 export let requestId : number = 0;
 

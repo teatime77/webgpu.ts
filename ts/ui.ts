@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 
 const $dic = new Map<string, HTMLElement>();
 

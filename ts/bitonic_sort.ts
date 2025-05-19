@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 //
 
 let iii : number = 0;

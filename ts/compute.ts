@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');

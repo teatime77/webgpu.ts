@@ -1,6 +1,6 @@
 var glMatrix: any;
 
-namespace webgputs {
+namespace webgpu_ts {
 
 export async function asyncBodyOnLoadTex() {
 

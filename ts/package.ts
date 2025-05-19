@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 
 class ComputeInfo {
     compName!    : string;

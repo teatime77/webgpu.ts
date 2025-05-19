@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 //
 export class Editor {
     camera : Camera = new Camera();

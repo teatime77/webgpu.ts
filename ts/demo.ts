@@ -1,4 +1,4 @@
-namespace webgputs {
+namespace webgpu_ts {
 
 // Define global buffer size
 const BUFFER_SIZE = 1000;
