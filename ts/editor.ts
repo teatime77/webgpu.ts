@@ -60,7 +60,7 @@ class Camera extends Tool {
         this.camDistance += 0.002 * ev.deltaY;
 
         // ホイール操作によるスクロールを無効化する
-        // ev.preventDefault();
+        ev.preventDefault();
     }
 
     setAutoAngle(milliseconds : number){

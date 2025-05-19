@@ -755,6 +755,10 @@ export class Parser {
         }
         this.readText("}");
 
+        if(this.currentToken.text == ";"){
+            this.readText(";");
+        }
+
         return struct;
     }
 

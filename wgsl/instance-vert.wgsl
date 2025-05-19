@@ -112,13 +112,14 @@ fn main(
 
     var pos = vertPos;
 
+    const arrow = 1.0;
     const disk1 = 1.0;
     const disk2 = 2.0;
     const tube  = 3.0;
     const cone  = 4.0;
     const cone_h = 0.1;
 
-    if(uniforms.shapeInfo.x == 1.0){
+    if(uniforms.shapeInfo.x == arrow){
         if(uniforms.shapeInfo.y == cone){
 
             pos.x *= 0.2;

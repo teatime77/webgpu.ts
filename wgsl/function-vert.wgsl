@@ -19,86 +19,92 @@ struct VertexOutput {
 }
 
 
-fn rotz(x : f32) -> mat3x3<f32> {
-    return mat3x3<f32>(
-         cos(x),  sin(x), 0.0,
-        -sin(x),  cos(x), 0.0,
-            0.0,     0.0, 1.0
+struct Complex {
+    real: f32,
+    imag: f32,
+};
+
+fn comp(a: f32, b: f32) -> Complex {
+    return Complex(a, b);
+}
+
+fn add(a: Complex, b: Complex) -> Complex {
+    return Complex(a.real + b.real, a.imag + b.imag);
+}
+
+fn sub(a: Complex, b: Complex) -> Complex {
+    return Complex(a.real - b.real, a.imag - b.imag);
+}
+
+fn mul(a: Complex, b: Complex) -> Complex {
+    return Complex(
+        a.real * b.real - a.imag * b.imag,
+        a.real * b.imag + a.imag * b.real
     );
 }
 
-fn roty(x : f32) -> mat3x3<f32> {
-    return mat3x3<f32>(
-        cos(x), 0.0, -sin(x),
-        0.0   , 1.0,  0.0   ,
-         sin(x), 0.0,  cos(x)
-    );
+fn mulR(a: f32, b: Complex) -> Complex {
+    return Complex(a * b.real, a * b.imag);
 }
 
-fn rotVec(pos : vec3<f32>, dir : vec3<f32>) -> vec3<f32> {
-    var zaxis = vec3<f32>(0.0, 0.0, 1.0);
-    var v1    = normalize(dir);
-    var c     = dot(v1, zaxis);
-    var theta = acos(c);
-    var m1    = roty(theta);
-    var pos2  = m1 * pos;
-
-    var z2    = m1 * zaxis;
-    var v2    = normalize(vec2<f32>(v1.x, v1.y));
-    var v3    = normalize(vec2<f32>(z2.x, z2.y));
-    if(length(v2) < 0.9 || length(v3) < 0.9){
-        return pos2;
-    }
-    // var phi   = atan2(v2.y - v3.y, v2.x - v3.x);
-    var phi   = atan2(v1.y, v1.x);
-    var m2    = rotz(phi);
-
-    return m2 * pos2;
+fn absC(c: Complex) -> f32 {
+    return sqrt(c.real * c.real + c.imag * c.imag);
 }
 
-fn conjugate_q(q : vec4<f32>) -> vec4<f32> {
-  return vec4<f32>(-q.x, -q.y, -q.z, q.w);
+fn arg(c: Complex) -> f32 {
+    return atan2(c.imag, c.real);
 }
 
-fn mulq(q1 : vec4<f32>, q2 : vec4<f32>) -> vec4<f32> {
-  return vec4<f32>(
-    q2.w * q1.x - q2.z * q1.y + q2.y * q1.z + q2.x * q1.w,
-    q2.z * q1.x + q2.w * q1.y - q2.x * q1.z + q2.y * q1.w,
-    -q2.y * q1.x + q2.x * q1.y + q2.w * q1.z + q2.z * q1.w,
-    -q2.x * q1.x - q2.y * q1.y - q2.z * q1.z + q2.w * q1.w
-  );
+fn pow2(a: Complex) -> Complex {
+    return mul(a, a);
 }
 
-fn axisAngle(axis : vec3<f32>, radian : f32) -> vec4<f32> {
-  var naxis = normalize(axis);
-  var h = 0.5 * radian;
-  var s = sin(h);
-  return vec4<f32>(naxis.x * s, naxis.y * s, naxis.z * s, cos(h));
+fn pow3(a: Complex) -> Complex {
+    return mul(pow2(a), a);
 }
 
-fn rotate(v : vec3<f32>, q : vec4<f32>) -> vec3<f32> {
-  // norm of q must be 1.
-  var vq = vec4<f32>(v.x, v.y, v.z, 0.0);
-  var cq = conjugate_q(q);
-  var mq = mulq(mulq(cq, vq), q);
-  return vec3<f32>(mq.x, mq.y, mq.z);
+fn conjugate(a: Complex) -> Complex {
+    return Complex(a.real, -a.imag);
 }
 
-fn rotVec2(pos : vec3<f32>, dir : vec3<f32>) -> vec3<f32> {
-    var z = vec3<f32>(0.0,0.0,0.1);
-    var axis = cross(z, dir);
-    if(length(axis) < 0.001){
-        return pos;
+fn rgba(theta_arg : f32) -> vec4<f32>{
+    const pi      = 3.14159265359;
+
+    var theta = theta_arg;
+    if(theta < 0){
+        theta += 2 * pi;
     }
 
-    var radian = acos(dot(z, normalize(dir)));
-    var q = axisAngle(axis, radian);
+    var r : f32 = 0;
+    var g : f32 = 0;
+    var b : f32 = 0;
 
-    return rotate(pos, q);
+    var t = theta * 3.0 / (2.0 * pi);
+    if(t <= 1.0){
+        r = (1.0 - t);
+        g = t;
+    }
+    else{
+        t -= 1.0;
+        if(t <= 1.0){
+            g = (1.0 - t);
+            b = t;
+        }
+        else{
+            t -= 1.0;
+
+            b = (1.0 - t);
+            r = t;
+        }
+    }
+
+    return vec4<f32>(r, g, b, 1.0);
 }
 
-fn scale(v : vec3<f32>, x : f32, y : f32, z : f32) -> vec3<f32> {
-    return vec3<f32>(x * v.x, y * v.y, z * v.z);
+
+fn colorC(c: Complex) -> vec4<f32> {
+    var theta = arg(c);
+    return rgba(theta);
 }
 
 
@@ -109,63 +115,38 @@ fn main(
     @location(2) meshPos : vec4<f32>,
     @location(3) meshVec : vec4<f32>
 ) -> VertexOutput {
+    const pi      = 3.14159265359;
+    const sz      = 100;
+    const max_xy  = 2.0;
+    const step    = (2.0 * max_xy) / f32(sz);
+    const scale   = step / 2.0;
 
-    var pos = vertPos;
+    var x = meshPos.x + scale * vertPos.x;
+    var y = meshPos.y + scale * vertPos.y;
 
-    const disk1 = 1.0;
-    const disk2 = 2.0;
-    const tube  = 3.0;
-    const cone  = 4.0;
-    const cone_h = 0.1;
+    // var c  = comp(x, y);
 
-    if(uniforms.shapeInfo.x == 1.0){
-        if(uniforms.shapeInfo.y == cone){
+    // var c2 = pow2(c);
+    // var c3 = pow3(c);
+    // var c2 = add(pow3(c), mulR(-6.0, pow2(c)));
+    // var c2 = comp()
+    // var z = sin(x + y);
+    // var z  = sqrt(x*x + y*y);
 
-            pos.x *= 0.2;
-            pos.y *= 0.2;
-        }
-        else{
+    // var t = atan2(y, x);
+    // var color4 = rgba(t);
 
-            pos.x *= 0.1;
-            pos.y *= 0.1;
-        }
+    var z = exp(x);
+    var color4 = rgba(y);
 
-        var len = length(meshVec.xyz);
-        if(uniforms.shapeInfo.y == tube){
-            // pos = scale(pos, 1.0, 1.0, length(meshVec.xyz));
-            pos.z *= max(0.0, len - cone_h);
-        }
-        if(uniforms.shapeInfo.y == cone){
-            if(cone_h <= len){
+    // var z  = absC(c2);
+    // var color4 = colorC(c2);
 
-                pos.z *= cone_h;
-            }
-            else{
-
-                pos.z *= len;
-            }
-        }
-
-        pos = rotVec(pos, meshVec.xyz);
-        if(cone_h <= len){
-
-            if(uniforms.shapeInfo.y == disk2){
-
-                pos += (len - cone_h) * meshVec.xyz;
-            }
-            if(uniforms.shapeInfo.y == cone){
-
-                pos += meshVec.xyz;
-            }
-        }
-    }
+    var pos = vec4<f32>(x, y, z, 1.0);
 
     var output : VertexOutput;
 
-    output.Position = uniforms.viewMatrix * (meshPos + vec4<f32>(pos, 1));
-
-    var color3 : vec3<f32> = normalize(meshVec.xyz);
-    var color4 = vec4<f32>(color3, 1.0);
+    output.Position = uniforms.viewMatrix * pos;
 
     var transformedNormal = uniforms.normMatrix * vec4<f32>(vertNorm, 1.0);
     var directionalLightWeighting = max(dot(transformedNormal.xyz, uniforms.lightingDirection.xyz), 0.0);
