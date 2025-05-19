@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>WebGPU sphere</title>
+  <script src="gl-matrix-min.js"></script>
+  <script src="js/main.js?ver=0"></script>
+
+  <script>
+    function start(fnc){
+      fnc().then(result => {
+        console.log("finish");
+      });
+    }
+  </script>
+
+
+</head>
+
+<body onload="start(webgpu_ts.asyncBodyOnLoad)">
+  <h5>WebGPU triangle</h5>
+
+ambientColor  
+  R <input type="number" id="ambient-r" min="0" max="100" value="50" style="width: 3em;" />
+  G <input type="number" id="ambient-g" min="0" max="100" value="50" style="width: 3em;" />
+  B <input type="number" id="ambient-b" min="0" max="100" value="50" style="width: 3em;" />
+<br/>
+directionalColor  
+  R <input type="number" id="directional-r" min="0" max="100" value="50" style="width: 3em;" />
+  G <input type="number" id="directional-g" min="0" max="100" value="50" style="width: 3em;" />
+  B <input type="number" id="directional-b" min="0" max="100" value="50" style="width: 3em;" />
+<br/>
+
+  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("function")'>Function</button>
+  <button onclick="start(webgpu_ts.asyncBodyOnLoadTestAll)">test all</button>
+  <button onclick="start(webgpu_ts.asyncBodyOnLoadDemo)">Demo</button>
+  <button onclick="start(webgpu_ts.asyncBodyOnLoadCom)">Compute</button>
+  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("arrow")'>Arrow</button>
+  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("electric-field")'>電場</button>
+  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("point")'>Point</button>
+  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("line")'>Line</button>
+  <button onclick="start(webgpu_ts.asyncBodyOnLoadMaxwell_1D)">Maxwell 1D</button>
+  <button onclick="start(webgpu_ts.asyncBodyOnLoadTex)">Texture</button>
+  <button onclick="webgpu_ts.stopAnimation()">Stop</button>
+<br/>
+<input type="checkbox" id="auto-rotate" checked /> <label for="auto-rotatate">auto rotate</label>
+<br/>
+  <canvas id="world" width="800" height="800"></canvas>
+</body>
+
+</html>
