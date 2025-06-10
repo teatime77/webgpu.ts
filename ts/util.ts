@@ -68,7 +68,8 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
 
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");
-    bitonic_sort_test();
+    // bitonic_sort_test();
+    algebra_ts.testGalois();
 
     editor = new Editor();
     
@@ -87,7 +88,7 @@ export async function asyncBodyOnLoad(){
 
     g_presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
-    await parseAll();
+    // await parseAll();
 }
 
 let g_context : GPUCanvasContext | null = null;
