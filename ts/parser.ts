@@ -131,20 +131,36 @@ export class Token{
     }
 }
 
-function makeGPUVertexAttributes(vars : Variable[]) : GPUVertexAttribute[] {
+function makeGPUVertexVarsAttributes(vars : Variable[]) : GPUVertexAttribute[] {
     const attributes : GPUVertexAttribute[] = [];
     let offset : number = 0;
     for(const va of vars){
-        const fmt = va.type.format() as GPUVertexFormat;
-
         const attr : GPUVertexAttribute = {
             shaderLocation: va.mod.location!,
             offset: offset,
-            format: fmt
+            format: va.type.format() as GPUVertexFormat
         };
         attributes.push(attr);
 
         offset += va.type.size();
+    }
+
+    return attributes;
+}
+
+function makeGPUInstanceVarsAttributes(vars : Variable[], map : Map<Variable, Field>) : GPUVertexAttribute[] {
+    const attributes : GPUVertexAttribute[] = [];
+    for(const va of vars){
+        const field = map.get(va)!;
+        assert(field != undefined);
+
+        const attr : GPUVertexAttribute = {
+            shaderLocation: va.mod.location!,
+            offset: field.offset(),
+            format: va.type.format() as GPUVertexFormat
+        };
+
+        attributes.push(attr);
     }
 
     return attributes;
@@ -175,7 +191,7 @@ export class Module {
     }
 
     getUniformVar() : Variable {
-        const uniform_var = this.vars.find(x => x.mod.uniform);
+        const uniform_var = this.vars.find(x => x.mod.usage == BufferUsage.uniform);
         if(uniform_var == undefined){
             throw new Error("no uniform var");
         }
@@ -197,23 +213,53 @@ export class Module {
     }
     
 
-    makeVertexBufferLayouts(instance_var_names : string[]) : GPUVertexBufferLayout[] {
+    makeVertexBufferLayouts(compute : ComputePipeline | null) : GPUVertexBufferLayout[] {
+        
         const main = this.fns.find(x => x.mod.fnType == "@vertex");
         if(main == undefined){
             throw new Error(`no vert main `);
         }
+        const map = new Map<Variable, Field>();
+
+        let struct: Struct | undefined;
+        let instance_var_names : string[];
+        if(compute == null){
+            instance_var_names = [];
+        }
+        else{
+            instance_var_names = compute.varNames;
+            const output_vars = compute.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage_read_write);
+            assert(output_vars.length == 1);
+            const output_var  = output_vars[0];
+
+            struct = compute.compModule.structs.find(x => x.typeName == output_var.type.typeName);
+            if(struct == undefined){
+                throw new MyError();
+            }
+
+            for(const arg of main.args){
+                const member = struct.members.find(x => x.name == arg.name);
+                if(member != undefined){
+                    msg(`arg-mem:${arg.name}`);
+                    map.set(arg, member);
+                }
+            }
+        }
 
         const builtin_var_names = [ "vertex_index" ];
         const instance_vars = main.args.filter(x => instance_var_names.includes(x.name) );
+        assert(instance_vars.length == map.size && instance_vars.every(x => map.has(x)));
+
         const vertex_vars   = main.args.filter(x => (! instance_vars.includes(x) && ! builtin_var_names.includes(x.name)) );
         
         const vertex_step_layout : GPUVertexBufferLayout = {
             arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
             stepMode: 'vertex',
-            attributes: makeGPUVertexAttributes(vertex_vars)
+            attributes: makeGPUVertexVarsAttributes(vertex_vars)
         };
     
-        if(instance_var_names.length == 0){
+        assert((compute == null) == (instance_var_names.length == 0));
+        if(compute == null){
             this.vertexSlot = 0;
             return [ vertex_step_layout ];
         }
@@ -222,19 +268,14 @@ export class Module {
             const instance_step_layout  : GPUVertexBufferLayout = {
                 arrayStride: sum( instance_vars.map(x => x.type.size()) ),    
                 stepMode: 'instance',    
-                attributes: makeGPUVertexAttributes(instance_vars)
+                attributes: makeGPUInstanceVarsAttributes(instance_vars, map)
             };
+            assert(instance_step_layout.arrayStride == struct!.size());
 
-            if(vertex_vars[0].mod.location == 0){
-                this.vertexSlot = 0;
-                this.instanceSlot = 1;
-                return [ vertex_step_layout, instance_step_layout ];
-            }
-            else{
-                this.instanceSlot = 0;
-                this.vertexSlot = 1;
-                return [ instance_step_layout, vertex_step_layout ];
-            }
+
+            this.instanceSlot = 0;
+            this.vertexSlot = 1;
+            return [ instance_step_layout, vertex_step_layout ];
         }
     }
 }
@@ -376,6 +417,12 @@ export function lexicalAnalysis(text : string) : Token[] {
     return tokens;
 }
 
+enum BufferUsage {
+    unknown,
+    uniform,
+    storage_read,
+    storage_read_write
+}
 
 class Modifier {
     group : number | undefined;
@@ -384,7 +431,7 @@ class Modifier {
     workgroup_size : number[] | undefined;
     builtin : string | undefined;
     fnType : string | undefined;
-    uniform : boolean = false;
+    usage : BufferUsage = BufferUsage.unknown;
 
     empty() : boolean {
         const v = [
@@ -395,7 +442,7 @@ class Modifier {
             this.builtin,
             this.fnType
         ];
-        return v.every(x => x == undefined) && this.uniform == false;
+        return v.every(x => x == undefined) && this.usage == BufferUsage.unknown;
     }
 
     str() : string {
@@ -524,7 +571,7 @@ class Type {
 }
 
 export class Struct extends Type {
-    members : Variable[] = [];
+    members : Field[] = [];
 
     constructor(mod : Modifier, type_name : string){
         super(mod, undefined, type_name);
@@ -558,6 +605,23 @@ class Variable {
 
     str() : string {
         return `${this.mod.str()} ${this.name} : ${this.type.str()}`
+    }
+}
+
+class Field extends Variable {
+    parent : Struct;
+
+    constructor(mod : Modifier, name : string, type : Type, parent : Struct){
+        super(mod, name, type);
+        this.parent = parent;
+    }
+
+    offset() : number {
+        const idx = this.parent.members.indexOf(this);
+        assert(idx != -1);
+
+        const prev_siblings = this.parent.members.slice(0, idx);
+        return sum(prev_siblings.map(x => x.type.size()));
     }
 }
 
@@ -715,14 +779,18 @@ export class Parser {
         }
     }
 
-    readVariable() : Variable {
+    readVariable(parent : Struct | undefined) : Variable {
         const mod = this.readModifiers();
         const name = this.readId();
         this.readText(":");
         const type = this.readType();
         
-        return new Variable(mod, name, type);
-
+        if(parent == undefined){
+            return new Variable(mod, name, type);
+        }
+        else{
+            return new Field(mod, name, type, parent);
+        }
     }
 
     structDeclaration(mod : Modifier) : Struct {
@@ -743,8 +811,8 @@ export class Parser {
                 break;
             }
 
-            const variable  = this.readVariable();
-            struct.members.push(variable);
+            const field  = this.readVariable(struct) as Field;
+            struct.members.push(field);
 
             if(this.currentToken.text == ","){
                 this.readText(",");
@@ -768,10 +836,24 @@ export class Parser {
         if(this.currentText() == "<"){
 
             this.readText("<");
+            let is_storage = false;
             while(true){
                 const buf_attr = this.readReserved();
-                if(buf_attr == "uniform"){
-                    mod.uniform = true;
+                switch(buf_attr){
+                case "uniform":
+                    mod.usage = BufferUsage.uniform;
+                    break;
+                case "storage":
+                    is_storage = true;
+                    break;
+                case "read":
+                    mod.usage = BufferUsage.storage_read;
+                    break;
+                case "read_write":
+                    mod.usage = BufferUsage.storage_read_write;
+                    break;
+                default:
+                    throw new MyError();
                 }
 
                 if(this.currentText() == ","){
@@ -782,6 +864,13 @@ export class Parser {
                 }
             }
             this.readText(">");
+
+            if(is_storage){
+                assert(mod.usage == BufferUsage.storage_read || mod.usage == BufferUsage.storage_read_write);
+            }
+            else{
+                assert(mod.usage == BufferUsage.uniform);
+            }
         }
 
         const name = this.readId();
@@ -867,7 +956,7 @@ export class Parser {
                 break;
             }
 
-            const variable  = this.readVariable();
+            const variable  = this.readVariable(undefined);
             fn.args.push(variable);
 
             if(this.currentToken.text == ","){

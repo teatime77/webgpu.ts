@@ -132,6 +132,7 @@ export class ComputePipeline extends AbstractPipeline {
     workgroupCounts : [number, number, number] | null = null;
 
     pipeline!     : GPUComputePipeline;
+    compModule!   : Module;
     updateBuffers : GPUBuffer[] = new Array(2);
     bindGroups    : GPUBindGroup[] = new Array(2);
 
@@ -151,12 +152,12 @@ export class ComputePipeline extends AbstractPipeline {
     }
 
     async makeComputePipeline(){
-        const shader_module = await fetchModule(this.compName);
+        this.compModule = await fetchModule(this.compName);
 
         this.pipeline = g_device.createComputePipeline({
             layout: 'auto',
             compute: {
-                module: shader_module.module,
+                module: this.compModule.module,
                 entryPoint: 'main'
             }
         });
@@ -174,6 +175,11 @@ export class ComputePipeline extends AbstractPipeline {
                 initial_update_Data
             );
             this.updateBuffers[i].unmap();
+        }
+
+        assert(this.compModule.vars.length == 3);
+        for(const [i, v] of this.compModule.vars.entries()){
+            assert(v.mod.binding == i);
         }
 
         for (let i = 0; i < 2; ++i) {

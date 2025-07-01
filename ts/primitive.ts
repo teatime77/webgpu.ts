@@ -236,7 +236,7 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertModule = await fetchModule(this.vertName);
         this.fragModule = await fetchModule(this.fragName);
     
-        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute != null ? this.compute.varNames : []);
+        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             layout: 'auto',

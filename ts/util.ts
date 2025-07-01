@@ -29,6 +29,10 @@ export function msg(s : string){
 }
 
 export function sum(v : number[]) : number {
+    if(v.length == 0){
+        return 0;
+    }
+
     return v.reduce((acc, val) => acc + val, 0);
 }
 
@@ -88,7 +92,7 @@ export async function asyncBodyOnLoad(){
 
     g_presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 
-    // await parseAll();
+    await parseAll();
 }
 
 let g_context : GPUCanvasContext | null = null;
