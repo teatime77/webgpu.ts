@@ -1,4 +1,4 @@
-namespace webgpu_ts {
+import { fetchText, makeShaderModule, g_device } from "./util.js";
 
 // Define global buffer size
 const BUFFER_SIZE = 1000;
@@ -96,6 +96,4 @@ export async function asyncBodyOnLoadDemo() {
     const data = copyArrayBuffer.slice(0);
     stagingBuffer.unmap();
     console.log(new Float32Array(data));
-}
-
 }

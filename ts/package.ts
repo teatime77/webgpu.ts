@@ -1,4 +1,4 @@
-namespace webgpu_ts {
+import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, makeLines, Point, Rect, RenderPipeline, Tube } from "./primitive.js";
 
 class ComputeInfo {
     compName!    : string;
@@ -35,7 +35,4 @@ export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
     }
     
     throw Error("shape info");
-}
-
-
 }

@@ -1,4 +1,11 @@
-namespace webgpu_ts {
+declare var glMatrix: any;
+
+import { Vec3 } from "@i18n";
+import { AbstractPipeline, ComputePipeline } from "./compute.js";
+import { ShapeInfo } from "./package.js";
+import { Module, Struct } from "./parser.js";
+import { mat4fromMat3, ui3D } from "./ui.js";
+import { g_device, fetchModule, g_presentationFormat, MyError, range } from "./util.js";
 
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
@@ -22,53 +29,6 @@ function vecDot(a: Vec3, b: Vec3) {
 
 function vecCross(a: Vec3, b: Vec3) {
     return new Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
-}
-
-export class Vec3 {
-    x: number;
-    y: number;
-    z: number;
-
-    constructor(x: number, y: number, z: number){
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-
-    len(){
-        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    }
-
-    unit() : Vec3 {
-        const len = this.len();
-
-        if(len == 0){
-            return new Vec3(0, 0, 0);
-        }
-        else{
-            return new Vec3(this.x / len, this.y / len, this.z / len);
-        }
-    }
-
-    mul(n: number){
-        return new Vec3(n * this.x, n * this.y, n * this.z);
-    }
-
-    add(v: Vec3) {
-        return new Vec3( this.x + v.x, this.y + v.y, this.z + v.z );
-    }
-
-    sub(v: Vec3) {
-        return new Vec3( this.x - v.x, this.y - v.y, this.z - v.z );
-    }
-    
-    dot(v: Vec3) {
-        return this.x * v.x + this.y * v.y + this.z * v.z;
-    }
-    
-    cross(v: Vec3) {
-        return new Vec3(this.y * v.z - this.z * v.y, this.z * v.x - this.x * v.z, this.x * v.y - this.y * v.x);
-    }
 }
 
 export class Vertex extends Vec3 {
@@ -936,6 +896,4 @@ function setPosNorm(v : Float32Array, idx : number, x : number, y : number, z : 
     v[base + 3] = nx;
     v[base + 4] = ny;
     v[base + 5] = nz;
-}
-
 }

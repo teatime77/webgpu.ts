@@ -5,23 +5,10 @@
   <meta charset="utf-8">
   <title>WebGPU sphere</title>
   <script src="lib/webgpu/gl-matrix-min.js"></script>
-  <script type="text/javascript" src="lib/i18n/i18n.js?ver=1"></script>
-  <script type="text/javascript" src="lib/parser/parser.js?ver=1"></script>
-  <script type="text/javascript" src="lib/algebra/algebra.js?ver=1"></script>
-  <script type="text/javascript" src="lib/webgpu/webgpu.js?ver=1"></script>
-
-  <script>
-    function start(fnc){
-      fnc().then(result => {
-        console.log("finish");
-      });
-    }
-  </script>
-
-
+  <script type="module" src="dist/index.mjs"></script>
 </head>
 
-<body onload="start(webgpu_ts.asyncBodyOnLoad)">
+<body>
   <h5>WebGPU triangle</h5>
 
 ambientColor  
@@ -35,18 +22,8 @@ directionalColor
   B <input type="number" id="directional-b" min="0" max="100" value="50" style="width: 3em;" />
 <br/>
 
-  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("function")'>Function</button>
-  <button onclick="start(webgpu_ts.asyncBodyOnLoadTestAll)">test all</button>
-  <button onclick="start(webgpu_ts.asyncBodyOnLoadDemo)">Demo</button>
-  <button onclick="start(webgpu_ts.asyncBodyOnLoadCom)">Compute</button>
-  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("arrow")'>Arrow</button>
-  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("electric-field")'>電場</button>
-  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("point")'>Point</button>
-  <button onclick='webgpu_ts.asyncBodyOnLoadPackage("line")'>Line</button>
-  <button onclick="start(webgpu_ts.asyncBodyOnLoadMaxwell_1D)">Maxwell 1D</button>
-  <button onclick="start(webgpu_ts.asyncBodyOnLoadTex)">Texture</button>
-  <button onclick="webgpu_ts.stopAnimation()">Stop</button>
-<br/>
+<div id="div-buttons"></div>
+
 <input type="checkbox" id="auto-rotate" checked /> <label for="auto-rotatate">auto rotate</label>
 <br/>
   <canvas id="world" width="800" height="800"></canvas>

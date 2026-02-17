@@ -1,6 +1,9 @@
-var glMatrix: any;
+declare var glMatrix: any;
 
-namespace webgpu_ts {
+import { editor } from "./editor.js";
+import { setRequestId } from "./instance.js";
+import { initUI3D, ui3D } from "./ui.js";
+import { fetchText, initContext, g_device, makeShaderModule, g_presentationFormat } from "./util.js";
 
 export async function asyncBodyOnLoadTex() {
 
@@ -242,12 +245,10 @@ export async function asyncBodyOnLoadTex() {
         passEncoder.end();
 
         g_device.queue.submit([commandEncoder.finish()]);
-        requestId = requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture }));
+        setRequestId(requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture }))) ;
     }
 
     const { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture } = await init(document.getElementById('world') as HTMLCanvasElement);
-    requestId = requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture }));
-
-}
+    setRequestId(requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture })));
 
 }

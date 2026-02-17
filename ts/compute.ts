@@ -1,4 +1,6 @@
-namespace webgpu_ts {
+import { Module } from "./parser.js";
+import { ui3D } from "./ui.js";
+import { fetchText, makeShaderModule, range, g_device, particleDim, fetchModule, assert } from "./util.js";
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('../wgsl/compute.wgsl');
@@ -212,6 +214,4 @@ export class ComputePipeline extends AbstractPipeline {
             });
         }
     }
-}
-
 }

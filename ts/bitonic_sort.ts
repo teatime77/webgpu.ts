@@ -1,5 +1,4 @@
-namespace webgpu_ts {
-//
+import { range, assert, msg } from "./util.js";
 
 let iii : number = 0;
 let last_false : number;
@@ -130,6 +129,4 @@ function bitonic_compare(up: boolean, x : Float32Array, offset : number, count :
             swapped = true;
         }
     }
-}
-
 }

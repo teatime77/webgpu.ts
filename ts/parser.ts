@@ -1,4 +1,5 @@
-namespace webgpu_ts {
+import { ComputePipeline } from "./compute.js";
+import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
 
 let unknownToken  = new Set();
 
@@ -1264,6 +1265,4 @@ export async function parseAll(){
         const mod = new Module(text);
         mod.dump();
     }
-}
-
 }

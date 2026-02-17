@@ -1,11 +1,13 @@
-namespace webgpu_ts {
-//
 export class Editor {
     camera : Camera = new Camera();
     tool : Tool = this.camera;
 }
 
 export let editor : Editor;
+
+export function initEditor(){
+    editor = new Editor();
+}
 
 abstract class Tool {
     lastMouseX : number | null = null;
@@ -81,7 +83,5 @@ class Camera extends Tool {
 
         return [camX, camY, camZ];
     }
-
-}
 
 }

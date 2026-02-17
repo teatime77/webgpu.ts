@@ -1,4 +1,13 @@
-namespace webgpu_ts {
+declare var glMatrix: any;
+
+import { testGalois } from "@algebra"
+import { initEditor } from "./editor.js";
+import { Module, parseAll } from "./parser.js";
+import { asyncBodyOnLoadPackage, asyncBodyOnLoadTestAll, asyncBodyOnLoadMaxwell_1D, stopAnimation } from "./instance.js";
+import { asyncBodyOnLoadDemo } from "./demo.js";
+import { asyncBodyOnLoadCom } from "./compute.js";
+import { asyncBodyOnLoadTex } from "./texture.js";
+import { $div } from "@i18n";
 
 export function range(n: number) : number[]{
     return [...Array(n).keys()];
@@ -73,9 +82,9 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");
     // bitonic_sort_test();
-    algebra_ts.testGalois();
+    testGalois();
 
-    editor = new Editor();
+    initEditor();
     
     if (!navigator.gpu) {
         throw Error('WebGPU not supported.');
@@ -182,4 +191,31 @@ export function makeShaderModule( text : string) : GPUShaderModule {
     return module;
 }
 
+// app/src/main.ts
+
+window.addEventListener('load', async() => {
+    console.log('画像も含めてすべてのロードが完了しました');
+    await asyncBodyOnLoad();
+    console.log('初期化完了');
+});
+
+let divButtons = $div("div-buttons");
+function makeButton( text : string) : HTMLButtonElement {
+    const button = document.createElement("button");
+    button.innerText = text;
+    divButtons.appendChild(button);
+
+    return button;
 }
+
+makeButton("Function").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("function") });
+makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
+makeButton("Demo").addEventListener("click", async()=>{ await asyncBodyOnLoadDemo() });
+makeButton("Compute").addEventListener("click", async()=>{ await asyncBodyOnLoadCom() });
+makeButton("Arrow").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("arrow") });
+makeButton("電場").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("electric-field") });
+makeButton("Point").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("point") });
+makeButton("Line").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("line") });
+makeButton("Maxwell 1D").addEventListener("click", async()=>{ await asyncBodyOnLoadMaxwell_1D() });
+makeButton("Texture").addEventListener("click", async()=>{ await asyncBodyOnLoadTex() });
+makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });

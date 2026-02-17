@@ -1,8 +1,18 @@
-var glMatrix: any;
+import { ComputePipeline } from "./compute.js";
+import { editor } from "./editor.js";
+import { Package, makeMesh } from "./package.js";
+import { parseParams } from "./parser.js";
+import { RenderPipeline } from "./primitive.js";
+import { initUI3D, ui3D } from "./ui.js";
+import { initContext, g_device, msg, fetchText, wait } from "./util.js";
 
-namespace webgpu_ts {
+declare var glMatrix: any;
 
 export let requestId : number = 0;
+
+export function setRequestId(request_Id : number){
+    requestId = request_Id;
+}
 
 let validFrame : boolean = false;
 
@@ -171,7 +181,4 @@ export async function asyncBodyOnLoadTestAll(){
 
 export async function asyncBodyOnLoadMaxwell_1D(){
     await asyncBodyOnLoadPackage("maxwell");
-}
-
-
 }

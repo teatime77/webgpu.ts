@@ -1,4 +1,7 @@
-namespace webgpu_ts {
+declare var glMatrix: any;
+
+import { editor } from "./editor.js";
+import { getColor } from "./util.js";
 
 const $dic = new Map<string, HTMLElement>();
 
@@ -137,6 +140,4 @@ export function makeLightDir(){
     glMatrix.vec3.normalize(v, v);
 
     return v;
-}
-
 }
