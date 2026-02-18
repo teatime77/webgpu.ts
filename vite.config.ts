@@ -12,7 +12,7 @@ export default defineConfig(
         fileName: 'webgpu',
         formats: ['es']
       },
-      outDir: '../dist'
+      outDir: '../dist/webgpu/assets'
     }
   })
 );
