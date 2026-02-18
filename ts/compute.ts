@@ -120,7 +120,7 @@ export abstract class AbstractPipeline {
     }
 
     writeUniformBuffer(data : Float32Array, offset : number){
-        g_device.queue.writeBuffer(this.uniformBuffer, offset, data);
+        g_device.queue.writeBuffer(this.uniformBuffer, offset, data as any);
 
         return offset + data.byteLength;
     }

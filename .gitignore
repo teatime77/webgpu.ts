@@ -10,3 +10,5 @@ public/lib/parser
 public/lib/webgpu
 ts/@types
 public/lib/tsconfig.tsbuildinfo
+dist
+tsconfig.tsbuildinfo
