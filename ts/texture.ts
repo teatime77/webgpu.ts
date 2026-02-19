@@ -143,7 +143,7 @@ export async function asyncBodyOnLoadTex() {
         {
             const img = document.createElement('img');
             img.crossOrigin = 'Anonymous';
-            img.src = 'lib/webgpu/pexels-james-wheeler-1552212.jpg';
+            img.src = '../plane/images/pexels-james-wheeler-1552212.jpg';
             await img.decode();
             const imageBitmap = await createImageBitmap(img);
 
