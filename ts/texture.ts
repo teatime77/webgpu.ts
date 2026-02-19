@@ -58,9 +58,9 @@ export async function asyncBodyOnLoadTex() {
         -1, 1, -1, 1, 0, 1, 0, 1, 0, 0,
     ]);
 
-    const vertWGSL = await fetchText('../wgsl/texture-vert.wgsl');
+    const vertWGSL = await fetchText('./wgsl/texture-vert.wgsl');
 
-    const fragWGSL = await fetchText('../wgsl/texture-frag.wgsl');
+    const fragWGSL = await fetchText('./wgsl/texture-frag.wgsl');
 
     async function init(canvas: HTMLCanvasElement): Promise<{ context: GPUCanvasContext, pipeline: GPURenderPipeline, verticesBuffer: GPUBuffer, uniformBindGroup: GPUBindGroup, uniformBuffer: GPUBuffer, depthTexture: GPUTexture, texture: GPUTexture }> {
 

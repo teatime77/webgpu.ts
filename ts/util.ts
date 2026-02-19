@@ -72,7 +72,7 @@ export function getColor(name : string){
 }
 
 export async function fetchModule(shader_name: string) : Promise<Module> {
-    const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
+    const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
     const module = new Module(text);
 
     return module;

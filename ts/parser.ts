@@ -1261,7 +1261,7 @@ export async function parseAll(){
 
     for(const shader_name of shader_names){
         msg(`\n------------------------------ ${shader_name}`)
-        const text = await fetchText(`../wgsl/${shader_name}.wgsl`);
+        const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
         const mod = new Module(text);
         mod.dump();
     }

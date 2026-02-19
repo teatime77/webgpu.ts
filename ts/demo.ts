@@ -8,7 +8,7 @@ const BUFFER_SIZE = 1000;
 export async function asyncBodyOnLoadDemo() {
 
     // Compute shader
-    const shader = await fetchText('../wgsl/demo.wgsl');
+    const shader = await fetchText('./wgsl/demo.wgsl');
 
     // 2: Create a shader module from the shader template literal
     const shaderModule = makeShaderModule(shader);

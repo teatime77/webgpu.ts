@@ -3,7 +3,7 @@ import { ui3D } from "./ui.js";
 import { fetchText, makeShaderModule, range, g_device, particleDim, fetchModule, assert } from "./util.js";
 
 export async function asyncBodyOnLoadCom() {
-    const shader = await fetchText('../wgsl/compute.wgsl');
+    const shader = await fetchText('./wgsl/compute.wgsl');
 
     // シェーダーコードを準備
     const shaderModule = makeShaderModule(shader);
