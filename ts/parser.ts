@@ -1,4 +1,5 @@
 import { ComputePipeline } from "./compute.js";
+import { FncParser } from "./parser-new.js";
 import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
 
 let unknownToken  = new Set();
@@ -54,6 +55,20 @@ var SymbolTable : Array<string> = new  Array<string> (
     "*",
     "%",
     "/",
+
+    "++",
+    "--",
+
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+
+    "==",
+    "<=",
+    ">=",
+
     "&&",
     "||",
 
@@ -70,6 +85,7 @@ var KeywordMap : string[] = [
     "read",
     "read_write",
     "storage",
+    "return",
 
     "@group",
     "@binding",
@@ -377,6 +393,10 @@ export function lexicalAnalysis(text : string) : Token[] {
             }
             else {
 
+                if (pos < text.length && text[pos] == 'u'){
+                    pos++;
+                }
+                
                 sub_type = TokenSubType.integer;
             }
         }
@@ -425,7 +445,7 @@ enum BufferUsage {
     storage_read_write
 }
 
-class Modifier {
+export class Modifier {
     group : number | undefined;
     binding : number | undefined;
     location : number | undefined;
@@ -496,7 +516,7 @@ function primitiveTypeSize(primitive : string) : number{
     }
 }
 
-class Type {
+export class Type {
     mod : Modifier;
     aggregate : string | undefined;
     typeName : string;
@@ -593,7 +613,7 @@ export class Struct extends Type {
     }
 }
 
-class Variable {
+export class Variable {
     mod : Modifier;
     name : string;
     type : Type;
@@ -977,20 +997,27 @@ export class Parser {
             fn.type = this.readType();
         }
 
-        this.readText("{");
-        let nest = 1;
-        while(true){
-            if(this.currentToken.text == "{"){
-                nest++;
-            }
-            else if(this.currentToken.text == "}"){
-                nest--;
-                if(nest == 0){
-                    this.readText("}");
-                    break;
+        if(true){
+            const fncParser = new FncParser(this.tokenList, this.tokenPos);
+            fncParser.parseBlock();
+            this.tokenPos = fncParser.tokenPos;
+        }
+        else{
+            this.readText("{");
+            let nest = 1;
+            while(true){
+                if(this.currentToken.text == "{"){
+                    nest++;
                 }
+                else if(this.currentToken.text == "}"){
+                    nest--;
+                    if(nest == 0){
+                        this.readText("}");
+                        break;
+                    }
+                }
+                this.advance();
             }
-            this.advance();
         }
 
         return fn;
