@@ -1,5 +1,5 @@
 import { ComputePipeline } from "./compute.js";
-import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable } from "./parser.js";
+import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field } from "./parser.js";
 import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
 
 type StatementApp = Statement | App;
@@ -27,6 +27,15 @@ export abstract class Term {
     parent : App | null = null;
     // 係数
     value : Rational = new Rational(1);
+}
+
+class Str extends Term{
+    text : string;
+
+    constructor(text : string){
+        super();
+        this.text = text;
+    }
 }
 
 export class RefVar extends Term{
@@ -104,11 +113,10 @@ export abstract class Statement {
 
 export class VariableDeclaration extends Statement {
     variable: Variable;
-    initializer: Term | undefined;
-    constructor(variable: Variable, initializer: Term | undefined) {
+
+    constructor(variable: Variable) {
         super();
         this.variable = variable;
-        this.initializer = initializer;
     }
 }
 
@@ -144,6 +152,17 @@ export class IfStatement extends Statement {
     }
 }
 
+export class WhileStatement extends Statement {
+    condition: Term;
+    body: BlockStatement;
+
+    constructor(condition: Term, body: BlockStatement) {
+        super();
+        this.condition = condition;
+        this.body = body;
+    }
+}
+
 export class ForStatement extends Statement {
     initializer: VariableDeclaration;
     condition: Term;
@@ -159,6 +178,19 @@ export class ForStatement extends Statement {
     }
 }
 
+export class ParallelStatement extends Statement {
+    blocks : BlockStatement[];
+
+    constructor(blocks : BlockStatement[]){
+        super();
+        this.blocks = blocks;
+    }
+}
+
+export enum Context {
+    unknown,
+    Object
+}
 
 export class FncParser {
     tokenPos:number;
@@ -217,14 +249,15 @@ export class FncParser {
             error(`identifier is expected.`)
         }
 
-        const text = this.current();
-        this.next();
-
-        return text;
+        return this.readText();
     }
 
     current(){
         return this.token.text;
+    }
+
+    peek() : string {
+        return this.tokenPos + 1 < this.tokens.length ? this.tokens[this.tokenPos + 1].text : ""; 
     }
 
     readType() : Type {
@@ -277,30 +310,153 @@ export class FncParser {
         this.nextToken(">");
     }
 
-    readArgs(start: string, end : string, app : App){
-        this.nextToken(start);
+
+    structDeclaration(ctx : Context) : Struct {
+        this.nextToken("struct");
+
+        const name = this.readName();
+        const struct = new Struct(new Modifier(), name);
+        this.structs.push(struct);
+
+        // change typeTkn
+        this.tokens.filter(x => x.text == name).forEach(x => x.typeTkn = TokenType.type);
+
+        this.nextToken("{");
 
         while(true){
-            const trm = this.RelationalExpression();
-            app.args.push(trm);
+            if(this.current() == "}"){
+                break;
+            }
 
-            if(this.token.text == ","){
+            const field  = this.readVariable(ctx, struct) as Field;
+            struct.members.push(field);
+
+            if(this.current() == ","){
                 this.nextToken(",");
             }
             else{
                 break;
             }
         }
+        this.nextToken("}");
 
-        this.nextToken(end);
+        if(this.current() == ";"){
+            this.nextToken(";");
+        }
+
+        return struct;
     }
 
-    readId() : RefVar | App {
+
+    readFn(ctx : Context) : Function {
+        this.nextToken("fn");
+
+        const name = this.readName();
+
+        const fn = new Function(new Modifier(), name);
+
+        this.nextToken("(");
+
+        while(true){
+            if(this.current() == ")"){
+                break;
+            }
+
+            const variable  = this.readVariable(ctx, undefined);
+            fn.args.push(variable);
+
+            if(this.current() == ","){
+                this.nextToken(",");
+
+            }
+            else{
+                break;
+            }
+        }
+        this.nextToken(")");
+
+        if(this.current() == "->"){
+
+            this.nextToken("->");
+
+            fn.type = this.readType();
+        }
+
+        this.parseBlock(ctx, );
+
+        return fn;
+    }
+
+    readFncArgs(ctx : Context, app : App){
+        this.nextToken("(");
+
+        while(this.current() != ")"){
+            const trm = this.RelationalExpression(ctx);
+
+            if(this.token.text == ":"){
+                this.nextToken(":");
+                const value = this.LogicalExpression(ctx);
+                if(trm instanceof RefVar){
+                    msg(`fnc arg[${trm.name}] with init`);
+                }
+                else{
+                    msg(`NG fnc arg`);
+                }
+            }
+            
+            app.args.push(trm);
+
+            if(this.token.text == ","){
+                this.nextToken(",");
+            }
+        }
+
+        this.nextToken(")");
+    }
+
+    readComma(ctx : Context, start: string, end : string) : Term[]{
+        this.nextToken(start);
+
+        const terms : Term[] = [];
+        while(this.current() != end){
+            const trm = this.RelationalExpression(ctx);
+            terms.push(trm);
+
+            if(this.token.text == ","){
+                this.nextToken(",");
+            }
+        }
+
+        this.nextToken(end);
+
+        return terms;
+    }
+
+    readArgs(ctx : Context, start: string, end : string, app : App){
+        const terms = this.readComma(ctx, start, end);
+
+        app.args.push(...terms);
+    }
+
+    readText() : string {
+        const text = this.current();
+        this.next();
+
+        return text;
+    }
+
+    readName() : string {
         const idType = this.token.typeTkn;
         assert(idType == TokenType.identifier || idType == TokenType.type);
 
-        let term : RefVar | App = new RefVar(this.token.text);
-        this.next();
+        return this.readText();
+    }
+
+    readId(ctx : Context) : RefVar | App {
+        const idType = this.token.typeTkn;
+        const name = this.readName();
+
+        let term : RefVar | App = new RefVar(name);
 
         if(idType == TokenType.type && this.token.text == '<'){
             term = new App(operator("<>"), [term]);
@@ -311,16 +467,16 @@ export class FncParser {
             if(this.token.text == '('){
 
                 term = new App(operator("()"), [term]);
-                this.readArgs("(", ")", term);
+                this.readFncArgs(ctx, term);
             }
             else if(this.token.text == '['){
 
                 term = new App(operator("[]"), [term]);
-                this.readArgs("[", "]", term);
+                this.readArgs(ctx, "[", "]", term);
             }
             else if(this.token.text == "."){
                 this.nextToken(".");
-                const id = this.readId();
+                const id = this.readId(ctx);
                 term = new App(operator("."), [term, id]);
             }
             else{
@@ -330,14 +486,28 @@ export class FncParser {
         }
     }
 
-    PrimaryExpression() : Term {
+    PrimaryExpression(ctx : Context) : Term {
         let trm : Term;
 
         if(this.token.typeTkn == TokenType.identifier || this.token.typeTkn == TokenType.type){
-            return this.readId();
+            const id = this.readId(ctx);
+            if(ctx == Context.Object && this.current() == ":"){
+                this.nextToken(":");
+                const value = this.LogicalExpression(Context.unknown);
+            }
+
+            return id;
         }
         else if(this.token.typeTkn == TokenType.Number){
-            let n = parseFloat(this.token.text);
+            let n : number;
+
+            if(this.token.text[0] == "#"){
+                n = parseInt(this.token.text.substring(1), 16);
+            }
+            else{
+                n = parseFloat(this.token.text);
+            }
+
             if(isNaN(n)){
                 throw new MyError();
             }
@@ -345,39 +515,37 @@ export class FncParser {
             trm = new ConstNum(n);
             this.next();
         }
+        else if(this.token.typeTkn == TokenType.String){
+            trm = new Str(this.token.text);
+            this.next();
+        }
         else if(this.token.text == '('){
 
-            this.next();
-            trm = this.RelationalExpression();
+            const terms = this.readComma(ctx, "(", ")");
 
-            if(this.current() != ')'){
-                throw new MyError();
+            if(this.current() == "=>"){
+                this.nextToken("=>");
+                if(this.current() == "{"){
+
+                    const block = this.parseBlock(ctx);
+                }
+                else{
+                    this.ArithmeticExpression(ctx);
+                }
+
+                return new RefVar("arrow");
             }
-            this.next();
-
-            if(this.token.text == '('){
-
-                let app = new App(trm, []);
-                this.readArgs("(", ")", app);
-
-                return app;
+            else{
+                return new App(operator(","), terms);
             }
-
-            return trm;
         }
         else if(this.token.text == '{'){
-
-            this.next();
-            const element = this.RelationalExpression();
-
-            this.nextToken('|');
-
-            const logic = this.LogicalExpression();
-
-            this.nextToken('}');
-
-            trm = new App(operator("{|}"), [element, logic]);
-            return trm;
+            const terms = this.readComma(Context.Object, "{", "}");
+            return new App(operator("{}"), terms);
+        }
+        else if(this.token.text == '['){
+            const terms = this.readComma(ctx, "[", "]");
+            return new App(operator("[]"), terms);
         }
         else{
             throw new MyError();
@@ -386,13 +554,13 @@ export class FncParser {
         return trm;
     }
 
-    PowerExpression() : Term {
-        const trm1 = this.PrimaryExpression();
+    PowerExpression(ctx : Context) : Term {
+        const trm1 = this.PrimaryExpression(ctx);
         if(this.token.text == "^"){
 
             this.nextToken("^");
 
-            const trm2 = this.PowerExpression();
+            const trm2 = this.PowerExpression(ctx);
 
             return new App(operator("^"), [trm1, trm2]);
         }
@@ -400,14 +568,14 @@ export class FncParser {
         return trm1;
     }
 
-    UnaryExpression() : Term {
+    UnaryExpression(ctx : Context) : Term {
         if (this.token.text == "-") {
             // 負号の場合
 
             this.nextToken("-");
 
             // 基本の式を読みます。
-            const t1 = this.PowerExpression();
+            const t1 = this.PowerExpression(ctx);
 
             // 符号を反転します。
             t1.value.numerator *= -1;
@@ -417,19 +585,20 @@ export class FncParser {
         else {
 
             // 基本の式を読みます。
-            return this.PowerExpression();
+            return this.PowerExpression(ctx);
         }
     }
 
     
-    DivExpression() : Term {
-        let trm1 = this.UnaryExpression();
+    DivExpression(ctx : Context) : Term {
+        let trm1 = this.UnaryExpression(ctx);
         while(this.token.text == "/" || this.token.text == "%"){
             let app = new App(operator(this.token.text), [trm1]);
             this.next();
 
             while(true){
-                let trm2 = this.UnaryExpression();
+                let trm2 = this.
+                UnaryExpression(ctx);
                 app.args.push(trm2);
                 
                 if(this.token.text == app.fncName){
@@ -446,8 +615,8 @@ export class FncParser {
     }
 
     
-    MultiplicativeExpression() : Term {
-        let trm1 = this.DivExpression();
+    MultiplicativeExpression(ctx : Context) : Term {
+        let trm1 = this.DivExpression(ctx);
         if(this.current() != "*"){
             return trm1;
         }
@@ -457,7 +626,7 @@ export class FncParser {
             this.next();
 
             while(true){
-                let trm2 = this.DivExpression();
+                let trm2 = this.DivExpression(ctx);
                 app.args.push(trm2);
                 
                 if(this.token.text == app.fncName){
@@ -473,14 +642,14 @@ export class FncParser {
         return trm1;
     }
     
-    AdditiveExpression() : Term {
+    AdditiveExpression(ctx : Context) : Term {
         let nagative : boolean = false;
         if(this.token.text == "-"){
             nagative = true;
             this.next();
         }
 
-        const trm1 = this.MultiplicativeExpression();
+        const trm1 = this.MultiplicativeExpression(ctx);
         if(nagative){
             trm1.value.numerator *= -1;
         }
@@ -492,7 +661,7 @@ export class FncParser {
                 const opr = this.token.text;
                 this.next();
 
-                const trm2 = this.MultiplicativeExpression();
+                const trm2 = this.MultiplicativeExpression(ctx);
                 if(opr == "-"){
                     trm2.value.numerator *= -1;
                 }
@@ -506,29 +675,19 @@ export class FncParser {
         return trm1;
     }
 
-    ArithmeticExpression() : Term {
-        return this.AdditiveExpression();
+    ArithmeticExpression(ctx : Context) : Term {
+        return this.AdditiveExpression(ctx);
     }
 
-    RelationalExpression() : Term {
-        let trm1 : Term;
-        if(this.token.text == "["){
-
-            const ref = new RefVar("[]");
-            trm1 = new App(ref, []);
-            this.readArgs("[", "]", trm1 as App);
-        }
-        else{
-
-            trm1 = this.ArithmeticExpression();
-        }
+    RelationalExpression(ctx : Context) : Term {
+        let trm1 = this.ArithmeticExpression(ctx);
 
         while(isRelationToken(this.token.text)){
             let app = new App(operator(this.token.text), [trm1]);
             this.next();
 
             while(true){
-                let trm2 = this.ArithmeticExpression();
+                let trm2 = this.ArithmeticExpression(ctx);
                 app.args.push(trm2);
                 
                 if(this.token.text == app.fncName){
@@ -544,8 +703,8 @@ export class FncParser {
         return trm1;
     }
 
-    AndExpression() : Term {
-        const trm1 = this.RelationalExpression();
+    AndExpression(ctx : Context) : Term {
+        const trm1 = this.RelationalExpression(ctx);
 
         if(this.token.text != "&&"){
 
@@ -557,15 +716,15 @@ export class FncParser {
         while( [";", "&&"].includes(this.token.text) ){
             this.next();
 
-            const trm2 = this.RelationalExpression();
+            const trm2 = this.RelationalExpression(ctx);
             app.addArg(trm2);
         }
 
         return app;
     }
 
-    OrExpression() : Term {
-        const trm1 = this.AndExpression();
+    OrExpression(ctx : Context) : Term {
+        const trm1 = this.AndExpression(ctx);
 
         if(this.current() != "||"){
 
@@ -577,22 +736,22 @@ export class FncParser {
         while( this.current() == "||" ){
             this.next();
 
-            const trm2 = this.AndExpression();
+            const trm2 = this.AndExpression(ctx);
             app.addArg(trm2);
         }
 
         return app;
     }
 
-    LogicalExpression(){
-        const trm1 = this.OrExpression();
+    LogicalExpression(ctx : Context){
+        const trm1 = this.OrExpression(ctx);
 
         if([ "=>", "⇔" ].includes(this.token.text)){
             const opr = this.token.text;
 
             this.next();
 
-            let trm2 = this.OrExpression();
+            let trm2 = this.OrExpression(ctx);
             return new App(operator(opr), [trm1, trm2]);    
         }
         else{
@@ -601,9 +760,7 @@ export class FncParser {
         }
     }
 
-    parseVariableDeclaration() : VariableDeclaration {
-        assert(this.token.text == "var" || this.token.text == "const");
-        this.next();
+    readVariable(ctx : Context, parent : Struct | undefined) : Variable {
         const name = this.readToken(TokenType.identifier);
         
         let type: Type | undefined;
@@ -611,36 +768,58 @@ export class FncParser {
             this.nextToken(":");
             type = this.readType();
         }
-        
-        const variable = new Variable(new Modifier(), name, type ?? new Type(new Modifier(), undefined, "inferred"));
 
         let initializer: Term | undefined;
         if (this.current() === '=') {
             this.nextToken("=");
-            initializer = this.ArithmeticExpression();
+            initializer = this.ArithmeticExpression(ctx);
         }
-        this.nextToken(";");
+        
+        if(parent == undefined){
 
-        return new VariableDeclaration(variable, initializer);
+            return  new Variable(new Modifier(), name, new Type(new Modifier(), undefined, "inferred"), initializer);
+        }
+        else{
+
+            return  new Field(new Modifier(), name, new Type(new Modifier(), undefined, "inferred"), initializer, parent);
+        }
+
     }
 
-    parseReturn() : ReturnStatement {
+    parseVariableDeclaration(ctx : Context) : VariableDeclaration {
+        assert(this.token.text == "var" || this.token.text == "const");
+        this.next();
+
+        if(this.current() == "<"){
+            this.nextToken("<");
+            const varKind = this.readToken(TokenType.reservedWord);
+            assert(varKind == "storage");
+            this.nextToken(">");
+        }
+
+        const variable = this.readVariable(ctx, undefined);
+
+        this.nextToken(";");
+        return new VariableDeclaration(variable);
+    }
+
+    parseReturn(ctx : Context) : ReturnStatement {
         this.nextToken("return");
         let value : Term | undefined;
         if(this.current() != ";"){
-            value = this.LogicalExpression();
+            value = this.LogicalExpression(ctx);
         }
         this.nextToken(";");
 
         return new ReturnStatement(value);
     }
 
-    parseAssignment() : App {
-        const trm1 = this.PrimaryExpression();
+    parseAssignment(ctx : Context) : App {
+        const trm1 = this.PrimaryExpression(ctx);
 
         if(["=", "+=", "-=", "*=", "/=", "%="].includes(this.current())){
             this.next();
-            const trm2 = this.ArithmeticExpression();
+            const trm2 = this.ArithmeticExpression(ctx);
 
             this.nextToken(";");
             return new App(operator("="), [trm1, trm2]);
@@ -654,12 +833,12 @@ export class FncParser {
         }
     }
 
-    parseBlock(): BlockStatement {
+    parseBlock(ctx : Context): BlockStatement {
         this.nextToken("{");
 
         const statements: StatementApp[] = [];
         while (this.current() !== '}' && !this.isEoT()) {
-            statements.push(this.parseStatement());
+            statements.push(this.parseStatement(ctx));
         }
 
         this.nextToken("}");
@@ -667,14 +846,14 @@ export class FncParser {
         return new BlockStatement(statements);
     }
 
-    parseIf(): IfStatement {
+    parseIf(ctx : Context): IfStatement {
         this.nextToken("if");
 
         this.nextToken("(");
-        const condition = this.OrExpression();
+        const condition = this.OrExpression(ctx);
         this.nextToken(")");
 
-        const ifBlock = this.parseBlock();
+        const ifBlock = this.parseBlock(ctx);
 
         let elseIf : IfStatement | undefined;
         let elseBlock: BlockStatement | undefined;
@@ -682,51 +861,113 @@ export class FncParser {
             this.nextToken('else');
 
             if (this.current() === 'if') {
-                elseIf = this.parseIf();
+                elseIf = this.parseIf(ctx);
             } else {
-                elseBlock = this.parseBlock();
+                elseBlock = this.parseBlock(ctx);
             }
         }
 
         return new IfStatement(condition, ifBlock, elseIf, elseBlock);
     }
 
-    parseFor(): ForStatement {
+    parseWhile(ctx : Context): WhileStatement {
+        this.nextToken("while");
+        this.nextToken("(");
+        const condition = this.LogicalExpression(ctx);
+        this.nextToken(')');        
+
+        const body = this.parseBlock(ctx);
+
+        return new WhileStatement(condition, body);
+    }
+
+    parseFor(ctx : Context): ForStatement {
         this.nextToken("for");
         this.nextToken("(");
 
-        const initializer = this.parseVariableDeclaration();
+        const initializer = this.parseVariableDeclaration(ctx);
         this.nextToken(';');
 
-        const condition = this.LogicalExpression();
+        const condition = this.LogicalExpression(ctx);
         this.nextToken(';');
 
-        const update = this.parseAssignment();
+        const update = this.parseAssignment(ctx);
 
         this.nextToken(')');        
 
-        const body = this.parseBlock();
+        const body = this.parseBlock(ctx);
 
         return new ForStatement(initializer, condition, update, body);
     }
 
-    parseStatement() : Statement | App{
+    parseParallel(ctx : Context): ParallelStatement {
+        this.nextToken("parallel");
+        this.nextToken("{");
+
+        const blocks : BlockStatement[] = [];
+        while(this.current() != "}"){
+            const block = this.parseBlock(ctx);
+            blocks.push(block);
+        }
+
+        this.nextToken("}");
+
+        return new ParallelStatement(blocks);
+    }
+
+    parseStatement(ctx : Context) : Statement | App{
         if(this.token.text == "var" || this.token.text == "const"){
-            return this.parseVariableDeclaration();
+            return this.parseVariableDeclaration(ctx);
         }
         else if(this.token.text == "return"){
-            return this.parseReturn();
+            return this.parseReturn(ctx);
         }
         else if(this.token.text == "if"){
-            return this.parseIf();
+            return this.parseIf(ctx);
+        }
+        else if(this.token.text == "while"){
+            return this.parseWhile(ctx);
         }
         else if(this.token.text == "for"){
-            return this.parseFor();
+            return this.parseFor(ctx);
+        }
+        else if(this.token.text == "parallel"){
+            return this.parseParallel(ctx);
         }
         else{
     
-            return this.parseAssignment();
+            return this.parseAssignment(ctx);
         }
-    
+    }
+
+    parseSource() : void {
+        const ctx = Context.unknown;
+
+        while(!this.isEoT()){
+            switch(this.current()){
+            case "[":{
+                this.nextToken("[");
+                const name = this.readName();
+                assert(name == "gpu" || name == "cpu");
+                this.nextToken("]");
+                break;
+                }
+                
+            case "struct":
+                this.structDeclaration(ctx);
+                break;
+
+            case "var":
+                this.parseVariableDeclaration(ctx);
+                break;
+                
+            case "fn":
+                this.readFn(ctx);
+                break;
+
+            default:
+                throw new MyError();
+            }
+        }
     }
 }

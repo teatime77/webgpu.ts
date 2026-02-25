@@ -1,5 +1,5 @@
 import { ComputePipeline } from "./compute.js";
-import { FncParser } from "./parser-new.js";
+import { Context, FncParser, Term } from "./parser-new.js";
 import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
 
 let unknownToken  = new Set();
@@ -23,6 +23,9 @@ export enum TokenType{
     reservedWord,
 
     type,
+
+    // 文字列
+    String,
 
     // End Of Text
     eot,
@@ -73,6 +76,7 @@ var SymbolTable : Array<string> = new  Array<string> (
     "||",
 
     "//",
+    "=>",
     "->"
 );
     
@@ -86,6 +90,7 @@ var KeywordMap : string[] = [
     "read_write",
     "storage",
     "return",
+    "parallel",
 
     "@group",
     "@binding",
@@ -120,6 +125,10 @@ function isLetter(s : string) : boolean {
 
 function isDigit(s : string) : boolean {
     return s.length == 1 && "0123456789".indexOf(s) != -1;
+}
+
+function isHexDigit(s : string) : boolean {
+    return s.length == 1 && "0123456789ABCDEF".indexOf(s) != -1;
 }
 
 function isLetterOrDigit(s : string) : boolean {
@@ -396,9 +405,24 @@ export function lexicalAnalysis(text : string) : Token[] {
                 if (pos < text.length && text[pos] == 'u'){
                     pos++;
                 }
-                
+
                 sub_type = TokenSubType.integer;
             }
+        }
+        else if(ch1 == '#'){
+            token_type = TokenType.Number;
+            sub_type = TokenSubType.integer;
+
+            // 10進数の終わりを探します。
+            for (pos++; pos < text.length && isHexDigit(text[pos]); pos++);
+
+            assert(pos - start_pos == 7);
+        }
+        else if(ch1 == '"'){
+            token_type = TokenType.String;
+            pos = text.indexOf('"', pos + 1);
+            assert(pos != -1);
+            pos++;
         }
         else if (SymbolTable.indexOf("" + ch1 + ch2) != -1) {
             // 2文字の記号の表にある場合
@@ -426,7 +450,13 @@ export function lexicalAnalysis(text : string) : Token[] {
         }
 
         // 字句の文字列を得ます。
-        var word : string = text.substring(start_pos, pos);
+        var word : string;
+        if(token_type == TokenType.String){
+            word = text.substring(start_pos + 1, pos - 1);
+        }
+        else{
+            word = text.substring(start_pos, pos);
+        }
 
         const token = new Token(token_type, sub_type, word, start_pos);
 
@@ -617,11 +647,13 @@ export class Variable {
     mod : Modifier;
     name : string;
     type : Type;
+    initializer : Term | undefined;
 
-    constructor(mod : Modifier, name : string, type : Type){
+    constructor(mod : Modifier, name : string, type : Type, initializer : Term | undefined){
         this.mod = mod;
         this.name = name;
         this.type = type;
+        this.initializer = initializer;
     }
 
     str() : string {
@@ -629,11 +661,11 @@ export class Variable {
     }
 }
 
-class Field extends Variable {
+export class Field extends Variable {
     parent : Struct;
 
-    constructor(mod : Modifier, name : string, type : Type, parent : Struct){
-        super(mod, name, type);
+    constructor(mod : Modifier, name : string, type : Type, initializer : Term | undefined, parent : Struct){
+        super(mod, name, type, initializer);
         this.parent = parent;
     }
 
@@ -646,7 +678,7 @@ class Field extends Variable {
     }
 }
 
-class Function {
+export class Function {
     mod : Modifier;
     name : string;
     args : Variable[] = [];
@@ -807,10 +839,10 @@ export class Parser {
         const type = this.readType();
         
         if(parent == undefined){
-            return new Variable(mod, name, type);
+            return new Variable(mod, name, type, undefined);
         }
         else{
-            return new Field(mod, name, type, parent);
+            return new Field(mod, name, type, undefined, parent);
         }
     }
 
@@ -898,7 +930,7 @@ export class Parser {
         this.readText(":");
         const type = this.readType();
         
-        const buf_var = new Variable(mod, name, type);
+        const buf_var = new Variable(mod, name, type, undefined);
 
         this.readText(";");
 
@@ -999,7 +1031,7 @@ export class Parser {
 
         if(true){
             const fncParser = new FncParser(this.tokenList, this.tokenPos);
-            fncParser.parseBlock();
+            fncParser.parseBlock(Context.unknown);
             this.tokenPos = fncParser.tokenPos;
         }
         else{
@@ -1292,4 +1324,12 @@ export async function parseAll(){
         const mod = new Module(text);
         mod.dump();
     }
+
+    {
+        const text = await fetchText(`./wgsl/test.wgsl`);
+        const tokens = lexicalAnalysis(text);
+        const fncParser = new FncParser(tokens, 0);
+        fncParser.parseSource();
+    }
+    
 }
