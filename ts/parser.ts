@@ -1,6 +1,7 @@
+import { assert, msg, MyError, sum, fetchText  } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { Context, FncParser, Term } from "./parser-new.js";
-import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
+import { makeShaderModule, error } from "./util.js";
 
 let unknownToken  = new Set();
 
@@ -1326,7 +1327,7 @@ export async function parseAll(){
     }
 
     {
-        const text = await fetchText(`./wgsl/test.wgsl`);
+        const text = await fetchText(`./script/test.wgsl`);
         const tokens = lexicalAnalysis(text);
         const fncParser = new FncParser(tokens, 0);
         fncParser.parseSource();

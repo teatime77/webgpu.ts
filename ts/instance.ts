@@ -1,10 +1,11 @@
+import { msg, fetchText, sleep } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
 import { parseParams } from "./parser.js";
 import { RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
-import { initContext, g_device, msg, fetchText, wait } from "./util.js";
+import { initContext, g_device } from "./util.js";
 
 declare var glMatrix: any;
 
@@ -171,7 +172,7 @@ export async function asyncBodyOnLoadPackage(package_name : string){
         
         await startAnimation(comps, meshes);
 
-        await wait(3000);
+        await sleep(3000);
     }
 }
 

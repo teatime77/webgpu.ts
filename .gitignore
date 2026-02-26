@@ -13,3 +13,4 @@ public/lib/tsconfig.tsbuildinfo
 dist
 tsconfig.tsbuildinfo
 lib
+public/script

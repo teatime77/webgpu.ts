@@ -1,4 +1,4 @@
-import { range, assert, msg } from "./util.js";
+import { range, assert, msg } from "@i18n";
 
 let iii : number = 0;
 let last_false : number;

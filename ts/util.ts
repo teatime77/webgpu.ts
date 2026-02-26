@@ -1,5 +1,6 @@
 declare var glMatrix: any;
 
+import { $div, fetchText } from "@i18n";
 import { testGalois } from "@algebra"
 import { initEditor } from "./editor.js";
 import { Module, parseAll } from "./parser.js";
@@ -7,57 +8,13 @@ import { asyncBodyOnLoadPackage, asyncBodyOnLoadTestAll, asyncBodyOnLoadMaxwell_
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadCom } from "./compute.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
-import { $div } from "@i18n";
-
-export function range(n: number) : number[]{
-    return [...Array(n).keys()];
-}
 
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
 
-export class MyError extends Error {
-    constructor(text : string = ""){
-        super();
-    }
-}
-
-export function assert(b : boolean, msg : string = ""){
-    if(!b){
-        throw new MyError(msg);
-    }
-}    
-
 export function error(msg : string){
     console.log(`error [${msg}]`)
     throw new Error(msg);
-}
-
-export function msg(s : string){
-    console.log(s);
-}
-
-export function sum(v : number[]) : number {
-    if(v.length == 0){
-        return 0;
-    }
-
-    return v.reduce((acc, val) => acc + val, 0);
-}
-
-export async function wait(millisec : number) : Promise<null> {
-    return new Promise((resolve) => {
-        setTimeout(()=>{
-            resolve(null);
-        }, millisec);
-    });
-}
-
-export async function fetchText(fileURL: string) {
-    const response = await fetch(fileURL);
-    const text = await response!.text();
-
-    return text;
 }
 
 export function getColor(name : string){

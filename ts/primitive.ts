@@ -1,11 +1,11 @@
 declare var glMatrix: any;
 
-import { Vec3 } from "@i18n";
+import { Vec3, MyError, range } from "@i18n";
 import { AbstractPipeline, ComputePipeline } from "./compute.js";
 import { ShapeInfo } from "./package.js";
 import { Module, Struct } from "./parser.js";
 import { mat4fromMat3, ui3D } from "./ui.js";
-import { g_device, fetchModule, g_presentationFormat, MyError, range } from "./util.js";
+import { g_device, fetchModule, g_presentationFormat } from "./util.js";
 
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);

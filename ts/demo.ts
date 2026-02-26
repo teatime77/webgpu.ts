@@ -1,4 +1,5 @@
-import { fetchText, makeShaderModule, g_device } from "./util.js";
+import { fetchText  } from "@i18n";
+import { makeShaderModule, g_device } from "./util.js";
 
 // Define global buffer size
 const BUFFER_SIZE = 1000;

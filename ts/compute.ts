@@ -1,6 +1,7 @@
+import { fetchText, range, assert } from "@i18n";
 import { Module } from "./parser.js";
 import { ui3D } from "./ui.js";
-import { fetchText, makeShaderModule, range, g_device, particleDim, fetchModule, assert } from "./util.js";
+import { makeShaderModule, g_device, particleDim, fetchModule } from "./util.js";
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('./wgsl/compute.wgsl');

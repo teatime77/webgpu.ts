@@ -1,9 +1,10 @@
 declare var glMatrix: any;
 
+import { fetchText  } from "@i18n";
 import { editor } from "./editor.js";
 import { setRequestId } from "./instance.js";
 import { initUI3D, ui3D } from "./ui.js";
-import { fetchText, initContext, g_device, makeShaderModule, g_presentationFormat } from "./util.js";
+import { initContext, g_device, makeShaderModule, g_presentationFormat } from "./util.js";
 
 export async function asyncBodyOnLoadTex() {
 

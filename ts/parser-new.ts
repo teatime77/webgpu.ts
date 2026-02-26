@@ -1,6 +1,7 @@
+import { assert, msg, MyError, sum, fetchText  } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field } from "./parser.js";
-import { assert, makeShaderModule, msg, MyError, sum, error, fetchText } from "./util.js";
+import { makeShaderModule, error } from "./util.js";
 
 type StatementApp = Statement | App;
 
