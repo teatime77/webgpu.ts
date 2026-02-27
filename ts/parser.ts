@@ -28,6 +28,9 @@ export enum TokenType{
     // 文字列
     String,
 
+    // 改行
+    newLine,
+
     // End Of Text
     eot,
 
@@ -350,9 +353,9 @@ export function lexicalAnalysis(text : string) : Token[] {
 
         if(ch1 == '\n'){
 
+            token_type = TokenType.newLine;
             line_num++;
             pos++;
-            continue;
         }
         else if(ch1 + ch2 == "//"){
             for (pos += 2 ; pos < text.length && text[pos] != "\n"; pos++);
@@ -699,7 +702,7 @@ export class Function {
 }
 
 export class Parser {
-    tokenPos:number = 0;
+    private tokenPos:number = 0;
     inFn : boolean = false;
 
     tokenList : Token[];
@@ -708,6 +711,7 @@ export class Parser {
     constructor(tokens : Token[]){
         this.tokenList = tokens;
         this.tokenPos = 0;
+        this.skipNewLine();
     }
 
     get currentToken() : Token {
@@ -719,12 +723,19 @@ export class Parser {
         }
     }
 
+    skipNewLine(){
+        while(this.tokenPos < this.tokenList.length && this.tokenList[this.tokenPos].typeTkn == TokenType.newLine){
+            this.tokenPos++;
+        }
+    }
+
     currentText() : string {
         return this.currentToken.text;
     }
 
     advance(){
         this.tokenPos++;
+        this.skipNewLine();
     }
 
     readText(text : string){

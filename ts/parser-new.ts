@@ -202,7 +202,19 @@ export class FncParser {
     constructor(tokens: Token[], tokenPos : number){
         this.tokenPos = tokenPos;
         this.tokens = tokens;
+
+        this.skipNewLine();
         this.token = this.tokens[this.tokenPos];
+    }
+
+    skipNewLine(){
+        while(this.tokenPos < this.tokens.length && this.tokens[this.tokenPos].typeTkn == TokenType.newLine){
+            let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
+            const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
+            msg(`line :${lineWords.join(" ")}`);
+
+            this.tokenPos++;
+        }
     }
 
     next(){
@@ -213,14 +225,9 @@ export class FncParser {
         else{
 
             this.tokenPos++;
-            this.token = this.tokens[this.tokenPos];
+            this.skipNewLine();
 
-            if(this.token.text == ";" || this.token.text == "{"){
-                const i = this.tokens.findIndex((x, idx, arr) => this.tokenPos < idx && (x.text == ";" || x.text == "{"));
-                if(i != -1){
-                    msg(`line :${this.tokens.map(x => x.text).slice(this.tokenPos + 1, i + 1).join(" ")}`);
-                }
-            }
+            this.token = this.tokens[this.tokenPos];
         }
     }
 
