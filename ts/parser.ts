@@ -86,6 +86,7 @@ var SymbolTable : Array<string> = new  Array<string> (
     
 var KeywordMap : string[] = [
     "struct",
+    "let",
     "var",
     "const",
     "fn",
@@ -1313,6 +1314,8 @@ const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
 
 export async function parseAll(){
     const shader_names = [
+        "instance-vert-phong",
+        "phong-frag",
         "line-comp",
         "line-vert",
         "line-vert-fix",
@@ -1331,10 +1334,10 @@ export async function parseAll(){
     ];
 
     for(const shader_name of shader_names){
-        msg(`\n------------------------------ ${shader_name}`)
+        // msg(`\n------------------------------ ${shader_name}`)
         const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
         const mod = new Module(text);
-        mod.dump();
+        // mod.dump();
     }
 
     {

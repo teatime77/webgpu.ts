@@ -8,6 +8,7 @@ import { asyncBodyOnLoadPackage, asyncBodyOnLoadTestAll, asyncBodyOnLoadMaxwell_
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadCom } from "./compute.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
+import { initFnc } from "./fnc.js";
 
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
@@ -39,7 +40,7 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");
     // bitonic_sort_test();
-    testGalois();
+    // testGalois();
 
     initEditor();
     
@@ -153,6 +154,7 @@ export function makeShaderModule( text : string) : GPUShaderModule {
 window.addEventListener('load', async() => {
     console.log('画像も含めてすべてのロードが完了しました');
     await asyncBodyOnLoad();
+    // await initFnc();
     console.log('初期化完了');
 });
 

@@ -8,7 +8,8 @@
                 "shapes" : [
                     {
                         "type" : "arrow",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }

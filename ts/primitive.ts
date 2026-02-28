@@ -138,7 +138,12 @@ export class RenderPipeline extends AbstractPipeline {
         else{
             this.vertName = "shape-vert";
         }
-        this.fragName = "depth-frag";
+        if(shape.fragName != undefined){
+            this.fragName = shape.fragName;
+        }
+        else{
+            this.fragName = "depth-frag";
+        }
     }
 
     red() : RenderPipeline {
@@ -264,6 +269,12 @@ export class RenderPipeline extends AbstractPipeline {
                 break;
             case "lightingDirection":
                 offset = this.writeUniformBuffer(ui3D.lightingDirection, offset);
+                break;
+            case "lightPosition":
+                offset = this.writeUniformBuffer(ui3D.lightPosition, offset);
+                break;
+            case "cameraPosition":
+                offset = this.writeUniformBuffer(ui3D.cameraPosition, offset);
                 break;
             case "env":
                 offset = this.writeUniformBuffer(ui3D.env              , offset);

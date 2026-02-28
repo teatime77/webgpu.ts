@@ -211,7 +211,7 @@ export class FncParser {
         while(this.tokenPos < this.tokens.length && this.tokens[this.tokenPos].typeTkn == TokenType.newLine){
             let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
             const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
-            msg(`line :${lineWords.join(" ")}`);
+            // msg(`line :${lineWords.join(" ")}`);
 
             this.tokenPos++;
         }
@@ -405,7 +405,7 @@ export class FncParser {
                 this.nextToken(":");
                 const value = this.LogicalExpression(ctx);
                 if(trm instanceof RefVar){
-                    msg(`fnc arg[${trm.name}] with init`);
+                    // msg(`fnc arg[${trm.name}] with init`);
                 }
                 else{
                     msg(`NG fnc arg`);
@@ -544,7 +544,16 @@ export class FncParser {
                 return new RefVar("arrow");
             }
             else{
-                return new App(operator(","), terms);
+                const cmTerm = new App(operator(","), terms);
+
+                if(this.current() == "."){
+                    this.nextToken(".");
+                    const id = this.readId(ctx);
+                    return new App(operator("."), [cmTerm, id]);
+                }
+                else{
+                    return cmTerm;
+                }
             }
         }
         else if(this.token.text == '{'){
@@ -795,7 +804,7 @@ export class FncParser {
     }
 
     parseVariableDeclaration(ctx : Context) : VariableDeclaration {
-        assert(this.token.text == "var" || this.token.text == "const");
+        assert(["let", "var", "const"].includes(this.token.text));
         this.next();
 
         if(this.current() == "<"){
@@ -924,7 +933,7 @@ export class FncParser {
     }
 
     parseStatement(ctx : Context) : Statement | App{
-        if(this.token.text == "var" || this.token.text == "const"){
+        if(["let", "var", "const"].includes(this.token.text)){
             return this.parseVariableDeclaration(ctx);
         }
         else if(this.token.text == "return"){
@@ -966,6 +975,7 @@ export class FncParser {
                 break;
 
             case "var":
+            case "let":
                 this.parseVariableDeclaration(ctx);
                 break;
                 

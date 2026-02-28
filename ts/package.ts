@@ -12,7 +12,7 @@ export class ShapeInfo {
     scale    : [ number, number, number ] | undefined;
     position : [ number, number, number ] | undefined;
     vertName : string | undefined = undefined;
-    // fragName : string | undefined = undefined;
+    fragName : string | undefined = undefined;
 }
 
 export class Package {

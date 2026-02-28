@@ -1,5 +1,6 @@
 declare var glMatrix: any;
 
+import { assert } from "@i18n";
 import { editor } from "./editor.js";
 import { getColor } from "./util.js";
 
@@ -44,6 +45,7 @@ export function mat4fromMat3(m3 : Float32Array){
 }
 
 class UI3D {
+    canvas : HTMLCanvasElement;
     autoRotate : boolean = false;
 
     ProjViewMatrix!               : Float32Array;
@@ -52,6 +54,8 @@ class UI3D {
     ambientColor!      : Float32Array;
     directionalColor!  : Float32Array;
     lightingDirection! : Float32Array;
+    lightPosition      : Float32Array = new Float32Array([5,5,5,0]);
+    cameraPosition!    : Float32Array;
 
     startTime          : number;
     tick               : number = 0;
@@ -60,6 +64,7 @@ class UI3D {
     constructor(canvas : HTMLCanvasElement){
         this.startTime = Date.now();
 
+        this.canvas = canvas;
         canvas.addEventListener('pointermove', this.pointermove.bind(this));
         canvas.addEventListener("wheel", this.wheel.bind(this));
 
@@ -89,7 +94,14 @@ class UI3D {
         this.setViewMatrix();
 
         const projectionMatrix = glMatrix.mat4.create();
-        glMatrix.mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, 1, 1, 100.0);
+
+        const fov = (2 * Math.PI) / 5;
+        assert(this.canvas.width == this.canvas.height);
+        const aspect = this.canvas.width / this.canvas.height;
+        const near = 0.1;
+        const far = 100.0;
+
+        glMatrix.mat4.perspective(projectionMatrix, fov, aspect, near, far);
 
         this.ProjViewMatrix = glMatrix.mat4.create();
         glMatrix.mat4.mul(this.ProjViewMatrix, projectionMatrix, this.viewMatrix);
@@ -102,6 +114,8 @@ class UI3D {
         const lookAtPosition = [0, 0, 0];
         const upDirection    = [0, 1, 0];
         glMatrix.mat4.lookAt(this.viewMatrix, cameraPosition, lookAtPosition, upDirection);
+
+        this.cameraPosition = new Float32Array(cameraPosition.concat([0]));
     }
 
     setEnv(){

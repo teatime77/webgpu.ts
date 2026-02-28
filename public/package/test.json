@@ -26,17 +26,20 @@
                 "shapes" : [
                     {
                         "type" : "Cone",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                     ,
                     {
                         "type" : "Tube",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                     ,
                     {
                         "type" : "Cube",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -53,7 +56,8 @@
                 "shapes" : [
                     {
                         "type" : "Cone",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -70,7 +74,8 @@
                 "shapes" : [
                     {
                         "type" : "Tube",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -87,7 +92,8 @@
                 "shapes" : [
                     {
                         "type" : "Cube",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -104,7 +110,8 @@
                 "shapes" : [
                     {
                         "type" : "GeodesicPolyhedron",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -121,7 +128,8 @@
                 "shapes" : [
                     {
                         "type" : "Disc",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
@@ -138,7 +146,8 @@
                 "shapes" : [
                     {
                         "type" : "arrow",
-                        "vertName" : "instance-vert"
+                        "vertName" : "instance-vert-phong",
+                        "fragName" : "phong-frag"
                     }
                 ]
             }
