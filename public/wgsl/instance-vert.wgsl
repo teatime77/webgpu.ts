@@ -7,6 +7,8 @@ struct Uniforms {
     ambientColor      : vec4<f32>,
     directionalColor  : vec4<f32>,
     lightingDirection : vec4<f32>,
+    lightPosition     : vec4<f32>,
+    cameraPosition    : vec4<f32>,
     env               : vec4<f32>,
     shapeInfo         : vec4<f32>
 }

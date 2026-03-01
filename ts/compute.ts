@@ -136,6 +136,7 @@ export class ComputePipeline extends AbstractPipeline {
 
     pipeline!     : GPUComputePipeline;
     compModule!   : Module;
+    bindGroupLayout!: GPUBindGroupLayout;
     updateBuffers : GPUBuffer[] = new Array(2);
     bindGroups    : GPUBindGroup[] = new Array(2);
 
@@ -157,8 +158,55 @@ export class ComputePipeline extends AbstractPipeline {
     async makeComputePipeline(){
         this.compModule = await fetchModule(this.compName);
 
+        if(this.compName == "compute"){
+
+            this.bindGroupLayout = g_device.createBindGroupLayout({
+                label: "Bind-Group-Layout (Input + Output)",
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: "read-only-storage" }, // The Input
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: "storage" },           // The Output
+                    },
+                ],
+            });
+        }
+        else{
+
+            this.bindGroupLayout = g_device.createBindGroupLayout({
+                label: "Combined Layout (Uniforms + Ping-Pong)",
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: "uniform" },          // The Shared Uniform
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: "read-only-storage" }, // The Input
+                    },
+                    {
+                        binding: 2,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: "storage" },           // The Output
+                    },
+                ],
+            });
+        }
+
+        const pipelineLayout = g_device.createPipelineLayout({
+            bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
+        });
+
         this.pipeline = g_device.createComputePipeline({
-            layout: 'auto',
+            // layout: 'auto',
+            layout: pipelineLayout,
             compute: {
                 module: this.compModule.module,
                 entryPoint: 'main'
@@ -187,7 +235,8 @@ export class ComputePipeline extends AbstractPipeline {
 
         for (let i = 0; i < 2; ++i) {
             this.bindGroups[i] = g_device.createBindGroup({
-                layout: this.pipeline.getBindGroupLayout(0),
+                // layout: this.pipeline.getBindGroupLayout(0),
+                layout: this.bindGroupLayout,
                 entries: [
                     {
                         binding: 0,
