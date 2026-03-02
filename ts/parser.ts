@@ -162,49 +162,12 @@ export class Token{
     }
 }
 
-function makeGPUVertexVarsAttributes(vars : Variable[]) : GPUVertexAttribute[] {
-    const attributes : GPUVertexAttribute[] = [];
-    let offset : number = 0;
-    for(const va of vars){
-        const attr : GPUVertexAttribute = {
-            shaderLocation: va.mod.location!,
-            offset: offset,
-            format: va.type.format() as GPUVertexFormat
-        };
-        attributes.push(attr);
-
-        offset += va.type.size();
-    }
-
-    return attributes;
-}
-
-function makeGPUInstanceVarsAttributes(vars : Variable[], map : Map<Variable, Field>) : GPUVertexAttribute[] {
-    const attributes : GPUVertexAttribute[] = [];
-    for(const va of vars){
-        const field = map.get(va)!;
-        assert(field != undefined);
-
-        const attr : GPUVertexAttribute = {
-            shaderLocation: va.mod.location!,
-            offset: field.offset(),
-            format: va.type.format() as GPUVertexFormat
-        };
-
-        attributes.push(attr);
-    }
-
-    return attributes;
-}
-
 export class Module {
     module : GPUShaderModule;
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Function[] = [];
     instances : number[] = [];
-    vertexSlot : number = -1;
-    instanceSlot : number = -1;
 
     constructor(text : string){
         this.module = makeShaderModule(text);
@@ -240,73 +203,6 @@ export class Module {
         else{
 
             throw new Error("no uniform type");
-        }
-    }
-    
-
-    makeVertexBufferLayouts(compute : ComputePipeline | null) : GPUVertexBufferLayout[] {
-        
-        const main = this.fns.find(x => x.mod.fnType == "@vertex");
-        if(main == undefined){
-            throw new Error(`no vert main `);
-        }
-        const map = new Map<Variable, Field>();
-
-        let struct: Struct | undefined;
-        let instance_var_names : string[];
-        if(compute == null){
-            instance_var_names = [];
-        }
-        else{
-            instance_var_names = compute.varNames;
-            const output_vars = compute.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage_read_write);
-            assert(output_vars.length == 1);
-            const output_var  = output_vars[0];
-
-            struct = compute.compModule.structs.find(x => x.typeName == output_var.type.typeName);
-            if(struct == undefined){
-                throw new MyError();
-            }
-
-            for(const arg of main.args){
-                const member = struct.members.find(x => x.name == arg.name);
-                if(member != undefined){
-                    msg(`arg-mem:${arg.name}`);
-                    map.set(arg, member);
-                }
-            }
-        }
-
-        const builtin_var_names = [ "vertex_index" ];
-        const instance_vars = main.args.filter(x => instance_var_names.includes(x.name) );
-        assert(instance_vars.length == map.size && instance_vars.every(x => map.has(x)));
-
-        const vertex_vars   = main.args.filter(x => (! instance_vars.includes(x) && ! builtin_var_names.includes(x.name)) );
-        
-        const vertex_step_layout : GPUVertexBufferLayout = {
-            arrayStride: sum( vertex_vars.map(x => x.type.size()) ),
-            stepMode: 'vertex',
-            attributes: makeGPUVertexVarsAttributes(vertex_vars)
-        };
-    
-        assert((compute == null) == (instance_var_names.length == 0));
-        if(compute == null){
-            this.vertexSlot = 0;
-            return [ vertex_step_layout ];
-        }
-        else{
-    
-            const instance_step_layout  : GPUVertexBufferLayout = {
-                arrayStride: sum( instance_vars.map(x => x.type.size()) ),    
-                stepMode: 'instance',    
-                attributes: makeGPUInstanceVarsAttributes(instance_vars, map)
-            };
-            assert(instance_step_layout.arrayStride == struct!.size());
-
-
-            this.instanceSlot = 0;
-            this.vertexSlot = 1;
-            return [ instance_step_layout, vertex_step_layout ];
         }
     }
 }

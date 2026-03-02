@@ -235,8 +235,6 @@ export class RenderPipeline extends AbstractPipeline {
     async makeRenderPipeline(){
         this.vertModule = await fetchModule(this.vertName);
         this.fragModule = await fetchModule(this.fragName);
-    
-        // const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute);
 
         let pipelineLayout : GPUPipelineLayout | undefined;
         this.bindGroupLayout = g_device.createBindGroupLayout({
@@ -355,10 +353,8 @@ export class RenderPipeline extends AbstractPipeline {
     render(tick : number, bindGroupIdx : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
-        // passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.vertexBuffer);
         if(this.compute != null){
 
-            // passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
             passEncoder.draw(this.vertexCount, this.compute.instanceCount);
         }
         else{
