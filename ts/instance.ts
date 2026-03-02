@@ -44,9 +44,9 @@ class Run {
             // create a render pipeline
             await mesh.makeRenderPipeline();
 
-            mesh.makeUniformBufferAndBindGroup();
-
             mesh.makeVertexBuffer();
+
+            mesh.makeUniformBufferAndBindGroup();
         }
 
         this.depthTexture = g_device.createTexture({
@@ -84,12 +84,13 @@ class Run {
 
         ui3D.setEnv();
 
+        const bindGroupIdx = this.tick % 2;
         for(const comp of this.comps){
             comp.writeUniformBuffer(ui3D.env, 0);
 
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(comp.pipeline);
-            passEncoder.setBindGroup(0, comp.bindGroups[this.tick % 2]);
+            passEncoder.setBindGroup(0, comp.bindGroups[bindGroupIdx]);
             if(comp.workgroupCounts != null){
 
                 passEncoder.dispatchWorkgroups(... comp.workgroupCounts);
@@ -107,7 +108,7 @@ class Run {
 
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-            this.meshes.forEach(mesh => mesh.render(this.tick, passEncoder));
+            this.meshes.forEach(mesh => mesh.render(this.tick, bindGroupIdx, passEncoder));
 
             passEncoder.end();
         }

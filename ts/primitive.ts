@@ -1,6 +1,6 @@
 declare var glMatrix: any;
 
-import { Vec3, MyError, range } from "@i18n";
+import { Vec3, MyError, range, msg, assert } from "@i18n";
 import { AbstractPipeline, ComputePipeline } from "./compute.js";
 import { ShapeInfo } from "./package.js";
 import { Module, Struct } from "./parser.js";
@@ -114,6 +114,7 @@ export class RenderPipeline extends AbstractPipeline {
 
     vertexCount!: number;
     vertexArray!: Float32Array;
+    vertexArray2!: Float32Array;
 
     topology!: GPUPrimitiveTopology;
 
@@ -125,7 +126,6 @@ export class RenderPipeline extends AbstractPipeline {
     pipeline!         : GPURenderPipeline;
     vertModule!       : Module;
     fragModule!       : Module;
-    uniformBindGroup! : GPUBindGroup;
     vertexBuffer!     : GPUBuffer;
 
     constructor(shape : ShapeInfo){
@@ -172,28 +172,63 @@ export class RenderPipeline extends AbstractPipeline {
 
         this.makeUniformBuffer(uniform_buffer_size);
 
-        this.uniformBindGroup = g_device.createBindGroup({
-            layout: this.pipeline.getBindGroupLayout(0),
-            entries: [
-                {
-                    binding: 0,
-                    resource: {
-                        buffer: this.uniformBuffer,
+        for (let i = 0; i < 2; ++i){
+            this.bindGroups[i] = g_device.createBindGroup({
+                layout: this.bindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: this.uniformBuffer,
+                        },
                     },
-                },
-            ],
-        });
+                    {
+                        binding: 1,
+                        resource: {
+                            buffer: this.compute!.updateBuffers[(i + 1) % 2],
+                            offset: 0,
+                            size: this.compute!.instanceArray.byteLength,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        resource: {
+                            buffer: this.vertexBuffer,
+                            offset: 0,
+                            size: this.vertexArray2.byteLength,
+                        },
+                    },
+                ],
+            });
+
+        }
     }
 
     makeVertexBuffer(){
+        assert(this.vertexCount * 6 == this.vertexArray.length);
+        this.vertexArray2 = new Float32Array(this.vertexCount * 8);
+        for(const idx of range(this.vertexCount)){
+            const base1 = idx * 6;
+            const base2 = idx * 8;
+
+            this.vertexArray2[base2    ] = this.vertexArray[base1   ];
+            this.vertexArray2[base2 + 1] = this.vertexArray[base1 + 1];
+            this.vertexArray2[base2 + 2] = this.vertexArray[base1 + 2];
+            this.vertexArray2[base2 + 3] = 0;
+
+            this.vertexArray2[base2 + 4] = this.vertexArray[base1 + 3];
+            this.vertexArray2[base2 + 5] = this.vertexArray[base1 + 4];
+            this.vertexArray2[base2 + 6] = this.vertexArray[base1 + 5];
+            this.vertexArray2[base2 + 7] = 0;
+        }
 
         // Create a vertex buffer from the quad data.
         this.vertexBuffer = g_device.createBuffer({
-            size: this.vertexArray.byteLength,
-            usage: GPUBufferUsage.VERTEX,
+            size: this.vertexArray2.byteLength,
+            usage: GPUBufferUsage.STORAGE,
             mappedAtCreation: true,
         });
-        new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertexArray);
+        new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertexArray2);
         this.vertexBuffer.unmap();
     }
 
@@ -201,14 +236,43 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertModule = await fetchModule(this.vertName);
         this.fragModule = await fetchModule(this.fragName);
     
-        const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute);
+        // const vertex_buffer_layouts = this.vertModule.makeVertexBufferLayouts(this.compute);
+
+        let pipelineLayout : GPUPipelineLayout | undefined;
+        this.bindGroupLayout = g_device.createBindGroupLayout({
+            label: "Combined Layout (Uniforms + Ping-Pong)",
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                    buffer: { type: "uniform" },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: "read-only-storage" }, // instance buffer
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: "read-only-storage" }, // mesh buffer
+                },
+            ],
+        });
+
+        pipelineLayout = g_device.createPipelineLayout({
+            bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
+        });   
+        
+        msg(`set bind-Group-Layout:${this.vertName}`);
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
-            layout: 'auto',
+            // layout: 'auto',
+            layout: pipelineLayout,
             vertex: {
                 module: this.vertModule.module,
                 entryPoint: 'main',
-                buffers: vertex_buffer_layouts,
+                // buffers: vertex_buffer_layouts,
             },
             fragment: {
                 module: this.fragModule.module,
@@ -288,13 +352,13 @@ export class RenderPipeline extends AbstractPipeline {
         }
     }
     
-    render(tick : number, passEncoder : GPURenderPassEncoder){
+    render(tick : number, bindGroupIdx : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
-        passEncoder.setBindGroup(0, this.uniformBindGroup);
-        passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.vertexBuffer);
+        passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
+        // passEncoder.setVertexBuffer(this.vertModule.vertexSlot, this.vertexBuffer);
         if(this.compute != null){
 
-            passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
+            // passEncoder.setVertexBuffer(this.vertModule.instanceSlot, this.compute.updateBuffers[(tick + 1) % 2]);
             passEncoder.draw(this.vertexCount, this.compute.instanceCount);
         }
         else{

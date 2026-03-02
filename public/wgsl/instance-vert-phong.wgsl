@@ -13,7 +13,20 @@ struct Uniforms {
     shapeInfo         : vec4<f32>
 }
 
+struct Particle {
+    meshPos : vec4<f32>,
+    meshVec : vec4<f32>,
+}
+
+struct Vertex {
+    vertPos : vec4<f32>,
+    vertNorm: vec4<f32>,
+}
+
+
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
+@group(0) @binding(1) var<storage, read> particles : array<Particle>;
+@group(0) @binding(2) var<storage, read> vertexs   : array<Vertex>;
 
 struct VertexOutput {
     @builtin(position) Position : vec4<f32>, // Clip space position (internal use)
@@ -108,11 +121,16 @@ fn scale(v : vec3<f32>, x : f32, y : f32, z : f32) -> vec3<f32> {
 
 @vertex
 fn main(
-    @location(0) vertPos: vec3<f32>,
-    @location(1) vertNorm: vec3<f32>,
-    @location(2) meshPos : vec4<f32>,
-    @location(3) meshVec : vec4<f32>
+    @builtin(instance_index) iIdx : u32,   // Counts 0..ParticleCount
+    @builtin(vertex_index) vIdx   : u32    // Counts 0..SphereVertexCount
 ) -> VertexOutput {
+    var particle = particles[iIdx];
+    var vertex   = vertexs[vIdx];
+
+    var vertPos  = vertex.vertPos.xyz;
+    var vertNorm = vertex.vertNorm.xyz;
+    var meshPos  = particle.meshPos;
+    var meshVec  = particle.meshVec;
 
     var pos = vertPos;
 

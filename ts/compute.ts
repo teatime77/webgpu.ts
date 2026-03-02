@@ -108,6 +108,8 @@ export async function asyncBodyOnLoadCom() {
 }
 
 export abstract class AbstractPipeline {
+    bindGroupLayout!: GPUBindGroupLayout;
+    bindGroups    : GPUBindGroup[] = new Array(2);
     uniformBuffer! : GPUBuffer;
 
     constructor(){
@@ -136,9 +138,7 @@ export class ComputePipeline extends AbstractPipeline {
 
     pipeline!     : GPUComputePipeline;
     compModule!   : Module;
-    bindGroupLayout!: GPUBindGroupLayout;
     updateBuffers : GPUBuffer[] = new Array(2);
-    bindGroups    : GPUBindGroup[] = new Array(2);
 
     constructor(comp_name : string, var_names : string[], instance_array_length : number){
         super();
@@ -152,7 +152,7 @@ export class ComputePipeline extends AbstractPipeline {
     async initCompute(){
         await this.makeComputePipeline();
         this.makeUniformBuffer(ui3D.env.byteLength);
-        this.makeUpdateBuffers(this.instanceArray);
+        this.makeUpdateBuffers();
     }
 
     async makeComputePipeline(){
@@ -214,16 +214,16 @@ export class ComputePipeline extends AbstractPipeline {
         });
     }
 
-    makeUpdateBuffers(initial_update_Data : Float32Array){
+    makeUpdateBuffers(){
     
         for (let i = 0; i < 2; ++i) {
             this.updateBuffers[i] = g_device.createBuffer({
-                size: initial_update_Data.byteLength,
-                usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE,
+                size: this.instanceArray.byteLength,
+                usage: GPUBufferUsage.STORAGE,
                 mappedAtCreation: true,
             });
             new Float32Array(this.updateBuffers[i].getMappedRange()).set(
-                initial_update_Data
+                this.instanceArray
             );
             this.updateBuffers[i].unmap();
         }
@@ -249,7 +249,7 @@ export class ComputePipeline extends AbstractPipeline {
                         resource: {
                             buffer: this.updateBuffers[i],
                             offset: 0,
-                            size: initial_update_Data.byteLength,
+                            size: this.instanceArray.byteLength,
                         },
                     },
                     {
@@ -257,7 +257,7 @@ export class ComputePipeline extends AbstractPipeline {
                         resource: {
                             buffer: this.updateBuffers[(i + 1) % 2],
                             offset: 0,
-                            size: initial_update_Data.byteLength,
+                            size: this.instanceArray.byteLength,
                         },
                     },
                 ],
