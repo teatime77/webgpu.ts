@@ -166,11 +166,11 @@ export class WhileStatement extends Statement {
 
 export class ForStatement extends Statement {
     initializer: VariableDeclaration;
-    condition: Term;
-    update: Term;
+    condition: Term | undefined;
+    update: Term | undefined;
     body: BlockStatement;
 
-    constructor(initializer: VariableDeclaration, condition: Term, update: Term, body: BlockStatement) {
+    constructor(initializer: VariableDeclaration, condition: Term | undefined, update: Term | undefined, body: BlockStatement) {
         super();
         this.initializer = initializer;
         this.condition = condition;
@@ -211,7 +211,7 @@ export class FncParser {
         while(this.tokenPos < this.tokens.length && this.tokens[this.tokenPos].typeTkn == TokenType.newLine){
             let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
             const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
-            // msg(`line :${lineWords.join(" ")}`);
+            msg(`line :${lineWords.join(" ")}`);
 
             this.tokenPos++;
         }
@@ -816,7 +816,6 @@ export class FncParser {
 
         const variable = this.readVariable(ctx, undefined);
 
-        this.nextToken(";");
         return new VariableDeclaration(variable);
     }
 
@@ -903,12 +902,25 @@ export class FncParser {
         this.nextToken("(");
 
         const initializer = this.parseVariableDeclaration(ctx);
-        this.nextToken(';');
 
-        const condition = this.LogicalExpression(ctx);
-        this.nextToken(';');
+        let condition : Term | undefined;
+        let update    : Term | undefined;
 
-        const update = this.parseAssignment(ctx);
+        if(this.current() == "of"){
+
+            this.nextToken('of');
+
+            this.ArithmeticExpression(ctx);
+        }
+        else{
+
+            this.nextToken(';');
+
+            condition = this.LogicalExpression(ctx);
+            this.nextToken(';');
+
+            update = this.parseAssignment(ctx);
+        }
 
         this.nextToken(')');        
 
@@ -934,7 +946,9 @@ export class FncParser {
 
     parseStatement(ctx : Context) : Statement | App{
         if(["let", "var", "const"].includes(this.token.text)){
-            return this.parseVariableDeclaration(ctx);
+            const decl = this.parseVariableDeclaration(ctx);
+            this.nextToken(";");
+            return decl;
         }
         else if(this.token.text == "return"){
             return this.parseReturn(ctx);
@@ -977,6 +991,7 @@ export class FncParser {
             case "var":
             case "let":
                 this.parseVariableDeclaration(ctx);
+                this.nextToken(";");
                 break;
                 
             case "fn":

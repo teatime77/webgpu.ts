@@ -1,5 +1,16 @@
 [
     {
+        "shapes" : [
+            {
+                "type" : "Surface",
+                "vertName" : "surface-vert",
+                "fragName" : "phong-frag",
+                "gridSize": [100, 100]
+            }
+        ]
+    }
+    ,
+    {
         "computes" : [
             {
                 "compId" : "cone-tube-cube",

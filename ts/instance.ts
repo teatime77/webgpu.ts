@@ -3,7 +3,7 @@ import { ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
 import { parseParams } from "./parser.js";
-import { RenderPipeline } from "./primitive.js";
+import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { initContext, g_device } from "./util.js";
 
@@ -44,9 +44,12 @@ class Run {
             // create a render pipeline
             await mesh.makeRenderPipeline();
 
-            mesh.makeVertexBuffer();
+            if(!(mesh instanceof CalcRenderPipeline)){
+                mesh.makeVertexBuffer();
+            }
 
-            mesh.makeUniformBufferAndBindGroup();
+            mesh.makeUniformBuffer();
+            mesh.makeBindGroup();
         }
 
         this.depthTexture = g_device.createTexture({
@@ -148,22 +151,24 @@ export async function asyncBodyOnLoadPackage(package_name : string){
         const comps : ComputePipeline[] = [];
         let  meshes : RenderPipeline[] = [];
 
-        for(const info of pkg.computes!){
-            const parser = parseParams(info.params);
-            const array_length = parser.get("@instance_count") * parser.get("@instance_size");
+        if(pkg.computes != undefined){
+            for(const info of pkg.computes){
+                const parser = parseParams(info.params);
+                const array_length = parser.get("@instance_count") * parser.get("@instance_size");
 
-            const comp = new ComputePipeline(info.compName, info.varNames, array_length);
-            comps.push(comp);
+                const comp = new ComputePipeline(info.compName, info.varNames, array_length);
+                comps.push(comp);
 
-            if(parser.vars.has("@workgroup_counts")){
+                if(parser.vars.has("@workgroup_counts")){
 
-                comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
+                    comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
+                }
+            
+                const comp_meshes = info.shapes.map(shape => makeMesh(shape)).flat();
+                comp_meshes.forEach(x => x.compute = comp);
+
+                meshes = meshes.concat(comp_meshes);
             }
-        
-            const comp_meshes = info.shapes.map(shape => makeMesh(shape)).flat();
-            comp_meshes.forEach(x => x.compute = comp);
-
-            meshes = meshes.concat(comp_meshes);
         }
 
         if(pkg.shapes != undefined){

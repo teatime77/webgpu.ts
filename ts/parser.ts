@@ -95,6 +95,11 @@ var KeywordMap : string[] = [
     "read_write",
     "storage",
     "return",
+    "if",
+    "else",
+    "while",
+    "for",
+    "of",
     "parallel",
 
     "@group",

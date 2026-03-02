@@ -138,6 +138,7 @@ export class RenderPipeline extends AbstractPipeline {
         else{
             this.vertName = "shape-vert";
         }
+
         if(shape.fragName != undefined){
             this.fragName = shape.fragName;
         }
@@ -165,13 +166,14 @@ export class RenderPipeline extends AbstractPipeline {
         return glMatrix.mat4.create();
     }
 
-    makeUniformBufferAndBindGroup(){
-        // @uniform
+    getUniformBufferSize(){
         const uniform_size  = this.vertModule.uniformSize();
         const uniform_buffer_size = Math.ceil(uniform_size / 32) * 32;
 
-        this.makeUniformBuffer(uniform_buffer_size);
+        return uniform_buffer_size;
+    }
 
+    makeBindGroup(){
         for (let i = 0; i < 2; ++i){
             this.bindGroups[i] = g_device.createBindGroup({
                 layout: this.bindGroupLayout,
@@ -236,7 +238,15 @@ export class RenderPipeline extends AbstractPipeline {
         this.vertModule = await fetchModule(this.vertName);
         this.fragModule = await fetchModule(this.fragName);
 
-        let pipelineLayout : GPUPipelineLayout | undefined;
+        if(this instanceof CalcRenderPipeline){
+            await this.makeCalcRenderPipeline();
+        }
+        else{
+            await this.makePingPongRenderPipeline();
+        }
+    }
+
+    async makePingPongRenderPipeline(){
         this.bindGroupLayout = g_device.createBindGroupLayout({
             label: "Combined Layout (Uniforms + Ping-Pong)",
             entries: [
@@ -258,7 +268,7 @@ export class RenderPipeline extends AbstractPipeline {
             ],
         });
 
-        pipelineLayout = g_device.createPipelineLayout({
+        const pipelineLayout = g_device.createPipelineLayout({
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
         });   
         
@@ -344,6 +354,14 @@ export class RenderPipeline extends AbstractPipeline {
             case "shapeInfo":
                 offset = this.writeUniformBuffer(this.shapeInfo        , offset);
                 break;
+            case "gridSize":
+                if(this instanceof CalcRenderPipeline){
+                    offset = this.writeUniformBuffer(this.gridSize        , offset);
+                }
+                else{
+                    throw new MyError();
+                }
+                break;
             default:
                 throw new MyError(`unknown uniform:${member.name}`);
             }
@@ -352,15 +370,108 @@ export class RenderPipeline extends AbstractPipeline {
     
     render(tick : number, bindGroupIdx : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
-        passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
-        if(this.compute != null){
+        if(this instanceof CalcRenderPipeline){
+            passEncoder.setBindGroup(0, this.bindGroups[0]);
 
-            passEncoder.draw(this.vertexCount, this.compute.instanceCount);
+            passEncoder.draw(this.vertexCount, this.instanceCount);
         }
         else{
+            passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
 
-            passEncoder.draw(this.vertexCount);
+            if(this.compute != null){
+
+                passEncoder.draw(this.vertexCount, this.compute.instanceCount);
+            }
+            else{
+
+                passEncoder.draw(this.vertexCount);
+            }
         }
+    }
+}
+
+export class CalcRenderPipeline extends RenderPipeline {
+    gridSize : Float32Array;
+    instanceCount : number;
+
+    constructor(shape : ShapeInfo){
+        super(shape);
+        if(shape.gridSize == undefined || shape.gridSize.length != 2){
+            throw new MyError();
+        }
+
+        this.gridSize = new Float32Array(shape.gridSize.concat([0, 0]));
+
+        this.vertexCount = (this.gridSize[0] + 1) * 2;
+        this.instanceCount = this.gridSize[1];
+    }
+
+    async makeCalcRenderPipeline(){
+        this.bindGroupLayout = g_device.createBindGroupLayout({
+            label: "Calc Layout (Uniforms)",
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                    buffer: { type: "uniform" },
+                }
+            ],
+        });
+
+        const pipelineLayout = g_device.createPipelineLayout({
+            bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
+        });   
+
+        this.pipeline = g_device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: {
+                module: this.vertModule.module,
+                entryPoint: 'main',
+                // 1. CRITICAL: No vertex buffers needed
+                buffers: [],
+            },
+            primitive: {
+                // 2. Use triangle-strip for grid efficiency
+                topology: this.topology,
+                // 3. Optional: 'none' is safer for procedural generation until you verify normal directions
+                cullMode: 'none',
+            },
+            fragment: {
+                module: this.fragModule.module,
+                entryPoint: 'main',
+                targets: [
+                    { 
+                        format: g_presentationFormat 
+                    }
+                ],
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth24plus',
+            }
+        });
+    }
+
+    makeBindGroup(){
+        this.bindGroups[0] = g_device.createBindGroup({
+            layout: this.bindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.uniformBuffer,
+                    },
+                }
+            ],
+        });
+    }
+}
+
+export class Surface extends CalcRenderPipeline {
+    constructor(shape : ShapeInfo){
+        super(shape);
+        this.topology = 'triangle-strip';
     }
 }
 

@@ -1,4 +1,4 @@
-import { fetchText, range, assert } from "@i18n";
+import { fetchText, range, assert, MyError } from "@i18n";
 import { Module } from "./parser.js";
 import { ui3D } from "./ui.js";
 import { makeShaderModule, g_device, particleDim, fetchModule } from "./util.js";
@@ -115,7 +115,13 @@ export abstract class AbstractPipeline {
     constructor(){
     }
 
-    makeUniformBuffer(uniform_buffer_size : number){
+    getUniformBufferSize(){
+        return ui3D.env.byteLength;
+    }
+
+    makeUniformBuffer(){
+        const uniform_buffer_size = this.getUniformBufferSize();
+
         this.uniformBuffer = g_device.createBuffer({
             size: uniform_buffer_size,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -126,6 +132,13 @@ export abstract class AbstractPipeline {
         g_device.queue.writeBuffer(this.uniformBuffer, offset, data as any);
 
         return offset + data.byteLength;
+    }
+
+    writeUniformBufferFloat32(data : number, offset : number){
+        const buffer = new Float32Array([data]);
+        g_device.queue.writeBuffer(this.uniformBuffer, offset, buffer);
+
+        return offset + 4;
     }
 }
 
@@ -151,7 +164,7 @@ export class ComputePipeline extends AbstractPipeline {
 
     async initCompute(){
         await this.makeComputePipeline();
-        this.makeUniformBuffer(ui3D.env.byteLength);
+        this.makeUniformBuffer();
         this.makeUpdateBuffers();
     }
 
