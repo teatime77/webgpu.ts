@@ -211,7 +211,7 @@ export class FncParser {
         while(this.tokenPos < this.tokens.length && this.tokens[this.tokenPos].typeTkn == TokenType.newLine){
             let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
             const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
-            msg(`line :${lineWords.join(" ")}`);
+            // msg(`line :${lineWords.join(" ")}`);
 
             this.tokenPos++;
         }

@@ -30,7 +30,8 @@ fn main(input : VertexOutput) -> @location(0) vec4<f32> {
     let specularStrength = 0.5;
     let shininess = 32.0;
     let lightColor = vec3<f32>(1.0, 1.0, 1.0);
-    let objectColor = vec3<f32>(0.0, 0.5, 1.0); // Nice blue
+    // let objectColor = vec3<f32>(0.0, 0.5, 1.0); // Nice blue
+    let objectColor = input.fragColor.xyz;
 
     // -----------------------------------------------------
     // A. Renormalize!

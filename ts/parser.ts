@@ -1224,8 +1224,6 @@ export async function parseAll(){
         "compute",
         "demo",
         "depth-frag",
-        "function-comp",
-        "function-vert",
         "instance-vert",
         "shape-vert",
         "texture-frag",

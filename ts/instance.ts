@@ -1,11 +1,13 @@
 import { msg, fetchText, sleep } from "@i18n";
-import { ComputePipeline } from "./compute.js";
+import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
 import { parseParams } from "./parser.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { initContext, g_device } from "./util.js";
+import { asyncBodyOnLoadDemo } from "./demo.js";
+import { asyncBodyOnLoadTex } from "./texture.js";
 
 declare var glMatrix: any;
 
@@ -183,9 +185,8 @@ export async function asyncBodyOnLoadPackage(package_name : string){
 }
 
 export async function asyncBodyOnLoadTestAll(){
+    await asyncBodyOnLoadDemo();
+    await asyncBodyOnLoadCom();
+    await asyncBodyOnLoadTex();
     await asyncBodyOnLoadPackage("test");
-}
-
-export async function asyncBodyOnLoadMaxwell_1D(){
-    await asyncBodyOnLoadPackage("maxwell");
 }
