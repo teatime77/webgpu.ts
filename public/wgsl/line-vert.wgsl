@@ -8,7 +8,8 @@ struct Uniforms {
     directionalColor  : vec4<f32>,
     lightingDirection : vec4<f32>,
     env               : vec4<f32>,
-    shapeInfo         : vec4<f32>
+    shapeInfo         : vec4<f32>,
+    gridSize          : vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -18,29 +19,62 @@ struct VertexOutput {
     @location(0) fragColor : vec4<f32>,
 }
 
-@vertex
-fn main(
-    @location(0) vertPos:  vec3<f32>,
-    @location(1) vertNorm: vec3<f32>,
-    @location(2) meshPos : vec4<f32>,
-    @location(3) meshVec : vec4<f32>,
-    @builtin(vertex_index) vertex_index : u32
-) -> VertexOutput {
+const PI: f32 = 3.14159265359;
 
-    var pos = meshPos;
-    var output : VertexOutput;
+fn rgba(theta_arg : f32) -> vec4<f32>{
+    var theta = theta_arg;
+    if(theta < 0){
+        theta += 2 * PI;
+    }
 
-    if(vertex_index == 0){
+    var r : f32 = 0;
+    var g : f32 = 0;
+    var b : f32 = 0;
 
-        pos = vec4<f32>(meshPos.xyz, 1.0);
+    var t = theta * 3.0 / (2.0 * PI);
+    if(t <= 1.0){
+        r = (1.0 - t);
+        g = t;
     }
     else{
+        t -= 1.0;
+        if(t <= 1.0){
+            g = (1.0 - t);
+            b = t;
+        }
+        else{
+            t -= 1.0;
 
-        pos = vec4<f32>(meshPos.xyz + meshVec.xyz, 1.0);
+            b = (1.0 - t);
+            r = t;
+        }
     }
+
+    return vec4<f32>(r, g, b, 1.0);
+}
+
+@vertex
+fn main(
+    @builtin(vertex_index) vIndex : u32,
+    @builtin(instance_index) iIndex : u32
+) -> VertexOutput {
+
+    var theta = 2.0 * PI * f32(vIndex) / uniforms.gridSize.x;
+    var phi   =       PI * f32(iIndex) / uniforms.gridSize.y;
+
+    var r = 3.0;
+    var z = r * cos(phi);
+    var r2 = r * sin(phi);
+    var x = r2 * cos(theta);
+    var y = r2 * sin(theta);
+
+    var pos = vec4<f32>(x, y, z, 1.0);
+    let color = rgba(theta);
+
+    var output : VertexOutput;
     output.Position = uniforms.viewMatrix * vec4<f32>(pos.xyz, 1.0);
 
-    output.fragColor = uniforms.materialColor * uniforms.ambientColor;
+    output.fragColor = color;
     
     return output;
 }

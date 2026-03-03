@@ -1,4 +1,4 @@
-import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, makeLines, Point, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
+import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
 
 class ComputeInfo {
     compName!    : string;
@@ -28,10 +28,9 @@ export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
         case "Tube"  : return [new Tube(shape)];
         case "Cube"  : return [new Cube(shape)];
         case "Disc"  : return [new Disc(shape)];
-        case "point" : return [new Point(shape)];
-        case "line"  : return [new Line(shape)];
+        case "Point" : return [new Point(shape)];
+        case "Line"  : return [new Line(shape)];
         case "arrow" : return makeArrow(shape);
-        case "lines" : return makeLines(shape);
         case "GeodesicPolyhedron" : return [new GeodesicPolyhedron(shape)];
         case "Surface": return [new Surface(shape)];
     }

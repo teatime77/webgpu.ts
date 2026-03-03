@@ -166,6 +166,4 @@ function makeButton( text : string) : HTMLButtonElement {
 }
 
 makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
-makeButton("Point").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("point") });
-makeButton("Line").addEventListener("click", async()=>{ await asyncBodyOnLoadPackage("line") });
 makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });

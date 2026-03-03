@@ -1217,9 +1217,7 @@ export async function parseAll(){
     const shader_names = [
         "instance-vert-phong",
         "phong-frag",
-        "line-comp",
         "line-vert",
-        "line-vert-fix",
         "maxwell",
         "compute",
         "demo",

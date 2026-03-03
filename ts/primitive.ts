@@ -131,20 +131,12 @@ export class RenderPipeline extends AbstractPipeline {
     constructor(shape : ShapeInfo){
         super();
 
-        if(shape.vertName != undefined){
-
-            this.vertName = shape.vertName;
-        }
-        else{
-            this.vertName = "shape-vert";
+        if(shape.vertName == undefined || shape.fragName == undefined){
+            throw new MyError();
         }
 
-        if(shape.fragName != undefined){
-            this.fragName = shape.fragName;
-        }
-        else{
-            this.fragName = "depth-frag";
-        }
+        this.vertName = shape.vertName;
+        this.fragName = shape.fragName;
     }
 
     red() : RenderPipeline {
@@ -370,7 +362,12 @@ export class RenderPipeline extends AbstractPipeline {
     
     render(tick : number, bindGroupIdx : number, passEncoder : GPURenderPassEncoder){
         passEncoder.setPipeline(this.pipeline);
-        if(this instanceof CalcRenderPipeline){
+        if(this instanceof Point){
+            passEncoder.setBindGroup(0, this.bindGroups[0]);
+
+            passEncoder.draw(this.vertexCount);
+        }
+        else if(this instanceof CalcRenderPipeline){
             passEncoder.setBindGroup(0, this.bindGroups[0]);
 
             passEncoder.draw(this.vertexCount, this.instanceCount);
@@ -392,18 +389,15 @@ export class RenderPipeline extends AbstractPipeline {
 
 export class CalcRenderPipeline extends RenderPipeline {
     gridSize : Float32Array;
-    instanceCount : number;
+    instanceCount : number = NaN;
 
     constructor(shape : ShapeInfo){
         super(shape);
-        if(shape.gridSize == undefined || shape.gridSize.length != 2){
+        if(shape.gridSize == undefined){
             throw new MyError();
         }
 
         this.gridSize = new Float32Array(shape.gridSize.concat([0, 0]));
-
-        this.vertexCount = (this.gridSize[0] + 1) * 2;
-        this.instanceCount = this.gridSize[1];
     }
 
     async makeCalcRenderPipeline(){
@@ -471,43 +465,33 @@ export class CalcRenderPipeline extends RenderPipeline {
 export class Surface extends CalcRenderPipeline {
     constructor(shape : ShapeInfo){
         super(shape);
+        assert(shape.gridSize!.length == 2);
+
+        this.vertexCount = (this.gridSize[0] + 1) * 2;
+        this.instanceCount = this.gridSize[1];
+
         this.topology = 'triangle-strip';
     }
 }
 
 
-export class Point extends RenderPipeline {
+export class Point extends CalcRenderPipeline {
     constructor(shape : ShapeInfo){
         super(shape);
-        this.vertName    = "point-vert";
-        this.vertexCount = 1;
-        this.vertexArray = new Float32Array(1 * (3 + 3));
+        this.vertexCount = this.gridSize[0] * this.gridSize[1];
 
         this.topology = 'point-list';
     }
 }
 
 
-export class Line extends RenderPipeline {
-    constructor(shape : ShapeInfo, vertex_array : Float32Array | null = null){
+export class Line extends CalcRenderPipeline {
+    constructor(shape : ShapeInfo){
         super(shape);
-        if(vertex_array == null){
+        this.vertexCount   = this.gridSize[0];
+        this.instanceCount = this.gridSize[1];
 
-            this.vertName    = "line-vert";
-            this.vertexCount = 2;
-            this.vertexArray = new Float32Array(2 * (3 + 3));
-        }
-        else{
-
-            this.vertName = "line-vert-fix";
-        
-            // 位置の配列
-            this.vertexArray = vertex_array;
-            this.vertexCount = vertex_array.length / (3 + 3);
-            console.assert(vertex_array.length % (3 + 3) == 0)
-        }
-    
-        this.topology = 'line-list';
+        this.topology = 'line-strip';
     }
 }
 
@@ -792,36 +776,6 @@ export function makeArrow(shape : ShapeInfo) : RenderPipeline[] {
 
     return [ disc1, tube, disc2, cone ];
 }
-
-export function makeLines(shape : ShapeInfo) : RenderPipeline[] {
-    const th = Math.PI / 3.0;
-    const s = 100 * Math.sin(th);
-    const c = 100 * Math.cos(th);
-
-    const line = new Line(shape, new Float32Array([ 
-        -100,0,0, 1,0,0, 
-         100,0,0, 1,0,0,
-
-        0,-100,0, 0,1,0,
-        0, 100,0, 0,1,0,
-        
-        0,0,-100, 0,0,1,
-        0,0, 100, 0,0,1,
-
-        -c,-s,0, 1,1,0,
-         c, s,0, 1,1,0,
-
-         0,-c,-s, 0,1,1,
-         0, c, s, 0,1,1,
-
-         -s,0,-c, 1,0,1,
-          s,0, c, 1,0,1
-    ]));
-
-    return [ line ];
-}
-
-
 
 export class GeodesicPolyhedron extends RenderPipeline {
     constructor(shape : ShapeInfo){

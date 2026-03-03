@@ -1,6 +1,6 @@
 declare var glMatrix: any;
 
-import { fetchText  } from "@i18n";
+import { fetchText, sleep  } from "@i18n";
 import { editor } from "./editor.js";
 import { setRequestId } from "./instance.js";
 import { initUI3D, ui3D } from "./ui.js";
@@ -252,4 +252,5 @@ export async function asyncBodyOnLoadTex() {
     const { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture } = await init(document.getElementById('world') as HTMLCanvasElement);
     setRequestId(requestAnimationFrame(frame.bind(frame, { context, pipeline, verticesBuffer, uniformBindGroup, uniformBuffer, depthTexture, texture })));
 
+    await sleep(3000);
 }
