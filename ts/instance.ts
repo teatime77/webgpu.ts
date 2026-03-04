@@ -158,7 +158,7 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 const parser = parseParams(info.params);
                 const array_length = parser.get("@instance_count") * parser.get("@instance_size");
 
-                const comp = new ComputePipeline(info.compName, info.varNames, array_length);
+                const comp = new ComputePipeline(info.compName, array_length);
                 comps.push(comp);
 
                 if(parser.vars.has("@workgroup_counts")){

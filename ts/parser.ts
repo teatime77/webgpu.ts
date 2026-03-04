@@ -168,19 +168,21 @@ export class Token{
 }
 
 export class Module {
+    name : string;
     module : GPUShaderModule;
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Function[] = [];
-    instances : number[] = [];
 
-    constructor(text : string){
+    constructor(name : string, text : string){
+        this.name = name;
+
         this.module = makeShaderModule(text);
 
         const tokens = lexicalAnalysis(text);
 
-        const parser = new Parser(tokens);
-        parser.parse(this);
+        const parser = new FncParser(this, tokens, 0);
+        parser.parseSource();
     }
 
     dump(){
@@ -304,6 +306,16 @@ export function lexicalAnalysis(text : string) : Token[] {
                 // 10進数の終わりを探します。
                 for (; pos < text.length && isDigit(text[pos]); pos++);
 
+                if(text[pos] == "e"){
+                    pos++;
+                    if(text[pos] == "-"){
+                        pos++;
+                    }
+
+                    // 10進数の終わりを探します。
+                    for (; pos < text.length && isDigit(text[pos]); pos++);
+                }
+
                 sub_type = TokenSubType.float;
             }
             else {
@@ -374,7 +386,7 @@ export function lexicalAnalysis(text : string) : Token[] {
     return tokens;
 }
 
-enum BufferUsage {
+export enum BufferUsage {
     unknown,
     uniform,
     storage_read,
@@ -545,17 +557,18 @@ export class Struct extends Type {
     }
 
     size() : number {
-        return sum( this.members.map(x => x.type.size()) );
+        assert(this.members.every(x => x.type != undefined));
+        return sum( this.members.map(x => x.type!.size()) );
     }
 }
 
 export class Variable {
     mod : Modifier;
     name : string;
-    type : Type;
+    type : Type | undefined;
     initializer : Term | undefined;
 
-    constructor(mod : Modifier, name : string, type : Type, initializer : Term | undefined){
+    constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined){
         this.mod = mod;
         this.name = name;
         this.type = type;
@@ -563,14 +576,15 @@ export class Variable {
     }
 
     str() : string {
-        return `${this.mod.str()} ${this.name} : ${this.type.str()}`
+        assert(this.type != undefined);
+        return `${this.mod.str()} ${this.name} : ${this.type!.str()}`
     }
 }
 
 export class Field extends Variable {
     parent : Struct;
 
-    constructor(mod : Modifier, name : string, type : Type, initializer : Term | undefined, parent : Struct){
+    constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined, parent : Struct){
         super(mod, name, type, initializer);
         this.parent = parent;
     }
@@ -580,7 +594,8 @@ export class Field extends Variable {
         assert(idx != -1);
 
         const prev_siblings = this.parent.members.slice(0, idx);
-        return sum(prev_siblings.map(x => x.type.size()));
+        assert(prev_siblings.every(x => x.type != undefined))
+        return sum(prev_siblings.map(x => x.type!.size()));
     }
 }
 
@@ -603,7 +618,7 @@ export class Function {
     }
 }
 
-export class Parser {
+class Parser {
     private tokenPos:number = 0;
     inFn : boolean = false;
 
@@ -943,10 +958,7 @@ export class Parser {
             fn.type = this.readType();
         }
 
-        if(true){
-            const fncParser = new FncParser(this.tokenList, this.tokenPos);
-            fncParser.parseBlock(Context.unknown);
-            this.tokenPos = fncParser.tokenPos;
+        if(false){
         }
         else{
             this.readText("{");
@@ -1215,7 +1227,7 @@ const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
 
 export async function parseAll(){
     const shader_names = [
-        "instance-vert-phong",
+        "mesh-instance-vert",
         "phong-frag",
         "line-vert",
         "maxwell",
@@ -1231,17 +1243,9 @@ export async function parseAll(){
     ];
 
     for(const shader_name of shader_names){
-        // msg(`\n------------------------------ ${shader_name}`)
+        msg(`\n------------------------------ ${shader_name}`)
         const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
-        const mod = new Module(text);
+        const module = new Module(shader_name, text);
         // mod.dump();
     }
-
-    {
-        const text = await fetchText(`./script/test.wgsl`);
-        const tokens = lexicalAnalysis(text);
-        const fncParser = new FncParser(tokens, 0);
-        fncParser.parseSource();
-    }
-    
 }

@@ -1,6 +1,6 @@
 import { assert, msg, MyError, sum, fetchText  } from "@i18n";
 import { ComputePipeline } from "./compute.js";
-import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field } from "./parser.js";
+import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field, BufferUsage, Module } from "./parser.js";
 import { makeShaderModule, error } from "./util.js";
 
 type StatementApp = Statement | App;
@@ -165,12 +165,12 @@ export class WhileStatement extends Statement {
 }
 
 export class ForStatement extends Statement {
-    initializer: VariableDeclaration;
+    initializer: Variable;
     condition: Term | undefined;
     update: Term | undefined;
     body: BlockStatement;
 
-    constructor(initializer: VariableDeclaration, condition: Term | undefined, update: Term | undefined, body: BlockStatement) {
+    constructor(initializer: Variable, condition: Term | undefined, update: Term | undefined, body: BlockStatement) {
         super();
         this.initializer = initializer;
         this.condition = condition;
@@ -194,12 +194,14 @@ export enum Context {
 }
 
 export class FncParser {
+    module : Module;
     tokenPos:number;
     tokens: Token[];
     token: Token;
-    structs : Struct[] = [];
+    lineStart : number = 0;
 
-    constructor(tokens: Token[], tokenPos : number){
+    constructor(module : Module, tokens: Token[], tokenPos : number){
+        this.module = module;
         this.tokenPos = tokenPos;
         this.tokens = tokens;
 
@@ -209,12 +211,15 @@ export class FncParser {
 
     skipNewLine(){
         while(this.tokenPos < this.tokens.length && this.tokens[this.tokenPos].typeTkn == TokenType.newLine){
-            let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
-            const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
-            // msg(`line :${lineWords.join(" ")}`);
-
             this.tokenPos++;
         }
+    }
+
+    lineText() : string {
+        let i = this.tokens.findIndex((t, i)=>this.tokenPos < i && t.typeTkn == TokenType.newLine);
+        const lineWords = this.tokens.slice(this.tokenPos + 1, i != -1 ? i : this.tokens.length).map(x => x.text);
+        
+        return lineWords.join(" ");
     }
 
     next(){
@@ -226,6 +231,7 @@ export class FncParser {
 
             this.tokenPos++;
             this.skipNewLine();
+            this.lineStart = this.tokenPos;
 
             this.token = this.tokens[this.tokenPos];
         }
@@ -268,8 +274,95 @@ export class FncParser {
         return this.tokenPos + 1 < this.tokens.length ? this.tokens[this.tokenPos + 1].text : ""; 
     }
 
-    readType() : Type {
+    readInt(){
+        if(this.token.typeTkn != TokenType.Number){
+            error("number is missing.")
+        }
+        const n = parseInt(this.token.text);
+
+        this.next();
+
+        return n;
+    }
+
+    readAttribute() : number {
+        this.next();
+
+        this.nextToken("(");
+        const value = this.readInt();
+        this.nextToken(")");
+
+        return value;
+    }
+
+    readAttributeList() : number[] {
+        this.next();
+
+        this.nextToken("(");
+
+        const values : number[] = [];
+
+        while(true){
+            const n = this.readInt();
+            values.push( n );
+
+            if(this.current() == ","){
+
+                this.nextToken(",");
+            }
+            else{
+                break;
+            }
+        }
+
+        this.nextToken(")");
+
+        return values;
+    }
+
+    readModifiers() : Modifier {
         const mod = new Modifier();
+
+        while(true){
+            switch(this.current()){
+                case "@group":
+                    mod.group = this.readAttribute();
+                    break;
+    
+                case "@binding":
+                    mod.binding = this.readAttribute();
+                    break;
+    
+                case "@location":
+                    mod.location = this.readAttribute();
+                    break;
+    
+                case "@workgroup_size":
+                    mod.workgroup_size = this.readAttributeList();
+                    break;
+
+                case "@compute":
+                case "@vertex":
+                case "@fragment":
+                    mod.fnType = this.current();
+                    this.next();
+                    break;
+
+                case "@builtin":
+                    this.next();
+                    this.nextToken("(");
+                    mod.builtin = this.readName();
+                    this.nextToken(")");
+                    break;
+
+                default:
+                    return mod;
+            }
+        }
+    }
+
+    readType() : Type {
+        const mod = this.readModifiers();
 
         switch(this.current()){
             case "mat4x4":
@@ -288,7 +381,7 @@ export class FncParser {
 
         const type_name = this.readToken(TokenType.type);
 
-        const struct = this.structs.find(x => x.typeName == type_name);
+        const struct = this.module.structs.find(x => x.typeName == type_name);
         if(struct == undefined){
 
             return new Type(mod, undefined, type_name);
@@ -324,7 +417,7 @@ export class FncParser {
 
         const name = this.readName();
         const struct = new Struct(new Modifier(), name);
-        this.structs.push(struct);
+        this.module.structs.push(struct);
 
         // change typeTkn
         this.tokens.filter(x => x.text == name).forEach(x => x.typeTkn = TokenType.type);
@@ -336,7 +429,8 @@ export class FncParser {
                 break;
             }
 
-            const field  = this.readVariable(ctx, struct) as Field;
+            const mod = this.readModifiers();
+            const field  = this.readVariable(ctx, mod, struct) as Field;
             struct.members.push(field);
 
             if(this.current() == ","){
@@ -357,11 +451,13 @@ export class FncParser {
 
 
     readFn(ctx : Context) : Function {
+        const modFn = this.readModifiers();
+
         this.nextToken("fn");
 
         const name = this.readName();
 
-        const fn = new Function(new Modifier(), name);
+        const fn = new Function(modFn, name);
 
         this.nextToken("(");
 
@@ -370,7 +466,8 @@ export class FncParser {
                 break;
             }
 
-            const variable  = this.readVariable(ctx, undefined);
+            const modVar = this.readModifiers();
+            const variable  = this.readVariable(ctx, modVar, undefined);
             fn.args.push(variable);
 
             if(this.current() == ","){
@@ -777,11 +874,11 @@ export class FncParser {
         }
     }
 
-    readVariable(ctx : Context, parent : Struct | undefined) : Variable {
+    readVariable(ctx : Context, mod : Modifier, parent : Struct | undefined) : Variable {
         const name = this.readToken(TokenType.identifier);
         
-        let type: Type | undefined;
-        if (this.current() === ':') {
+        let type : Type | undefined;
+        if(this.current() == ":"){
             this.nextToken(":");
             type = this.readType();
         }
@@ -794,29 +891,55 @@ export class FncParser {
         
         if(parent == undefined){
 
-            return  new Variable(new Modifier(), name, new Type(new Modifier(), undefined, "inferred"), initializer);
+            return  new Variable(mod, name, type, initializer);
         }
         else{
 
-            return  new Field(new Modifier(), name, new Type(new Modifier(), undefined, "inferred"), initializer, parent);
+            return  new Field(mod, name, type, initializer, parent);
         }
 
     }
 
-    parseVariableDeclaration(ctx : Context) : VariableDeclaration {
+    parseVariableDeclaration(ctx : Context) : Variable {
+        const mod = this.readModifiers();
+
         assert(["let", "var", "const"].includes(this.token.text));
         this.next();
 
         if(this.current() == "<"){
+
             this.nextToken("<");
-            const varKind = this.readToken(TokenType.reservedWord);
-            assert(varKind == "storage");
+            let is_storage = false;
+            while(true){
+                const buf_attr = this.readToken(TokenType.reservedWord);
+                switch(buf_attr){
+                case "uniform":
+                    mod.usage = BufferUsage.uniform;
+                    break;
+                case "storage":
+                    is_storage = true;
+                    break;
+                case "read":
+                    mod.usage = BufferUsage.storage_read;
+                    break;
+                case "read_write":
+                    mod.usage = BufferUsage.storage_read_write;
+                    break;
+                default:
+                    throw new MyError();
+                }
+
+                if(this.current() == ","){
+                    this.nextToken(",");
+                }
+                else{
+                    break;
+                }
+            }
             this.nextToken(">");
         }
 
-        const variable = this.readVariable(ctx, undefined);
-
-        return new VariableDeclaration(variable);
+        return this.readVariable(ctx, mod, undefined);
     }
 
     parseReturn(ctx : Context) : ReturnStatement {
@@ -946,9 +1069,10 @@ export class FncParser {
 
     parseStatement(ctx : Context) : Statement | App{
         if(["let", "var", "const"].includes(this.token.text)){
-            const decl = this.parseVariableDeclaration(ctx);
+            const variable = this.parseVariableDeclaration(ctx);
             this.nextToken(";");
-            return decl;
+
+            return new VariableDeclaration(variable);
         }
         else if(this.token.text == "return"){
             return this.parseReturn(ctx);
@@ -988,19 +1112,37 @@ export class FncParser {
                 this.structDeclaration(ctx);
                 break;
 
+            case "@group":
             case "var":
             case "let":
-                this.parseVariableDeclaration(ctx);
+            case "const":{
+                const isGroup = this.current() == "@group";
+                const lineText = this.lineText();
+                const variable = this.parseVariableDeclaration(ctx);
+                if(isGroup){
+                    this.module.vars.push(variable);
+                    msg(`push var:${variable.name}: ${lineText}`);
+                }
                 this.nextToken(";");
                 break;
+            }
                 
-            case "fn":
-                this.readFn(ctx);
+            case "@compute":
+            case "@vertex":
+            case "@fragment":
+            case "fn":{
+                const fn = this.readFn(ctx);
+                this.module.fns.push(fn);
                 break;
+            }
 
             default:
                 throw new MyError();
             }
         }
+
+        msg(`shader:${this.module.name}`);
+        msg(`vars: ${this.module.vars.map(x => x.name).join(" ")}`);
+        msg(`fns : ${this.module.fns.map(x => x.name).join(" ")}`);
     }
 }

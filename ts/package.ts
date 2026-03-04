@@ -2,7 +2,6 @@ import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, Ren
 
 class ComputeInfo {
     compName!    : string;
-    varNames!    : string[];
     shapes!      : ShapeInfo[];
     params!      : string;
 }

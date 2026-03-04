@@ -35,7 +35,7 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const comp = new ComputePipeline("compute", [], inputArray.length);
+    const comp = new ComputePipeline("compute", inputArray.length);
 
     await comp.makeComputePipeline();
 
@@ -144,7 +144,6 @@ export abstract class AbstractPipeline {
 
 export class ComputePipeline extends AbstractPipeline {
     compName : string;
-    varNames : string[];
     instanceArray : Float32Array;
     instanceCount : number;
     workgroupCounts : [number, number, number] | null = null;
@@ -153,10 +152,9 @@ export class ComputePipeline extends AbstractPipeline {
     compModule!   : Module;
     updateBuffers : GPUBuffer[] = new Array(2);
 
-    constructor(comp_name : string, var_names : string[], instance_array_length : number){
+    constructor(comp_name : string, instance_array_length : number){
         super();
         this.compName = comp_name;
-        this.varNames = var_names;
         this.instanceArray = new Float32Array(instance_array_length);
 
         this.instanceCount = this.instanceArray.length / particleDim;   // Math.floor(this.array.length / 2);
