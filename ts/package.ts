@@ -4,7 +4,7 @@ class ComputeInfo {
     compName!    : string;
     shapes!      : ShapeInfo[];
     params       : string | undefined;
-    globalGrid   : number | [number] | [number, number] | [number, number, number] | undefined;
+    globalGrid!  : number | [number] | [number, number] | [number, number, number];
 }
 
 export class ShapeInfo {

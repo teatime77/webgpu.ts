@@ -2,14 +2,12 @@ import { msg, fetchText, sleep, assert, MyError, zip } from "@i18n";
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
-import { BufferUsage, ParamsParser, parseParams, ShaderType, Struct } from "./parser.js";
+import { BufferUsage, ShaderType, Struct } from "./parser.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { initContext, g_device, number123 } from "./util.js";
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
-
-declare var glMatrix: any;
 
 export let requestId : number = 0;
 
@@ -161,11 +159,6 @@ export async function asyncBodyOnLoadPackage(package_name : string){
 
         if(pkg.computes != undefined){
             for(const info of pkg.computes){
-                let parser : ParamsParser | undefined;
-
-                if(info.params != undefined){
-                    parser = parseParams(info.params);
-                }
 
                 const comp = new ComputePipeline(info.compName);
                 await comp.makeComputePipeline();
@@ -181,46 +174,38 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 const instance_size  = elementTypeSizes[0] / 4;
 
                 let instanceCount : number;
-                if(info.globalGrid != undefined){
-                    if(typeof info.globalGrid == "number"){
-                        info.globalGrid = [info.globalGrid];
-                        instanceCount = info.globalGrid[0];
-                    }
-                    else if(info.globalGrid.length == 2){
-                        throw new MyError();
-                    }
-                    else if(info.globalGrid.length == 3){
-                        instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
-                    }
-                    else{
-                        throw new MyError();
-                    }
+                assert(info.globalGrid != undefined);
+
+                if(typeof info.globalGrid == "number"){
+                    info.globalGrid = [info.globalGrid];
+                    instanceCount = info.globalGrid[0];
+                }
+                else if(info.globalGrid.length == 2){
+                    throw new MyError();
+                }
+                else if(info.globalGrid.length == 3){
+                    instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
                 }
                 else{
-                    if(parser == undefined){
-                        throw new MyError();
-                    }
-                    instanceCount = parser.get("@instance_count");
+                    throw new MyError();
                 }
+
                 const array_length = instanceCount * instance_size;
                 comp.makeInstanceArray(array_length)
 
                 comps.push(comp);
 
-                const workgroupSize = comp.compModule.fns[0].mod.workgroup_size;
+                const workgroupSize = comp.compModule.fns[0].mod.workgroup_size!;
                 console.log("workgroup-size", workgroupSize);
+                assert(workgroupSize != undefined)
 
-                if(workgroupSize != undefined && info.globalGrid != undefined && Array.isArray(info.globalGrid)){
-                    assert(workgroupSize.length == info.globalGrid!.length);
-                    const workgroupCounts = Array.from( zip(info.globalGrid, workgroupSize).map(([i,a,b])=> a / b) );
-                    assert(zip(workgroupCounts, workgroupSize).every(([i,a,b]) => a * b == (info.globalGrid as number[])[i]));
-                    comp.workgroupCounts = workgroupCounts as number123;
-                    msg(`workgroup-Counts ${comp.workgroupCounts}`);
-                }
-                else if(parser != undefined && parser.vars.has("@workgroup_counts")){
+                assert(workgroupSize.length == info.globalGrid!.length);
 
-                    comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
-                }
+                const workgroupCounts = Array.from( zip(info.globalGrid, workgroupSize).map(([i,a,b])=> a / b) );
+                assert(zip(workgroupCounts, workgroupSize).every(([i,a,b]) => a * b == (info.globalGrid as number[])[i]));
+
+                comp.workgroupCounts = workgroupCounts as number123;
+                msg(`workgroup-Counts ${comp.workgroupCounts}`);
             
                 const comp_meshes = info.shapes.map(shape => makeMesh(shape)).flat();
                 comp_meshes.forEach(x => x.compute = comp);

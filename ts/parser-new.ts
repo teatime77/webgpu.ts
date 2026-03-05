@@ -1,4 +1,4 @@
-import { assert, msg, MyError, sum, fetchText  } from "@i18n";
+import { assert, msg, MyError  } from "@i18n";
 import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field, BufferUsage, Module, ShaderType } from "./parser.js";
 import { error } from "./util.js";
 
@@ -936,6 +936,13 @@ export class FncParser {
                 }
             }
             this.nextToken(">");
+
+            if(is_storage){
+                assert(mod.usage == BufferUsage.storage_read || mod.usage == BufferUsage.storage_read_write);
+            }
+            else{
+                assert(mod.usage == BufferUsage.uniform);
+            }
         }
 
         return this.readVariable(ctx, mod, undefined);
@@ -1120,7 +1127,6 @@ export class FncParser {
                 const variable = this.parseVariableDeclaration(ctx);
                 if(isGroup){
                     this.module.vars.push(variable);
-                    msg(`push var:${variable.name}: ${lineText}`);
                 }
                 this.nextToken(";");
                 break;
@@ -1142,9 +1148,5 @@ export class FncParser {
                 throw new MyError();
             }
         }
-
-        msg(`shader:${this.module.name}`);
-        msg(`vars: ${this.module.vars.map(x => x.name).join(" ")}`);
-        msg(`fns : ${this.module.fns.map(x => x.name).join(" ")}`);
     }
 }
