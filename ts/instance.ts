@@ -1,8 +1,8 @@
-import { msg, fetchText, sleep } from "@i18n";
+import { msg, fetchText, sleep, assert, MyError } from "@i18n";
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
-import { parseParams } from "./parser.js";
+import { BufferUsage, parseParams, ShaderType, Struct } from "./parser.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { initContext, g_device } from "./util.js";
@@ -156,9 +156,23 @@ export async function asyncBodyOnLoadPackage(package_name : string){
         if(pkg.computes != undefined){
             for(const info of pkg.computes){
                 const parser = parseParams(info.params);
-                const array_length = parser.get("@instance_count") * parser.get("@instance_size");
 
-                const comp = new ComputePipeline(info.compName, array_length);
+                const comp = new ComputePipeline(info.compName);
+                await comp.makeComputePipeline();
+                if(comp.compModule == undefined || comp.compModule.vars == undefined){
+                    throw new MyError();
+                }
+
+                const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage_read || x.mod.usage == BufferUsage.storage_read_write);
+                assert(storages.length != 0);
+                assert(storages.every(x => x.type instanceof ShaderType && x.type.elementType instanceof Struct));
+                const elementTypeSizes = storages.map(x => (x.type as ShaderType).elementType.size());
+                elementTypeSizes.every(x => x == elementTypeSizes[0]);
+                const instance_size  = elementTypeSizes[0] / 4;
+
+                const array_length = parser.get("@instance_count") * instance_size;
+                comp.makeInstanceArray(array_length)
+
                 comps.push(comp);
 
                 if(parser.vars.has("@workgroup_counts")){

@@ -1,7 +1,6 @@
 import { assert, msg, MyError, sum, fetchText  } from "@i18n";
-import { ComputePipeline } from "./compute.js";
-import { lexicalAnalysis, Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field, BufferUsage, Module } from "./parser.js";
-import { makeShaderModule, error } from "./util.js";
+import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field, BufferUsage, Module, ShaderType } from "./parser.js";
+import { error } from "./util.js";
 
 type StatementApp = Statement | App;
 
@@ -374,9 +373,9 @@ export class FncParser {
             case "texture_2d":
                 const aggregate = this.readToken(TokenType.type);
                 this.nextToken("<");
-                const primitive = this.readToken(TokenType.type);
+                const elementType = this.readType();
                 this.nextToken(">");
-                return new Type(mod, aggregate, primitive);
+                return new ShaderType(mod, aggregate, elementType);
         }
 
         const type_name = this.readToken(TokenType.type);
@@ -384,7 +383,7 @@ export class FncParser {
         const struct = this.module.structs.find(x => x.typeName == type_name);
         if(struct == undefined){
 
-            return new Type(mod, undefined, type_name);
+            return new Type(mod, type_name);
         }
         else{
             assert(mod.empty());
@@ -1131,8 +1130,11 @@ export class FncParser {
             case "@vertex":
             case "@fragment":
             case "fn":{
+                const isEntry = this.current() != "fn";
                 const fn = this.readFn(ctx);
-                this.module.fns.push(fn);
+                if(isEntry){
+                    this.module.fns.push(fn);
+                }
                 break;
             }
 

@@ -2,8 +2,15 @@ struct Particle {
   meshPos : vec4<f32>,
   meshVec : vec4<f32>,
 }
+struct Env {
+    time   : f32,
+    tick   : f32,
+    filler1: f32,
+    filler2: f32,
+}
+
 struct SimParams {
-    env : vec4<f32>
+    env : Env
 }
 
 @group(0) @binding(0) var<uniform> params : SimParams;
@@ -16,7 +23,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     const pi = 3.14159265359;
 
     var index = GlobalInvocationID.x;
-    var tick  = i32(params.env.y);
+    var tick  = i32(params.env.tick);
     if(tick == 0){
       var theta_i = index / 20;
       var phi_i   = index % 20;
@@ -38,7 +45,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       var pos = particlesA[index].meshPos;
       var v1 : vec3<f32> = normalize(pos.xyz);
 
-      var alpha : f32 = 2.0 * pi * f32(i32(params.env.x) % 3000) / 3000.0;
+      var alpha : f32 = 2.0 * pi * f32(i32(params.env.time) % 3000) / 3000.0;
       var dist = sin(alpha);
 
       // Write back

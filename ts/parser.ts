@@ -183,6 +183,19 @@ export class Module {
 
         const parser = new FncParser(this, tokens, 0);
         parser.parseSource();
+
+        assert(this.fns.length == 1);
+        const main = this.fns[0];
+        switch(main.mod.fnType){
+        case "@compute":
+            break;
+        case "@vertex":
+            break;
+        case "@fragment":
+            break;
+        default:
+            throw new MyError();
+        }
     }
 
     dump(){
@@ -466,76 +479,79 @@ function primitiveTypeSize(primitive : string) : number{
 
 export class Type {
     mod : Modifier;
-    aggregate : string | undefined;
     typeName : string;
 
-    constructor(mod : Modifier, aggregate : string | undefined, type_name : string){
+    constructor(mod : Modifier, type_name : string){
         this.mod = mod;
-        this.aggregate = aggregate;
         this.typeName = type_name;
     }
 
     name() : string {
-        if(this.aggregate != undefined){
-            return `${this.aggregate}<${this.typeName}>`;
-        }
-        else{
-            return this.typeName;
-        }
+        return this.typeName;
     }
 
     str() : string {
-        if(this.aggregate != undefined){
-            return `${this.mod.str()} ${this.aggregate}<${this.typeName}>`;
-        }
-        else{
-            return `${this.mod.str()} ${this.typeName}`;
-        }
+        return `${this.mod.str()} ${this.typeName}`;
     }
 
     size() : number {
-        const primitive_size = primitiveTypeSize(this.typeName);
-        if(this.aggregate == undefined){
-            return primitive_size;
-        }
-        else{
-            switch(this.aggregate){
-            case "mat4x4" : return 4 * 4 * primitive_size;
-            case "mat3x3" : return 3 * 3 * primitive_size;
-            case "vec4"   : return     4 * primitive_size;
-            case "vec3"   : return     3 * primitive_size;
-            case "vec2"   : return     2 * primitive_size;
+        return primitiveTypeSize(this.typeName);
+    }
 
-            case "texture_2d":
-            case "array" :
-            default:
-                error(`unknown aggregate size ${this.aggregate}`);
-                return NaN;
-            }
+    format() : string {
+        switch(this.typeName){
+            case "f32"  : return "float32";
+            case "i32"  : return "int32";
+            case "u32"  : return "uint32";
+            default     : return this.typeName;
+        }
+    }
+}
+
+export class ShaderType extends Type {
+    elementType : Type;
+
+    constructor(mod : Modifier, type_name : string, elementType : Type){
+        super(mod, type_name);
+        this.elementType = elementType;
+    }
+
+    name() : string {
+        return `${this.typeName}<${this.typeName}>`;
+    }
+
+    str() : string {
+        return `${this.mod.str()} ${this.typeName}<${this.typeName}>`;
+    }
+
+    size() : number {
+        const elementTypeSize = primitiveTypeSize(this.elementType.typeName);
+
+        switch(this.typeName){
+        case "mat4x4" : return 4 * 4 * elementTypeSize;
+        case "mat3x3" : return 3 * 3 * elementTypeSize;
+        case "vec4"   : return     4 * elementTypeSize;
+        case "vec3"   : return     3 * elementTypeSize;
+        case "vec2"   : return     2 * elementTypeSize;
+
+        case "texture_2d":
+        case "array" :
+        default:
+            error(`unknown typeName size ${this.typeName}`);
+            return NaN;
         }
     }
 
     format() : string {
-        let fmt : string;
+        const elementTypeName = this.elementType.format();
 
         switch(this.typeName){
-            case "f32"  : fmt = "float32"; break;
-            case "i32"  : fmt = "int32"; break;
-            case "u32"  : fmt = "uint32"; break;
-            default:
-                error(`unknown type format ${this.typeName}`);
-                return "";
+        case undefined: return elementTypeName;
+        case "vec2"   : return elementTypeName + "x2";
+        case "vec3"   : return elementTypeName + "x3";
+        case "vec4"   : return elementTypeName + "x4";
+        default       : return `${this.typeName}<${elementTypeName}>`;
         }
-
-        switch(this.aggregate){
-        case undefined: return fmt;
-        case "vec2"   : return fmt + "x2";
-        case "vec3"   : return fmt + "x3";
-        case "vec4"   : return fmt + "x4";
-        }
-        
-        error(`unknown type format ${this.aggregate}`);
-        return "";
     }
 }
 
@@ -543,7 +559,7 @@ export class Struct extends Type {
     members : Field[] = [];
 
     constructor(mod : Modifier, type_name : string){
-        super(mod, undefined, type_name);
+        super(mod, type_name);
         this.mod = mod;
         this.typeName = type_name;
     }
@@ -743,9 +759,9 @@ class Parser {
             case "texture_2d":
                 const aggregate = this.readToken(TokenType.type);
                 this.readText("<");
-                const primitive = this.readToken(TokenType.type);
+                const elementType = this.readType();
                 this.readText(">");
-                return new Type(mod, aggregate, primitive);
+                return new ShaderType(mod, aggregate, elementType);
         }
 
         const type_name = this.readToken(TokenType.type);
@@ -753,7 +769,7 @@ class Parser {
         const struct = this.structs.find(x => x.typeName == type_name);
         if(struct == undefined){
 
-            return new Type(mod, undefined, type_name);
+            return new Type(mod, type_name);
         }
         else{
             assert(mod.empty());
@@ -1202,7 +1218,7 @@ export class ParamsParser extends Parser {
 
         assert(this.currentToken == eotToken);
 
-        assert(this.vars.has("@instance_count") && this.vars.has("@instance_size"));
+        assert(this.vars.has("@instance_count"));
 
         const s = Array.from(this.vars.keys()).map(x => `${x}:${this.vars.get(x)}`).join(", ");
         msg(`vars: ${s}`);
