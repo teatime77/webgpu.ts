@@ -37,7 +37,7 @@
             {
                 "compId" : "cone-tube-cube",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "Cone",
@@ -66,7 +66,7 @@
             {
                 "compId" : "cone",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "Cone",
@@ -77,13 +77,13 @@
             }
         ]
     }
-        ,
+    ,
     {
         "computes" : [
             {
                 "compId" : "tube",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "Tube",
@@ -94,13 +94,13 @@
             }
         ]
     }
-        ,
+    ,
     {
         "computes" : [
             {
                 "compId" : "cube",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "Cube",
@@ -117,7 +117,7 @@
             {
                 "compId" : "geodesic-polyhedron",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "GeodesicPolyhedron",
@@ -134,7 +134,7 @@
             {
                 "compId" : "disc",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "Disc",
@@ -151,7 +151,7 @@
             {
                 "compId" : "",
                 "compName" : "updateSprites",
-                "params": "@instance_count = 200",
+                "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "arrow",
@@ -167,7 +167,7 @@
         "computes" : [
             {
                 "compName" : "electric-field",
-                "params": "sx = 16, sy = 16, sz = 4, @workgroup_counts=[sx/4,sy/4,sz/4], @instance_count = sx * sy * sz",
+                "globalGrid" : [16, 16, 4],
                 "shapes" : [
                     {
                         "type" : "arrow",
@@ -183,7 +183,7 @@
         "computes" : [
             {
                 "compName" : "maxwell",
-                "params": "sx = 16, sy = 16, sz = 1, @instance_count = sx * sy * sz * 2, @workgroup_counts = [ sx/8, sy/8, 1 ]",
+                "globalGrid" : [16, 16, 2],
                 "shapes" : [
                     {
                         "type" : "arrow",

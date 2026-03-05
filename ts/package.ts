@@ -3,7 +3,8 @@ import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, Ren
 class ComputeInfo {
     compName!    : string;
     shapes!      : ShapeInfo[];
-    params!      : string;
+    params       : string | undefined;
+    globalGrid   : number | [number] | [number, number] | [number, number, number] | undefined;
 }
 
 export class ShapeInfo {

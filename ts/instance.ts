@@ -1,11 +1,11 @@
-import { msg, fetchText, sleep, assert, MyError } from "@i18n";
+import { msg, fetchText, sleep, assert, MyError, zip } from "@i18n";
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
-import { BufferUsage, parseParams, ShaderType, Struct } from "./parser.js";
+import { BufferUsage, ParamsParser, parseParams, ShaderType, Struct } from "./parser.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
-import { initContext, g_device } from "./util.js";
+import { initContext, g_device, number123 } from "./util.js";
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
 
@@ -98,7 +98,13 @@ class Run {
             passEncoder.setBindGroup(0, comp.bindGroups[bindGroupIdx]);
             if(comp.workgroupCounts != null){
 
-                passEncoder.dispatchWorkgroups(... comp.workgroupCounts);
+                const v = comp.workgroupCounts;
+                switch(v.length){
+                case 1: passEncoder.dispatchWorkgroups(v[0]); break;
+                case 2: passEncoder.dispatchWorkgroups(v[0], v[1]); break;
+                case 3: passEncoder.dispatchWorkgroups(v[0], v[1], v[2]); break;
+                }
+                
             }
             else{
 
@@ -155,7 +161,11 @@ export async function asyncBodyOnLoadPackage(package_name : string){
 
         if(pkg.computes != undefined){
             for(const info of pkg.computes){
-                const parser = parseParams(info.params);
+                let parser : ParamsParser | undefined;
+
+                if(info.params != undefined){
+                    parser = parseParams(info.params);
+                }
 
                 const comp = new ComputePipeline(info.compName);
                 await comp.makeComputePipeline();
@@ -170,12 +180,44 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 elementTypeSizes.every(x => x == elementTypeSizes[0]);
                 const instance_size  = elementTypeSizes[0] / 4;
 
-                const array_length = parser.get("@instance_count") * instance_size;
+                let instanceCount : number;
+                if(info.globalGrid != undefined){
+                    if(typeof info.globalGrid == "number"){
+                        info.globalGrid = [info.globalGrid];
+                        instanceCount = info.globalGrid[0];
+                    }
+                    else if(info.globalGrid.length == 2){
+                        throw new MyError();
+                    }
+                    else if(info.globalGrid.length == 3){
+                        instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
+                    }
+                    else{
+                        throw new MyError();
+                    }
+                }
+                else{
+                    if(parser == undefined){
+                        throw new MyError();
+                    }
+                    instanceCount = parser.get("@instance_count");
+                }
+                const array_length = instanceCount * instance_size;
                 comp.makeInstanceArray(array_length)
 
                 comps.push(comp);
 
-                if(parser.vars.has("@workgroup_counts")){
+                const workgroupSize = comp.compModule.fns[0].mod.workgroup_size;
+                console.log("workgroup-size", workgroupSize);
+
+                if(workgroupSize != undefined && info.globalGrid != undefined && Array.isArray(info.globalGrid)){
+                    assert(workgroupSize.length == info.globalGrid!.length);
+                    const workgroupCounts = Array.from( zip(info.globalGrid, workgroupSize).map(([i,a,b])=> a / b) );
+                    assert(zip(workgroupCounts, workgroupSize).every(([i,a,b]) => a * b == (info.globalGrid as number[])[i]));
+                    comp.workgroupCounts = workgroupCounts as number123;
+                    msg(`workgroup-Counts ${comp.workgroupCounts}`);
+                }
+                else if(parser != undefined && parser.vars.has("@workgroup_counts")){
 
                     comp.workgroupCounts = parser.vars.get("@workgroup_counts") as [number,number,number];
                 }

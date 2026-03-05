@@ -1,7 +1,7 @@
 import { fetchText, range, assert, MyError } from "@i18n";
 import { Module } from "./parser.js";
 import { ui3D } from "./ui.js";
-import { makeShaderModule, g_device, particleDim, fetchModule } from "./util.js";
+import { makeShaderModule, g_device, particleDim, fetchModule, number123 } from "./util.js";
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('./wgsl/compute.wgsl');
@@ -145,9 +145,10 @@ export abstract class AbstractPipeline {
 
 export class ComputePipeline extends AbstractPipeline {
     compName : string;
+    globalGrid : number | [number, number] | [number, number, number] | undefined;
     instanceArray! : Float32Array;
     instanceCount! : number;
-    workgroupCounts : [number, number, number] | null = null;
+    workgroupCounts : number123 | null = null;
 
     pipeline!     : GPUComputePipeline;
     compModule!   : Module;

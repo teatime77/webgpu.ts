@@ -18,7 +18,7 @@ struct SimParams {
 @group(0) @binding(2) var<storage, read_write> particlesB : array<Particle>;
 
 // https://github.com/austinEng/Project6-Vulkan-Flocking/blob/master/data/shaders/computeparticles/particle.comp
-@compute @workgroup_size(1)
+@compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     const pi = 3.14159265359;
 

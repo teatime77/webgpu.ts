@@ -12,6 +12,8 @@ import { asyncBodyOnLoadTex } from "./texture.js";
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
 
+export type number123 = [number] | [number, number] | [number, number, number];
+
 export function error(msg : string){
     console.log(`error [${msg}]`)
     throw new Error(msg);
