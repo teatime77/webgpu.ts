@@ -36,7 +36,7 @@
         "computes" : [
             {
                 "compId" : "cone-tube-cube",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -65,7 +65,7 @@
         "computes" : [
             {
                 "compId" : "cone",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -82,7 +82,7 @@
         "computes" : [
             {
                 "compId" : "tube",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -99,7 +99,7 @@
         "computes" : [
             {
                 "compId" : "cube",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -116,7 +116,7 @@
         "computes" : [
             {
                 "compId" : "geodesic-polyhedron",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -133,7 +133,7 @@
         "computes" : [
             {
                 "compId" : "disc",
-                "compName" : "updateSprites",
+                "compName" : "mesh-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
@@ -150,12 +150,12 @@
         "computes" : [
             {
                 "compId" : "",
-                "compName" : "updateSprites",
+                "compName" : "arrow-comp",
                 "globalGrid" : 256,
                 "shapes" : [
                     {
                         "type" : "arrow",
-                        "vertName" : "mesh-instance-vert",
+                        "vertName" : "arrow-instance-vert",
                         "fragName" : "phong-frag"
                     }
                 ]
@@ -171,7 +171,7 @@
                 "shapes" : [
                     {
                         "type" : "arrow",
-                        "vertName" : "mesh-instance-vert",
+                        "vertName" : "arrow-instance-vert",
                         "fragName" : "phong-frag"
                     }
                 ]
@@ -187,7 +187,7 @@
                 "shapes" : [
                     {
                         "type" : "arrow",
-                        "vertName" : "mesh-instance-vert",
+                        "vertName" : "arrow-instance-vert",
                         "fragName" : "phong-frag"
                     }
                 ]

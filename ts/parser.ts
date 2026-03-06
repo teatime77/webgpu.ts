@@ -637,6 +637,9 @@ const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
 
 export async function parseAll(){
     const shader_names = [
+        "arrow-comp",
+        "arrow-instance-vert",
+        "mesh-comp",
         "mesh-instance-vert",
         "phong-frag",
         "line-vert",
@@ -648,7 +651,6 @@ export async function parseAll(){
         "surface-vert",
         "texture-frag",
         "texture-vert",
-        "updateSprites",
         "electric-field"
     ];
 
