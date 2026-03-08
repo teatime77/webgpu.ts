@@ -1,23 +1,9 @@
 struct Uniforms {
-    // @uniform
     viewMatrix        : mat4x4<f32>,
     normMatrix        : mat4x4<f32>,
-
-    materialColor     : vec4<f32>,
-    ambientColor      : vec4<f32>,
-    directionalColor  : vec4<f32>,
-    lightingDirection : vec4<f32>,
-    lightPosition     : vec4<f32>,
-    cameraPosition    : vec4<f32>,
-    env               : vec4<f32>,
-    shapeInfo         : vec4<f32>
 }
 
-struct Particle {
-    position : vec4<f32>,
-    scale    : vec4<f32>,
-    color    : vec4<f32>,
-}
+struct Particle { position: vec4<f32>, scale: vec4<f32>, color: vec4<f32> }
 
 struct Vertex {
     vertPos : vec4<f32>,

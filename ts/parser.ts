@@ -1,6 +1,7 @@
 import { assert, msg, MyError, sum, fetchText  } from "@i18n";
-import { FncParser, Term } from "./parser-new.js";
+import { BlockStatement, FncParser, Statement, Term } from "./parser-new.js";
 import { makeShaderModule, error } from "./util.js";
+import { Script } from "./script.js";
 
 let unknownToken  = new Set();
 
@@ -128,7 +129,7 @@ const TypeName : string[] = [
     "sampler"
 ]
 
-function isLetter(s : string) : boolean {
+export function isLetter(s : string) : boolean {
     return s.length === 1 && ("a" <= s && s <= "z" || "A" <= s && s <= "Z");
 }
 
@@ -171,7 +172,7 @@ export class Module {
     module : GPUShaderModule;
     structs : Struct[] = [];
     vars : Variable[] = [];
-    fns : Function[] = [];
+    fns : Fn[] = [];
 
     constructor(name : string, text : string){
         this.name = name;
@@ -180,8 +181,9 @@ export class Module {
 
         const tokens = lexicalAnalysis(text);
 
-        const parser = new FncParser(this, tokens, 0);
+        const parser = new FncParser(tokens, 0);
         parser.parseSource();
+        [this.structs, this.vars, this.fns] = [parser.structs, parser.vars, parser.fns];
 
         assert(this.fns.length == 1);
         const main = this.fns[0];
@@ -401,6 +403,11 @@ export function lexicalAnalysis(text : string) : Token[] {
 export enum BufferUsage {
     unknown,
     uniform,
+    storage
+}
+
+export enum BufferReadWrite {
+    unknown,
     storage_read,
     storage_read_write
 }
@@ -413,6 +420,7 @@ export class Modifier {
     builtin : string | undefined;
     fnType : string | undefined;
     usage : BufferUsage = BufferUsage.unknown;
+    readWrite : BufferReadWrite = BufferReadWrite.unknown;
 
     empty() : boolean {
         const v = [
@@ -614,11 +622,12 @@ export class Field extends Variable {
     }
 }
 
-export class Function {
+export class Fn {
     mod : Modifier;
     name : string;
     args : Variable[] = [];
     type : Type | undefined;
+    block! : BlockStatement;
 
     constructor(mod : Modifier, name : string){
         this.mod = mod;
@@ -630,6 +639,12 @@ export class Function {
         const type_s = this.type == undefined ? "" : `-> ${this.type.str()}`;
         
         return `${this.mod.str()} fn ${this.name}(${vars_s}) ${type_s}`;
+    }
+
+    getAll() : (Statement | Term)[]{
+        const alls: (Statement | Term)[] = [];
+        this.block.getAll(alls);
+        return alls;
     }
 }
 
@@ -655,9 +670,12 @@ export async function parseAll(){
     ];
 
     for(const shader_name of shader_names){
-        msg(`\n------------------------------ ${shader_name}`)
+        msg(`\n------------------------------ ${shader_name}`);
         const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
         const module = new Module(shader_name, text);
         // mod.dump();
     }
+
+    const script = new Script();
+    await script.init();
 }

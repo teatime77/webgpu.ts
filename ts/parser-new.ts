@@ -1,15 +1,36 @@
 import { assert, msg, MyError  } from "@i18n";
-import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Function, Field, BufferUsage, Module, ShaderType } from "./parser.js";
+import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Fn, Field, BufferUsage, Module, ShaderType, isLetter, BufferReadWrite } from "./parser.js";
 import { error } from "./util.js";
 
-type StatementApp = Statement | App;
+export const indexOpr = "t[i]";
 
 function isRelationToken(text : string){
     return [ "==", "=", "!=", "<", ">", "<=", ">=", "in", "notin", "subset" ].includes(text);
 }
 
+function isAssignmentToken(text : string){
+    return ["=", "+=", "-=", "*=", "/=", "%="].includes(text);
+}
+
 function operator(opr : string) : RefVar {
     return new RefVar(opr);
+}
+
+function getAllSub(alls: (Statement | Term)[], ...args:(Term | Statement | Term[] | Statement[] | undefined)[]){
+    for(const arg of args){
+        if(arg instanceof Term){
+            alls.push(arg);
+            arg.getAll(alls);
+        }
+        else if(arg instanceof Statement){
+            alls.push(arg);
+            arg.getAll(alls);
+        }
+        else if(Array.isArray(arg)){
+            arg.forEach(x => x.getAll(alls));
+        }
+    }
+
 }
 
 export class Rational{
@@ -21,20 +42,64 @@ export class Rational{
         this.numerator = numerator;
         this.denominator = denominator;
     }
+
+
+    toString() : string {
+        if(this.denominator == 1){
+
+            return `${this.numerator}`;
+        }
+        else{
+
+            return `${this.numerator} / ${this.denominator}`;
+        }
+    }
 }
 
 export abstract class Term {
     parent : App | null = null;
     // 係数
     value : Rational = new Rational(1);
+
+    dumpTerm() : void {
+        throw new MyError();
+    }
+
+    isOperator() : boolean {
+        return this instanceof App && this.precedence() != -1;
+    }
+
+    isDot() : this is App & { fncName: "." }{
+        return this instanceof App && this.fncName == ".";
+    }
+
+    isAssignmentApp() : boolean {
+        return this instanceof App && isAssignmentToken(this.fncName);
+    }
+
+    isApp(fncName : string) : this is App {
+        return this instanceof App && this.fncName == fncName;
+    }
+
+    getAll(alls: (Statement | Term)[]) : void {
+        alls.push(this);
+    }
 }
 
-class Str extends Term{
+export class Str extends Term{
     text : string;
 
     constructor(text : string){
         super();
         this.text = text;
+    }
+
+    dumpTerm() : void {
+        msg(`pre-pare:${this.constructor.name}:${this.text}`);
+    }
+
+    toString() : string {
+        return `"${this.text}"`;
     }
 }
 
@@ -45,6 +110,14 @@ export class RefVar extends Term{
     constructor(name: string){
         super();
         this.name = name;
+    }
+
+    dumpTerm() : void {
+        msg(`pre-pare:${this.constructor.name}:${this.name}`);
+    }
+
+    toString() : string {
+        return this.name;
     }
 }
 
@@ -58,10 +131,14 @@ export class ConstNum extends Term{
         super();
         this.value = new Rational(numerator, denominator);
     }
+
+    dumpTerm() : void {
+        msg(`pre-pare:${this.constructor.name}:${this.value}`);
+    }
 }
 
 export class App extends Term{
-    fnc : Term;
+    fnc : RefVar;
     args: Term[];
     remParentheses : boolean = false;
 
@@ -81,16 +158,10 @@ export class App extends Term{
     }
 
     get fncName() : string {
-        if(this.fnc instanceof RefVar){
-            return this.fnc.name;
-        }
-        else{
-            return `no-fnc-name`;
-        }
+        return this.fnc.name;
     }
 
-
-    constructor(fnc: Term, args: Term[]){
+    constructor(fnc: RefVar, args: Term[]){
         super();
         this.fnc    = fnc;
         this.fnc.parent = this;
@@ -104,10 +175,97 @@ export class App extends Term{
         this.args.push(trm);
         trm.parent = this;
     }
+
+    precedence() : number {
+        switch(this.fncName){
+        case "^": 
+            return 0;
+
+        case "/": 
+            return 1;
+
+        case "*": 
+            return 2;
+
+        case "+": 
+        case "-": 
+            return 3;
+        }
+
+        return -1;
+    }
+
+    dumpTerm() : void {
+        msg(`pre-pare:${this.constructor.name}:${this.value}`);
+        this.fnc.dumpTerm();
+        this.args.forEach(x => x.dumpTerm());
+    }
+
+
+    toString() : string {
+        const args = this.args.map(x => x.toString());
+        
+        let text : string;
+        if(isLetter(this.fncName)){
+            const args_s = args.join(", ");
+            text = `${this.fncName}(${args_s})`;
+        }
+        else{
+
+            switch(this.fncName){
+                case "+":
+                    switch(args.length){
+                    case 0: return " +[] ";
+                    case 1: return ` +[${args[0]}] `;
+                    }
+                    break
+    
+                case "/":
+                    if(this.args.length != 2){
+                        throw new MyError();
+                    }
+                    break;
+
+                case ".":
+                    assert(args.length == 2);
+                    return `${args[0]}.${args[1]}`;
+
+                case indexOpr:
+                    return `${args[0]}[${args.slice(1).join(", ")}]`
+            }
+
+            text = args.join(` ${this.fncName} `);
+        }
+
+        if(this.isOperator() && this.parent != null && this.parent.isOperator()){
+            if(this.parent.precedence() <= this.precedence()){
+                return `(${text})`;
+            }            
+        }
+
+        return text;
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{ 
+        alls.push(this);
+        if(isLetter(this.fncName[0])){
+            alls.push(this.fnc);
+        }
+        getAllSub(alls, this.args);
+    }
 }
 
 
 export abstract class Statement {
+    dumpStatement() : void {
+        throw new MyError();
+    }
+
+    isAssignmentCall() : boolean {
+        return this instanceof CallStatement && this.app.isAssignmentApp();
+    }
+
+    abstract getAll(alls: (Statement | Term)[]) : void;
 }
 
 
@@ -118,6 +276,34 @@ export class VariableDeclaration extends Statement {
         super();
         this.variable = variable;
     }
+
+    dumpStatement() : void {
+        msg(`pre-pare:${this.constructor.name}`);
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.variable.initializer);
+    }
+}
+
+export class CallStatement extends Statement {
+    app : App;
+
+    constructor(app : App){
+        super();
+        this.app = app;
+    }
+
+    dumpStatement() : void {
+        msg(`pre-pare:${this.constructor.name}:${this.app}`);
+        this.app.dumpTerm();
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{  
+        alls.push(this);
+        getAllSub(alls, this.app);
+    }
 }
 
 export class ReturnStatement extends Statement {
@@ -127,15 +313,29 @@ export class ReturnStatement extends Statement {
         super();
         this.value = value;
     }
+
+    getAll(alls: (Statement | Term)[]) : void{     
+        alls.push(this);
+        getAllSub(alls, this.value);
+    }
 }
 
-
 export class BlockStatement extends Statement {
-    statements : StatementApp[];
+    statements : Statement[];
 
-    constructor(statements : StatementApp[]){
+    constructor(statements : Statement[]){
         super();
         this.statements = statements.slice();
+    }
+
+    dumpStatement() : void {
+        msg(`pre-pare:${this.constructor.name}`);
+        this.statements.forEach(x => x.dumpStatement());
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{  
+        alls.push(this);
+        getAllSub(alls, this.statements);
     }
 }
 
@@ -148,18 +348,36 @@ export class IfStatement extends Statement {
     constructor(condition: Term, ifBlock: BlockStatement, elseIf : IfStatement | undefined, elseBlock: BlockStatement | undefined) {
         super();
         this.condition = condition;
-        this.ifBlock = ifBlock;
+        this.ifBlock   = ifBlock;
+        this.elseIf    = elseIf;
+        this.elseBlock = elseBlock;
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{        
+        alls.push(this);
+        getAllSub(alls, this.condition, this.ifBlock, this.elseIf, this.elseBlock);
     }
 }
 
 export class WhileStatement extends Statement {
     condition: Term;
-    body: BlockStatement;
+    block: BlockStatement;
 
     constructor(condition: Term, body: BlockStatement) {
         super();
         this.condition = condition;
-        this.body = body;
+        this.block = body;
+    }
+
+    dumpStatement() : void {
+        msg(`pre-pare:${this.constructor.name}`);
+        this.condition.dumpTerm();
+        this.block.dumpStatement();
+    }
+
+    getAll(alls: (Statement | Term)[]) : void{        
+        alls.push(this);
+        getAllSub(alls, this.condition, this.block);
     }
 }
 
@@ -176,6 +394,11 @@ export class ForStatement extends Statement {
         this.update = update;
         this.body = body;
     }
+
+    getAll(alls: (Statement | Term)[]) : void{        
+        alls.push(this);
+        getAllSub(alls, this.initializer.initializer, this.condition, this.update, this.body);
+    }
 }
 
 export class ParallelStatement extends Statement {
@@ -185,6 +408,11 @@ export class ParallelStatement extends Statement {
         super();
         this.blocks = blocks;
     }
+
+    getAll(alls: (Statement | Term)[]) : void{        
+        alls.push(this);
+        getAllSub(alls, this.blocks);
+    }
 }
 
 export enum Context {
@@ -193,14 +421,16 @@ export enum Context {
 }
 
 export class FncParser {
-    module : Module;
     tokenPos:number;
     tokens: Token[];
     token: Token;
     lineStart : number = 0;
 
-    constructor(module : Module, tokens: Token[], tokenPos : number){
-        this.module = module;
+    structs : Struct[] = [];
+    vars : Variable[] = [];
+    fns : Fn[] = [];
+
+    constructor(tokens: Token[], tokenPos : number){
         this.tokenPos = tokenPos;
         this.tokens = tokens;
 
@@ -380,7 +610,7 @@ export class FncParser {
 
         const type_name = this.readToken(TokenType.type);
 
-        const struct = this.module.structs.find(x => x.typeName == type_name);
+        const struct = this.structs.find(x => x.typeName == type_name);
         if(struct == undefined){
 
             return new Type(mod, type_name);
@@ -416,7 +646,7 @@ export class FncParser {
 
         const name = this.readName();
         const struct = new Struct(new Modifier(), name);
-        this.module.structs.push(struct);
+        this.structs.push(struct);
 
         // change typeTkn
         this.tokens.filter(x => x.text == name).forEach(x => x.typeTkn = TokenType.type);
@@ -449,14 +679,14 @@ export class FncParser {
     }
 
 
-    readFn(ctx : Context) : Function {
+    readFn(ctx : Context) : Fn {
         const modFn = this.readModifiers();
 
         this.nextToken("fn");
 
         const name = this.readName();
 
-        const fn = new Function(modFn, name);
+        const fn = new Fn(modFn, name);
 
         this.nextToken("(");
 
@@ -486,7 +716,7 @@ export class FncParser {
             fn.type = this.readType();
         }
 
-        this.parseBlock(ctx, );
+        fn.block = this.parseBlock(ctx, );
 
         return fn;
     }
@@ -575,7 +805,7 @@ export class FncParser {
             }
             else if(this.token.text == '['){
 
-                term = new App(operator("[]"), [term]);
+                term = new App(operator(indexOpr), [term]);
                 this.readArgs(ctx, "[", "]", term);
             }
             else if(this.token.text == "."){
@@ -908,7 +1138,6 @@ export class FncParser {
         if(this.current() == "<"){
 
             this.nextToken("<");
-            let is_storage = false;
             while(true){
                 const buf_attr = this.readToken(TokenType.reservedWord);
                 switch(buf_attr){
@@ -916,13 +1145,13 @@ export class FncParser {
                     mod.usage = BufferUsage.uniform;
                     break;
                 case "storage":
-                    is_storage = true;
+                    mod.usage = BufferUsage.storage;
                     break;
                 case "read":
-                    mod.usage = BufferUsage.storage_read;
+                    mod.readWrite = BufferReadWrite.storage_read;
                     break;
                 case "read_write":
-                    mod.usage = BufferUsage.storage_read_write;
+                    mod.readWrite = BufferReadWrite.storage_read_write;
                     break;
                 default:
                     throw new MyError();
@@ -936,13 +1165,6 @@ export class FncParser {
                 }
             }
             this.nextToken(">");
-
-            if(is_storage){
-                assert(mod.usage == BufferUsage.storage_read || mod.usage == BufferUsage.storage_read_write);
-            }
-            else{
-                assert(mod.usage == BufferUsage.uniform);
-            }
         }
 
         return this.readVariable(ctx, mod, undefined);
@@ -962,7 +1184,7 @@ export class FncParser {
     parseAssignment(ctx : Context) : App {
         const trm1 = this.PrimaryExpression(ctx);
 
-        if(["=", "+=", "-=", "*=", "/=", "%="].includes(this.current())){
+        if(isAssignmentToken(this.current())){
             this.next();
             const trm2 = this.ArithmeticExpression(ctx);
 
@@ -981,7 +1203,7 @@ export class FncParser {
     parseBlock(ctx : Context): BlockStatement {
         this.nextToken("{");
 
-        const statements: StatementApp[] = [];
+        const statements: Statement[] = [];
         while (this.current() !== '}' && !this.isEoT()) {
             statements.push(this.parseStatement(ctx));
         }
@@ -1073,7 +1295,7 @@ export class FncParser {
         return new ParallelStatement(blocks);
     }
 
-    parseStatement(ctx : Context) : Statement | App{
+    parseStatement(ctx : Context) : Statement{
         if(["let", "var", "const"].includes(this.token.text)){
             const variable = this.parseVariableDeclaration(ctx);
             this.nextToken(";");
@@ -1097,7 +1319,8 @@ export class FncParser {
         }
         else{
     
-            return this.parseAssignment(ctx);
+            const app = this.parseAssignment(ctx);
+            return new CallStatement(app);
         }
     }
 
@@ -1126,7 +1349,7 @@ export class FncParser {
                 const lineText = this.lineText();
                 const variable = this.parseVariableDeclaration(ctx);
                 if(isGroup){
-                    this.module.vars.push(variable);
+                    this.vars.push(variable);
                 }
                 this.nextToken(";");
                 break;
@@ -1139,7 +1362,7 @@ export class FncParser {
                 const isEntry = this.current() != "fn";
                 const fn = this.readFn(ctx);
                 if(isEntry){
-                    this.module.fns.push(fn);
+                    this.fns.push(fn);
                 }
                 break;
             }

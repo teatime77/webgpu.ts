@@ -262,9 +262,7 @@ export class RenderPipeline extends AbstractPipeline {
 
         const pipelineLayout = g_device.createPipelineLayout({
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
-        });   
-        
-        msg(`set bind-Group-Layout:${this.vertName}`);
+        });
     
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             // layout: 'auto',
@@ -297,7 +295,7 @@ export class RenderPipeline extends AbstractPipeline {
         this.pipeline = g_device.createRenderPipeline(pipeline_descriptor);
     }
 
-    writeUniform(){
+    writeUniform() : void {
         let worldMatrix  = this.getWorldMatrix();
         let normalMatrix = glMatrix.mat3.create();
 
@@ -370,7 +368,7 @@ export class RenderPipeline extends AbstractPipeline {
         else if(this instanceof CalcRenderPipeline){
             passEncoder.setBindGroup(0, this.bindGroups[0]);
 
-            passEncoder.draw(this.vertexCount, this.instanceCount);
+            passEncoder.draw(this.vertexCount, this.renderInstanceCount);
         }
         else{
             passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
@@ -389,7 +387,7 @@ export class RenderPipeline extends AbstractPipeline {
 
 export class CalcRenderPipeline extends RenderPipeline {
     gridSize : Float32Array;
-    instanceCount : number = NaN;
+    renderInstanceCount : number = NaN;
 
     constructor(shape : ShapeInfo){
         super(shape);
@@ -468,7 +466,7 @@ export class Surface extends CalcRenderPipeline {
         assert(shape.gridSize!.length == 2);
 
         this.vertexCount = (this.gridSize[0] + 1) * 2;
-        this.instanceCount = this.gridSize[1];
+        this.renderInstanceCount = this.gridSize[1];
 
         this.topology = 'triangle-strip';
     }
@@ -489,7 +487,7 @@ export class Line extends CalcRenderPipeline {
     constructor(shape : ShapeInfo){
         super(shape);
         this.vertexCount   = this.gridSize[0];
-        this.instanceCount = this.gridSize[1];
+        this.renderInstanceCount = this.gridSize[1];
 
         this.topology = 'line-strip';
     }

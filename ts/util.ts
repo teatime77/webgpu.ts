@@ -89,8 +89,6 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
     return context;
 }
 
-export const particleDim = 8;
-
 function addVertex(v : number[], x : number, y : number , z: number){
     let c = 4.0;
 

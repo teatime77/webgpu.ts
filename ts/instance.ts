@@ -89,7 +89,7 @@ class Run {
 
         const bindGroupIdx = this.tick % 2;
         for(const comp of this.comps){
-            comp.writeUniformBuffer(ui3D.env, 0);
+            comp.writeUniform();
 
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(comp.pipeline);
@@ -107,6 +107,7 @@ class Run {
             else{
 
                 passEncoder.dispatchWorkgroups(comp.instanceCount);
+                msg(`dispatch instanceCount:${comp.instanceCount}`);
             }
             passEncoder.end();
         }
@@ -154,6 +155,7 @@ export async function asyncBodyOnLoadPackage(package_name : string){
     const packages = JSON.parse(test_text) as Package[];
 
     for(const pkg of packages){
+        msg("--------------------------------------------------");
         const comps : ComputePipeline[] = [];
         let  meshes : RenderPipeline[] = [];
 
@@ -166,32 +168,30 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                     throw new MyError();
                 }
 
-                const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage_read || x.mod.usage == BufferUsage.storage_read_write);
+                const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage);
                 assert(storages.length != 0);
                 assert(storages.every(x => x.type instanceof ShaderType && x.type.elementType instanceof Struct));
                 const elementTypeSizes = storages.map(x => (x.type as ShaderType).elementType.size());
                 elementTypeSizes.every(x => x == elementTypeSizes[0]);
                 const instance_size  = elementTypeSizes[0] / 4;
 
-                let instanceCount : number;
                 assert(info.globalGrid != undefined);
 
                 if(typeof info.globalGrid == "number"){
                     info.globalGrid = [info.globalGrid];
-                    instanceCount = info.globalGrid[0];
+                    comp.instanceCount = info.globalGrid[0];
                 }
                 else if(info.globalGrid.length == 2){
                     throw new MyError();
                 }
                 else if(info.globalGrid.length == 3){
-                    instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
+                    comp.instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
                 }
                 else{
                     throw new MyError();
                 }
 
-                const array_length = instanceCount * instance_size;
-                comp.makeInstanceArray(array_length)
+                comp.instanceArray = new Float32Array(comp.instanceCount * instance_size);
 
                 comps.push(comp);
 

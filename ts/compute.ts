@@ -1,7 +1,7 @@
-import { fetchText, range, assert, MyError } from "@i18n";
-import { Module } from "./parser.js";
+import { fetchText, range, assert, MyError, msg } from "@i18n";
+import { Module, Struct } from "./parser.js";
 import { ui3D } from "./ui.js";
-import { makeShaderModule, g_device, particleDim, fetchModule, number123 } from "./util.js";
+import { makeShaderModule, g_device, fetchModule, number123 } from "./util.js";
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('./wgsl/compute.wgsl');
@@ -38,7 +38,6 @@ export async function asyncBodyOnLoadCom() {
     const comp = new ComputePipeline("compute");
 
     await comp.makeComputePipeline();
-    comp.makeInstanceArray(inputArray.length);
 
     // ComputePipelineを生成
 
@@ -116,6 +115,8 @@ export abstract class AbstractPipeline {
     constructor(){
     }
 
+    abstract writeUniform() : void;
+
     getUniformBufferSize(){
         return ui3D.env.byteLength;
     }
@@ -124,7 +125,8 @@ export abstract class AbstractPipeline {
         const uniform_buffer_size = this.getUniformBufferSize();
 
         this.uniformBuffer = g_device.createBuffer({
-            size: uniform_buffer_size,
+            // The pipeline requires a buffer binding which is at least 256 bytes
+            size: Math.max(256, uniform_buffer_size),
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });    
     }
@@ -157,11 +159,6 @@ export class ComputePipeline extends AbstractPipeline {
     constructor(comp_name : string){
         super();
         this.compName = comp_name;
-    }
-
-    makeInstanceArray(instance_array_length : number){
-        this.instanceArray = new Float32Array(instance_array_length);
-        this.instanceCount = this.instanceArray.length / particleDim;   // Math.floor(this.array.length / 2);
     }
 
     async initCompute(){
@@ -277,5 +274,20 @@ export class ComputePipeline extends AbstractPipeline {
                 ],
             });
         }
+    }
+
+    writeUniform() : void {
+        let offset = 0;
+        const uniform_var_struct = this.compModule.getUniformVar().type as Struct;
+        for(const member of uniform_var_struct.members){
+            switch(member.name){
+            case "env":
+                offset = this.writeUniformBuffer(ui3D.env, offset);
+                break;
+            default:
+                throw new MyError(`unknown uniform:${member.name}`);
+            }
+        }
+
     }
 }
