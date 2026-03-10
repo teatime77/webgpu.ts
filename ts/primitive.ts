@@ -5,7 +5,7 @@ import { AbstractPipeline, ComputePipeline } from "./compute.js";
 import { ShapeInfo } from "./package.js";
 import { Module, Struct } from "./parser.js";
 import { mat4fromMat3, ui3D } from "./ui.js";
-import { g_device, fetchModule, g_presentationFormat } from "./util.js";
+import { g_device, fetchModule, g_presentationFormat, makeShaderModule } from "./util.js";
 
 function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
@@ -263,17 +263,20 @@ export class RenderPipeline extends AbstractPipeline {
         const pipelineLayout = g_device.createPipelineLayout({
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
         });
-    
+
+        const vertShaderModule = makeShaderModule(this.vertModule.text);
+        const fragShaderModule = makeShaderModule(this.fragModule.text);
+        
         const pipeline_descriptor : GPURenderPipelineDescriptor = {
             // layout: 'auto',
             layout: pipelineLayout,
             vertex: {
-                module: this.vertModule.module,
+                module: vertShaderModule,
                 entryPoint: 'main',
                 // buffers: vertex_buffer_layouts,
             },
             fragment: {
-                module: this.fragModule.module,
+                module: fragShaderModule,
                 entryPoint: 'main',
                 targets: [
                     // 0
@@ -414,10 +417,13 @@ export class CalcRenderPipeline extends RenderPipeline {
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
         });   
 
+        const vertShaderModule = makeShaderModule(this.vertModule.text);
+        const fragShaderModule = makeShaderModule(this.fragModule.text);
+
         this.pipeline = g_device.createRenderPipeline({
             layout: pipelineLayout,
             vertex: {
-                module: this.vertModule.module,
+                module: vertShaderModule,
                 entryPoint: 'main',
                 // 1. CRITICAL: No vertex buffers needed
                 buffers: [],
@@ -429,7 +435,7 @@ export class CalcRenderPipeline extends RenderPipeline {
                 cullMode: 'none',
             },
             fragment: {
-                module: this.fragModule.module,
+                module: fragShaderModule,
                 entryPoint: 'main',
                 targets: [
                     { 

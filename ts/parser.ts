@@ -169,15 +169,14 @@ export class Token{
 
 export class Module {
     name : string;
-    module : GPUShaderModule;
+    text : string;
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Fn[] = [];
 
     constructor(name : string, text : string){
         this.name = name;
-
-        this.module = makeShaderModule(text);
+        this.text = text;
 
         const tokens = lexicalAnalysis(text);
 
@@ -771,6 +770,7 @@ export async function parseAll(){
         msg(`\n------------------------------ ${shader_name}`);
         const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
         const module = new Module(shader_name, text);
+        const shaderModule = makeShaderModule(module.text);
         // mod.dump();
     }
 

@@ -210,11 +210,13 @@ export class ComputePipeline extends AbstractPipeline {
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
         });
 
+        const compShaderModule = makeShaderModule(this.compModule.text);
+
         this.pipeline = g_device.createComputePipeline({
             // layout: 'auto',
             layout: pipelineLayout,
             compute: {
-                module: this.compModule.module,
+                module: compShaderModule,
                 entryPoint: 'main'
             }
         });
