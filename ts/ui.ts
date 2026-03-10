@@ -66,7 +66,7 @@ class UI3D {
 
         this.canvas = canvas;
         canvas.addEventListener('pointermove', this.pointermove.bind(this));
-        canvas.addEventListener("wheel", this.wheel.bind(this));
+        canvas.addEventListener("wheel", this.wheel.bind(this), { passive: false });
 
         $inp("auto-rotate").addEventListener("click", this.click.bind(this));
 

@@ -199,6 +199,18 @@ export class Module {
         }
     }
 
+    uniformVars() : Variable[] {
+        return this.vars.filter(x => x.mod.usage == BufferUsage.uniform);
+    }
+
+    readStorageVars() : Variable[]{
+        return this.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read);
+    }
+
+    writeStorageVars() : Variable[]{
+        return this.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read_write);
+    }
+
     dump(){
         this.structs.forEach(x => x.dump());
         this.vars.forEach(x => msg(`${x.str()};`))

@@ -177,19 +177,8 @@ export async function asyncBodyOnLoadPackage(package_name : string){
 
                 assert(info.globalGrid != undefined);
 
-                if(typeof info.globalGrid == "number"){
-                    info.globalGrid = [info.globalGrid];
-                    comp.instanceCount = info.globalGrid[0];
-                }
-                else if(info.globalGrid.length == 2){
-                    throw new MyError();
-                }
-                else if(info.globalGrid.length == 3){
-                    comp.instanceCount = info.globalGrid[0] * info.globalGrid[1] * info.globalGrid[2];
-                }
-                else{
-                    throw new MyError();
-                }
+                comp.instanceCount = info.globalGrid.reduce((acc, cur) => acc * cur, 1);
+                msg(`instance-Count:${comp.instanceCount}`);
 
                 comp.instanceArray = new Float32Array(comp.instanceCount * instance_size);
 

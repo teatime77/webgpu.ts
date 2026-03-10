@@ -154,7 +154,7 @@ export class ComputePipeline extends AbstractPipeline {
 
     pipeline!     : GPUComputePipeline;
     compModule!   : Module;
-    updateBuffers : GPUBuffer[] = new Array(2);
+    updateBuffers : GPUBuffer[] = [];
 
     constructor(comp_name : string){
         super();
@@ -169,47 +169,42 @@ export class ComputePipeline extends AbstractPipeline {
     async makeComputePipeline(){
         this.compModule = await fetchModule(this.compName);
 
-        if(this.compName == "compute"){
-
-            this.bindGroupLayout = g_device.createBindGroupLayout({
-                label: "Bind-Group-Layout (Input + Output)",
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: "read-only-storage" }, // The Input
-                    },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: "storage" },           // The Output
-                    },
-                ],
+        let binding = 0;
+        const entries : GPUBindGroupLayoutEntry[] = [];
+        if(this.compModule.uniformVars().length == 1){
+            entries.push({
+                binding,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: { type: "uniform" },
             });
-        }
-        else{
 
-            this.bindGroupLayout = g_device.createBindGroupLayout({
-                label: "Combined Layout (Uniforms + Ping-Pong)",
-                entries: [
-                    {
-                        binding: 0,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: "uniform" },          // The Shared Uniform
-                    },
-                    {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: "read-only-storage" }, // The Input
-                    },
-                    {
-                        binding: 2,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: "storage" },           // The Output
-                    },
-                ],
-            });
+            binding++;
         }
+
+        if(this.compModule.readStorageVars().length == 1){
+            entries.push({
+                binding,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: { type: "read-only-storage" }, // The Input
+            });
+
+            binding++;
+        }
+
+        if(this.compModule.writeStorageVars().length == 1){
+            entries.push({
+                binding,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: { type: "storage" },           // The Output
+            });
+
+            binding++;
+        }
+
+        this.bindGroupLayout = g_device.createBindGroupLayout({
+            label: "Compute Bind Group Layout",
+            entries,
+        });
 
         const pipelineLayout = g_device.createPipelineLayout({
             bindGroupLayouts: [this.bindGroupLayout] // Index 0 matches group(0) in shader
@@ -226,8 +221,13 @@ export class ComputePipeline extends AbstractPipeline {
     }
 
     makeUpdateBuffers(){
+        assert(this.compModule.readStorageVars().length == 1 && this.compModule.writeStorageVars().length == 1);
+        this.updateBuffers = [];
+        this.bindGroups    = [];
+
+        const storageCount = this.compModule.readStorageVars().length + this.compModule.writeStorageVars().length;
     
-        for (let i = 0; i < 2; ++i) {
+        for (let i = 0; i < storageCount; ++i) {
             this.updateBuffers[i] = g_device.createBuffer({
                 size: this.instanceArray.byteLength,
                 usage: GPUBufferUsage.STORAGE,
@@ -244,35 +244,54 @@ export class ComputePipeline extends AbstractPipeline {
             assert(v.mod.binding == i);
         }
 
-        for (let i = 0; i < 2; ++i) {
-            this.bindGroups[i] = g_device.createBindGroup({
+        for(let i = 0; i < storageCount; ++i) {
+            const entries : GPUBindGroupEntry[] = [];
+            let binding = 0;
+
+            if(this.compModule.uniformVars().length == 1){
+                entries.push({
+                    binding,
+                    resource: {
+                        buffer: this.uniformBuffer,
+                    },
+                });
+
+                binding++;
+            }
+
+            if(this.compModule.readStorageVars().length == 1){
+                entries.push({
+                    binding,
+                    resource: {
+                        buffer: this.updateBuffers[i],
+                        offset: 0,
+                        size: this.instanceArray.byteLength,
+                    },
+                });
+
+                binding++;
+            }
+
+            if(this.compModule.writeStorageVars().length == 1){
+                entries.push({
+                    binding,
+                    resource: {
+                        buffer: this.updateBuffers[(i + 1) % 2],
+                        offset: 0,
+                        size: this.instanceArray.byteLength,
+                    },
+                });
+
+                binding++;
+            }
+
+            const bindGroup = g_device.createBindGroup({
                 // layout: this.pipeline.getBindGroupLayout(0),
                 layout: this.bindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: {
-                            buffer: this.uniformBuffer,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        resource: {
-                            buffer: this.updateBuffers[i],
-                            offset: 0,
-                            size: this.instanceArray.byteLength,
-                        },
-                    },
-                    {
-                        binding: 2,
-                        resource: {
-                            buffer: this.updateBuffers[(i + 1) % 2],
-                            offset: 0,
-                            size: this.instanceArray.byteLength,
-                        },
-                    },
-                ],
+                entries
             });
+
+            this.bindGroups.push(bindGroup);
         }
     }
 

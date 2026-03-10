@@ -37,7 +37,7 @@
             {
                 "compId" : "cone-tube-cube",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "Cone",
@@ -66,7 +66,7 @@
             {
                 "compId" : "cone",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "Cone",
@@ -83,7 +83,7 @@
             {
                 "compId" : "tube",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "Tube",
@@ -100,7 +100,7 @@
             {
                 "compId" : "cube",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "Cube",
@@ -117,7 +117,7 @@
             {
                 "compId" : "geodesic-polyhedron",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "GeodesicPolyhedron",
@@ -134,7 +134,7 @@
             {
                 "compId" : "disc",
                 "compName" : "mesh-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "Disc",
@@ -151,7 +151,7 @@
             {
                 "compId" : "",
                 "compName" : "arrow-comp",
-                "globalGrid" : 256,
+                "globalGrid" : [256],
                 "shapes" : [
                     {
                         "type" : "arrow",
