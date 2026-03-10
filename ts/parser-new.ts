@@ -1,8 +1,14 @@
 import { assert, msg, MyError  } from "@i18n";
-import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Fn, Field, BufferUsage, Module, ShaderType, isLetter, BufferReadWrite } from "./parser.js";
+import { Modifier, Struct, Token, TokenSubType, TokenType, Type, Variable, Fn, Field, BufferUsage, Module, ShaderType, isLetter, BufferReadWrite, SimpleType, ArrayType, Domain } from "./parser.js";
 import { error } from "./util.js";
 
 export const indexOpr = "t[i]";
+
+const predifined = new Set<string>([
+    "true", "dispatch", "drawTubes", "i32", "f32", "cos", "sin", "vec4", "t[i]", "swap"
+]);
+
+
 
 function isRelationToken(text : string){
     return [ "==", "=", "!=", "<", ">", "<=", ">=", "in", "notin", "subset" ].includes(text);
@@ -16,14 +22,21 @@ function operator(opr : string) : RefVar {
     return new RefVar(opr);
 }
 
-function getAllSub(alls: (Statement | Term)[], ...args:(Term | Statement | Term[] | Statement[] | undefined)[]){
+export function setParentSub(parent : AbstractSyntaxNode, ...args:(AbstractSyntaxNode | AbstractSyntaxNode[] | undefined)[]){
     for(const arg of args){
-        if(arg instanceof Term){
-            alls.push(arg);
-            arg.getAll(alls);
+        if(arg instanceof AbstractSyntaxNode){
+            arg.setParent(parent);
         }
-        else if(arg instanceof Statement){
-            alls.push(arg);
+        else if(Array.isArray(arg)){
+            arg.forEach(x => x.setParent(parent));
+        }
+    }
+
+}
+
+export function getAllSub(alls: AbstractSyntaxNode[], ...args:(AbstractSyntaxNode | AbstractSyntaxNode[] | undefined)[]){
+    for(const arg of args){
+        if(arg instanceof AbstractSyntaxNode){
             arg.getAll(alls);
         }
         else if(Array.isArray(arg)){
@@ -44,6 +57,11 @@ export class Rational{
     }
 
 
+    int() : number {
+        assert(this.denominator == 1);
+        return this.numerator;
+    }
+
     toString() : string {
         if(this.denominator == 1){
 
@@ -56,8 +74,34 @@ export class Rational{
     }
 }
 
-export abstract class Term {
-    parent : App | null = null;
+export abstract class AbstractSyntaxNode {
+    parent : AbstractSyntaxNode | undefined;
+
+    abstract getAll(alls: AbstractSyntaxNode[]) : void;
+
+    str() : string {
+        return this.toString();
+    }
+
+    setParent(parentNode : AbstractSyntaxNode){
+        this.parent = parentNode;
+    }
+
+    ancestors() : (App | Statement | Fn)[] {
+        const objs : (App | Statement | Fn)[] = [];
+        for(let obj : any = this; obj != undefined; obj = obj.parent){
+            objs.push(obj);
+        }
+
+        return objs;
+    }
+
+    ancestorBlocks() : BlockStatement[] {
+        return this.ancestors().filter(x => x instanceof BlockStatement);
+    }
+}
+
+export abstract class Term extends AbstractSyntaxNode {
     // 係数
     value : Rational = new Rational(1);
 
@@ -81,8 +125,15 @@ export abstract class Term {
         return this instanceof App && this.fncName == fncName;
     }
 
-    getAll(alls: (Statement | Term)[]) : void {
+    getAll(alls: AbstractSyntaxNode[]) : void {
         alls.push(this);
+    }
+
+    int() : number {
+        if(this instanceof ConstNum){
+            return this.value.int()
+        }
+        throw new MyError();
     }
 }
 
@@ -110,6 +161,20 @@ export class RefVar extends Term{
     constructor(name: string){
         super();
         this.name = name;
+    }
+
+    resolveVariable(domains:Domain[]){
+        const blocks = this.ancestorBlocks();
+        this.refVar = blocks.map(x => x.findVariable(this.name)).find(x => x != undefined);
+        if(this.refVar == undefined){
+            const vars = domains.map(x => x.vars).flat();
+            this.refVar = vars.find(x => x.name == this.name);
+
+            if(this.refVar == undefined && !predifined.has(this.name)){
+
+                msg(`ref no var:${this.name} parent:[${this.parent!.str()}]`);
+            }
+        }
     }
 
     dumpTerm() : void {
@@ -170,10 +235,17 @@ export class App extends Term{
 
         this.args.forEach(x => x.parent = this);
     }
+
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.fnc, this.args);
+    }
     
-    addArg(trm : Term){
-        this.args.push(trm);
-        trm.parent = this;
+    addArgs(...trms : Term[]){
+        for(const trm of trms){
+            this.args.push(trm);
+            trm.parent = this;
+        }
     }
 
     precedence() : number {
@@ -206,7 +278,12 @@ export class App extends Term{
         const args = this.args.map(x => x.toString());
         
         let text : string;
-        if(isLetter(this.fncName)){
+
+        if(this.fncName == indexOpr){
+
+            return `${args[0]}[${args.slice(1).join(", ")}]`
+        }
+        else if(isLetter(this.fncName[0])){
             const args_s = args.join(", ");
             text = `${this.fncName}(${args_s})`;
         }
@@ -229,15 +306,12 @@ export class App extends Term{
                 case ".":
                     assert(args.length == 2);
                     return `${args[0]}.${args[1]}`;
-
-                case indexOpr:
-                    return `${args[0]}[${args.slice(1).join(", ")}]`
             }
 
             text = args.join(` ${this.fncName} `);
         }
 
-        if(this.isOperator() && this.parent != null && this.parent.isOperator()){
+        if(this.isOperator() && this.parent instanceof App && this.parent.isOperator()){
             if(this.parent.precedence() <= this.precedence()){
                 return `(${text})`;
             }            
@@ -246,7 +320,7 @@ export class App extends Term{
         return text;
     }
 
-    getAll(alls: (Statement | Term)[]) : void{ 
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
         alls.push(this);
         if(isLetter(this.fncName[0])){
             alls.push(this.fnc);
@@ -256,7 +330,7 @@ export class App extends Term{
 }
 
 
-export abstract class Statement {
+export abstract class Statement extends AbstractSyntaxNode {
     dumpStatement() : void {
         throw new MyError();
     }
@@ -264,8 +338,6 @@ export abstract class Statement {
     isAssignmentCall() : boolean {
         return this instanceof CallStatement && this.app.isAssignmentApp();
     }
-
-    abstract getAll(alls: (Statement | Term)[]) : void;
 }
 
 
@@ -277,11 +349,16 @@ export class VariableDeclaration extends Statement {
         this.variable = variable;
     }
 
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.variable);
+    }
+
     dumpStatement() : void {
         msg(`pre-pare:${this.constructor.name}`);
     }
 
-    getAll(alls: (Statement | Term)[]) : void{ 
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
         alls.push(this);
         getAllSub(alls, this.variable.initializer);
     }
@@ -295,12 +372,17 @@ export class CallStatement extends Statement {
         this.app = app;
     }
 
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.app);
+    }
+
     dumpStatement() : void {
         msg(`pre-pare:${this.constructor.name}:${this.app}`);
         this.app.dumpTerm();
     }
 
-    getAll(alls: (Statement | Term)[]) : void{  
+    getAll(alls: AbstractSyntaxNode[]) : void{  
         alls.push(this);
         getAllSub(alls, this.app);
     }
@@ -314,7 +396,12 @@ export class ReturnStatement extends Statement {
         this.value = value;
     }
 
-    getAll(alls: (Statement | Term)[]) : void{     
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.value);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{     
         alls.push(this);
         getAllSub(alls, this.value);
     }
@@ -328,12 +415,29 @@ export class BlockStatement extends Statement {
         this.statements = statements.slice();
     }
 
+    addStatements(...statements : Statement[]){
+        for(const statement of statements){
+            this.statements.push(statement);
+            statement.parent = this;
+        }
+    }
+
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.statements);
+    }
+
+    findVariable(name : string) : Variable | undefined {
+        const decl = this.statements.find(x => x instanceof VariableDeclaration && x.variable.name == name) as VariableDeclaration;
+        return decl == undefined ? undefined : decl.variable;
+    }
+
     dumpStatement() : void {
         msg(`pre-pare:${this.constructor.name}`);
         this.statements.forEach(x => x.dumpStatement());
     }
 
-    getAll(alls: (Statement | Term)[]) : void{  
+    getAll(alls: AbstractSyntaxNode[]) : void{  
         alls.push(this);
         getAllSub(alls, this.statements);
     }
@@ -353,7 +457,12 @@ export class IfStatement extends Statement {
         this.elseBlock = elseBlock;
     }
 
-    getAll(alls: (Statement | Term)[]) : void{        
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.condition, this.ifBlock, this.elseIf, this.elseBlock);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.condition, this.ifBlock, this.elseIf, this.elseBlock);
     }
@@ -369,13 +478,18 @@ export class WhileStatement extends Statement {
         this.block = body;
     }
 
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.condition, this.block);
+    }
+
     dumpStatement() : void {
         msg(`pre-pare:${this.constructor.name}`);
         this.condition.dumpTerm();
         this.block.dumpStatement();
     }
 
-    getAll(alls: (Statement | Term)[]) : void{        
+    getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.condition, this.block);
     }
@@ -395,7 +509,12 @@ export class ForStatement extends Statement {
         this.body = body;
     }
 
-    getAll(alls: (Statement | Term)[]) : void{        
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.initializer, this.condition, this.update, this.body);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.initializer.initializer, this.condition, this.update, this.body);
     }
@@ -409,7 +528,7 @@ export class ParallelStatement extends Statement {
         this.blocks = blocks;
     }
 
-    getAll(alls: (Statement | Term)[]) : void{        
+    getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.blocks);
     }
@@ -590,7 +709,7 @@ export class FncParser {
         }
     }
 
-    readType() : Type {
+    readType(ctx : Context) : Type {
         const mod = this.readModifiers();
 
         switch(this.current()){
@@ -603,21 +722,30 @@ export class FncParser {
             case "texture_2d":
                 const aggregate = this.readToken(TokenType.type);
                 this.nextToken("<");
-                const elementType = this.readType();
+                const elementType = this.readType(ctx);
                 this.nextToken(">");
                 return new ShaderType(mod, aggregate, elementType);
         }
 
         const type_name = this.readToken(TokenType.type);
 
+        let elementType : Type;
         const struct = this.structs.find(x => x.typeName == type_name);
         if(struct == undefined){
 
-            return new Type(mod, type_name);
+            elementType = new SimpleType(mod, type_name);
         }
         else{
             assert(mod.empty());
-            return struct;
+            elementType = struct;
+        }
+
+        if(this.current() == "["){
+            const dimensions = this.readComma(ctx, "[", "]");
+            return new ArrayType(mod, elementType, dimensions);
+        }
+        else{
+            return elementType;
         }
     }
 
@@ -713,7 +841,7 @@ export class FncParser {
 
             this.nextToken("->");
 
-            fn.type = this.readType();
+            fn.type = this.readType(ctx);
         }
 
         fn.block = this.parseBlock(ctx, );
@@ -800,7 +928,12 @@ export class FncParser {
         while(true){
             if(this.token.text == '('){
 
-                term = new App(operator("()"), [term]);
+                if(term instanceof RefVar){
+                    term = new App(term, []);
+                }
+                else{
+                    term = new App(operator("()"), [term]);
+                }
                 this.readFncArgs(ctx, term);
             }
             else if(this.token.text == '['){
@@ -1009,7 +1142,7 @@ export class FncParser {
                     trm2.value.numerator *= -1;
                 }
 
-                app.addArg(trm2);
+                app.addArgs(trm2);
             }
 
             return app;
@@ -1060,7 +1193,7 @@ export class FncParser {
             this.next();
 
             const trm2 = this.RelationalExpression(ctx);
-            app.addArg(trm2);
+            app.addArgs(trm2);
         }
 
         return app;
@@ -1080,7 +1213,7 @@ export class FncParser {
             this.next();
 
             const trm2 = this.AndExpression(ctx);
-            app.addArg(trm2);
+            app.addArgs(trm2);
         }
 
         return app;
@@ -1109,7 +1242,7 @@ export class FncParser {
         let type : Type | undefined;
         if(this.current() == ":"){
             this.nextToken(":");
-            type = this.readType();
+            type = this.readType(ctx);
         }
 
         let initializer: Term | undefined;

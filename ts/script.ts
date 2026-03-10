@@ -1,6 +1,8 @@
 import { assert, fetchText, msg, MyError, unique } from "@i18n";
-import { lexicalAnalysis, Fn as Fn, Variable, BufferUsage } from "./parser";
+import { lexicalAnalysis, Fn as Fn, Variable, BufferUsage, Domain } from "./parser";
 import { App, BlockStatement, CallStatement, ConstNum, Context, FncParser, indexOpr, RefVar, Statement, Str, Term, VariableDeclaration, WhileStatement } from "./parser-new";
+import { ComputePipeline } from "./compute";
+import { RenderPipeline } from "./primitive";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -37,16 +39,18 @@ function getAssignmentTarget(app : App) : RefVar {
 }
 
 export class Script {
-    mode : ScriptMode = common;
-    commonVariables: Variable[] = [];
-    cpuVariables: Variable[] = [];
-    gpuVariables: Variable[] = [];
+    commonDomain : Domain;
+    cpuDomain    : Domain;
+    gpuDomain    : Domain;
 
-    commonStatements: Statement[] = [];
-    cpuStatements: Statement[] = [];
-    gpuStatements: Statement[] = [];
+    comps : ComputePipeline[] = [];
+    meshes: RenderPipeline[] = [];
 
-    gpuFns : Fn[] = [];
+    constructor(){
+        this.commonDomain = new Domain();
+        this.cpuDomain    = new Domain();
+        this.gpuDomain    = new Domain();
+    }
 
     async init(){
         msg(`\n------------------------------ test`);
@@ -56,58 +60,23 @@ export class Script {
         const parser = new FncParser(tokens, 0);
         this.parseScript(parser);
 
-        const statements = [this.commonStatements, this.cpuStatements, this.gpuStatements].flat();
-        for(const statement of statements){
-            if(statement instanceof VariableDeclaration){
-                const variable = statement.variable;
-
-                msg(`var:${variable.name}`);
-            }
-            else if(statement instanceof WhileStatement){
-                const condition = statement.condition;
-                const body      = statement.block;
-
-            }
-            else{
-                throw new MyError();
-            }
-
-            msg(`statement:${statement.constructor.name}`);
-        }
-
-        for(const fn of this.gpuFns){
-            const alls = fn.getAll();
+        for(const domain of [this.commonDomain, this.cpuDomain, this.gpuDomain]){            
+            domain.setParent();
+            const alls = domain.getAllInDomain();
             const refs = alls.filter(x => x instanceof RefVar);
-            msg(`refs:${refs.map(x => x.name).join(", ")}`);
-        }
-
-
-
-        statements.forEach(x => this.prepareStatement(x));
-    }
-
-    addVariable(variable: Variable){
-        switch(this.mode){
-        case common: this.commonVariables.push(variable); break;
-        case cpu   : this.cpuVariables.push(variable); break;
-        case gpu   : this.gpuVariables.push(variable); break;
-        }
-    }
-
-    addStatement(stmt: Statement){
-        switch(this.mode){
-        case common: this.commonStatements.push(stmt); break;
-        case cpu   : this.cpuStatements.push(stmt); break;
-        case gpu   : this.gpuStatements.push(stmt); break;
+            const domains = domain == this.commonDomain ? [domain] : [this.commonDomain, domain];
+            refs.forEach(x => x.resolveVariable(domains));
         }
     }
 
     parseScript(parser : FncParser){
         const ctx = Context.unknown;
 
+        let domain = this.commonDomain;
         while (!parser.isEoT()) {
-            if([common, cpu, gpu].includes(parser.current())){
-                this.mode = parser.current() as ScriptMode;
+            const idx = [common, cpu, gpu].indexOf(parser.current());
+            if(idx != -1){
+                domain = [this.commonDomain, this.cpuDomain, this.gpuDomain][idx];
                 parser.next();
             }
 
@@ -118,33 +87,33 @@ export class Script {
             else if(parser.current() == "fn"){
 
                 const fn = parser.readFn(ctx);
-                if(this.mode == gpu){
-                    this.gpuFns.push(fn);
-                    const alls = fn.getAll();
-                    const asns = alls.filter(x => x instanceof CallStatement && x.isAssignmentCall()) as CallStatement[];
-                    for(const asn of asns){
-                        const ref = getAssignmentTarget(asn.app);
-                        msg(`target:${ref}`);
-                    }
-
-                    const commonVariableNames = this.commonVariables.map(x => x.name);
-                    let   refs = alls.filter(x => x instanceof RefVar && commonVariableNames.includes(x.name)) as RefVar[];
-                    const usedcommonVariableNames = unique(refs).map(x => x.name);
-                    const usedcommonVariables = this.commonVariables.filter(x => usedcommonVariableNames.includes(x.name));
-                    msg(`com vars:${usedcommonVariables.map(x => x.name + ":" + BufferUsage[x.mod.usage]).join(", ")}`);
-                }
+                domain.fns.push(fn);
             }
             else{
 
                 const stmt = parser.parseStatement(ctx);
                 if(stmt instanceof VariableDeclaration){
-                    this.addVariable(stmt.variable);
+                    domain.vars.push(stmt.variable);
                 }
                 else{
-                    this.addStatement(stmt);
+                    throw new MyError();
                 }
             }
         }
+
+        const alls = this.gpuDomain.getAllInDomain();
+
+        const asns = alls.filter(x => x instanceof CallStatement && x.isAssignmentCall()) as CallStatement[];
+        for(const asn of asns){
+            const ref = getAssignmentTarget(asn.app);
+            msg(`target:${ref}`);
+        }
+
+        const commonVariableNames = this.commonDomain.vars.map(x => x.name);
+        let   refs = alls.filter(x => x instanceof RefVar && commonVariableNames.includes(x.name)) as RefVar[];
+        const usedcommonVariableNames = unique(refs).map(x => x.name);
+        const usedcommonVariables = this.commonDomain.vars.filter(x => usedcommonVariableNames.includes(x.name));
+        msg(`com vars:${usedcommonVariables.map(x => x.name + ":" + BufferUsage[x.mod.usage]).join(", ")}`);
     }
 
 

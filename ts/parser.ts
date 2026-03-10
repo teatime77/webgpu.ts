@@ -1,5 +1,5 @@
 import { assert, msg, MyError, sum, fetchText  } from "@i18n";
-import { BlockStatement, FncParser, Statement, Term } from "./parser-new.js";
+import { AbstractSyntaxNode, BlockStatement, FncParser, getAllSub, setParentSub, Statement, Term } from "./parser-new.js";
 import { makeShaderModule, error } from "./util.js";
 import { Script } from "./script.js";
 
@@ -130,7 +130,7 @@ const TypeName : string[] = [
 ]
 
 export function isLetter(s : string) : boolean {
-    return s.length === 1 && ("a" <= s && s <= "z" || "A" <= s && s <= "Z");
+    return s.length == 1 && ("a" <= s && s <= "z" || "A" <= s && s <= "Z");
 }
 
 function isDigit(s : string) : boolean {
@@ -435,6 +435,10 @@ export class Modifier {
     }
 
     str() : string {
+        return this.toString();
+    }
+
+    toString() : string {
         let s = "";
 
         if(this.group != undefined){
@@ -484,20 +488,21 @@ function primitiveTypeSize(primitive : string) : number{
     }
 }
 
-export class Type {
+export abstract class Type extends AbstractSyntaxNode {
     mod : Modifier;
     typeName : string;
 
     constructor(mod : Modifier, type_name : string){
+        super();
         this.mod = mod;
         this.typeName = type_name;
     }
 
-    name() : string {
-        return this.typeName;
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
     }
 
-    str() : string {
+    toString() : string {
         return `${this.mod.str()} ${this.typeName}`;
     }
 
@@ -515,6 +520,33 @@ export class Type {
     }
 }
 
+export class SimpleType extends Type {
+    constructor(mod : Modifier, type_name : string){
+        super(mod, type_name);
+    }
+}
+
+export class ArrayType extends Type {
+    elementType : Type;
+    dimensions : Term[];
+
+    constructor(mod : Modifier, elementType : Type, dimensions : Term[]){
+        super(mod, "array");
+        this.elementType = elementType;
+        this.dimensions  = dimensions.slice();
+    }
+
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.elementType, this.dimensions);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.elementType, this.dimensions);
+    }
+}
+
 export class ShaderType extends Type {
     elementType : Type;
 
@@ -523,11 +555,16 @@ export class ShaderType extends Type {
         this.elementType = elementType;
     }
 
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.elementType);
+    }
+
     name() : string {
         return `${this.typeName}<${this.typeName}>`;
     }
 
-    str() : string {
+    toString() : string {
         return `${this.mod.str()} ${this.typeName}<${this.typeName}>`;
     }
 
@@ -571,6 +608,16 @@ export class Struct extends Type {
         this.typeName = type_name;
     }
 
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.members);
+    }
+
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.members);
+    }
+
     dump(){
         msg(`${this.mod.str()} struct ${this.typeName}{`);
         for(const va of this.members){
@@ -585,44 +632,57 @@ export class Struct extends Type {
     }
 }
 
-export class Variable {
+export class Variable extends AbstractSyntaxNode {
     mod : Modifier;
     name : string;
     type : Type | undefined;
     initializer : Term | undefined;
 
     constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined){
+        super();
         this.mod = mod;
         this.name = name;
         this.type = type;
         this.initializer = initializer;
     }
 
-    str() : string {
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.type, this.initializer);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.type, this.initializer);
+    }
+
+    toString() : string {
         assert(this.type != undefined);
         return `${this.mod.str()} ${this.name} : ${this.type!.str()}`
     }
 }
 
 export class Field extends Variable {
-    parent : Struct;
-
     constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined, parent : Struct){
         super(mod, name, type, initializer);
         this.parent = parent;
     }
 
+    get struct() : Struct {
+        return this.parent as Struct;
+    }
+
     offset() : number {
-        const idx = this.parent.members.indexOf(this);
+        const idx = this.struct.members.indexOf(this);
         assert(idx != -1);
 
-        const prev_siblings = this.parent.members.slice(0, idx);
+        const prev_siblings = this.struct.members.slice(0, idx);
         assert(prev_siblings.every(x => x.type != undefined))
         return sum(prev_siblings.map(x => x.type!.size()));
     }
 }
 
-export class Fn {
+export class Fn extends AbstractSyntaxNode {
     mod : Modifier;
     name : string;
     args : Variable[] = [];
@@ -630,20 +690,46 @@ export class Fn {
     block! : BlockStatement;
 
     constructor(mod : Modifier, name : string){
+        super();
         this.mod = mod;
         this.name = name;
     }
 
-    str() : string {
+    setParent(parent : AbstractSyntaxNode){
+        super.setParent(parent);
+        setParentSub(this, this.args, this.type, this.block);
+    }
+
+    getAll(alls: AbstractSyntaxNode[]) : void{ 
+        alls.push(this);
+        getAllSub(alls, this.args, this.type, this.block);
+    }
+
+    toString() : string {
         const vars_s = this.args.map(x => x.str()).join(", ");
         const type_s = this.type == undefined ? "" : `-> ${this.type.str()}`;
         
         return `${this.mod.str()} fn ${this.name}(${vars_s}) ${type_s}`;
     }
+}
 
-    getAll() : (Statement | Term)[]{
+export class Domain extends AbstractSyntaxNode {
+    vars : Variable[] = [];
+    fns : Fn[] = [];
+
+    getAll(alls: AbstractSyntaxNode[]) : void{
+        alls.push(this);
+        getAllSub(alls, this.vars, this.fns);
+    }
+
+    setParent(){
+        setParentSub(this, this.vars, this.fns);
+    }
+
+    getAllInDomain() : (Statement | Term)[]{
         const alls: (Statement | Term)[] = [];
-        this.block.getAll(alls);
+        this.vars.forEach(x => x.getAll(alls));
+        this.fns.forEach(x => x.getAll(alls));
         return alls;
     }
 }
