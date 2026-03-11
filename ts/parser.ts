@@ -1,6 +1,6 @@
 import { assert, msg, MyError, sum, fetchText  } from "@i18n";
 import { AbstractSyntaxNode, BlockStatement, FncParser, getAllSub, setParentSub, Statement, Term } from "./parser-new.js";
-import { makeShaderModule, error } from "./util.js";
+import { makeShaderModule, error, formatCode } from "./util.js";
 import { Script } from "./script.js";
 
 let unknownToken  = new Set();
@@ -39,6 +39,29 @@ export enum TokenType{
 
     // ブロックコメント
     blockComment,
+}
+
+interface IDomain {
+    structs : Struct[];
+    vars : Variable[];
+    fns : Fn[];
+}
+
+
+export function getUniformVars(domain: IDomain): Variable[] {
+    return domain.vars.filter(x => x.mod.usage == BufferUsage.uniform);
+}
+
+export function getStorageVars(domain: IDomain): Variable[] {
+    return domain.vars.filter(x => x.mod.usage == BufferUsage.storage);
+}
+
+export function getReadStorageVars(domain: IDomain): Variable[] {
+    return domain.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read);
+}
+
+export function getWriteStorageVars(domain: IDomain): Variable[] {
+    return domain.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read_write);
 }
 
 
@@ -167,7 +190,7 @@ export class Token{
     }
 }
 
-export class Module {
+export class Module implements IDomain {
     name : string;
     text : string;
     structs : Struct[] = [];
@@ -198,22 +221,10 @@ export class Module {
         }
     }
 
-    uniformVars() : Variable[] {
-        return this.vars.filter(x => x.mod.usage == BufferUsage.uniform);
-    }
-
-    readStorageVars() : Variable[]{
-        return this.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read);
-    }
-
-    writeStorageVars() : Variable[]{
-        return this.vars.filter(x => x.mod.usage == BufferUsage.storage && x.mod.readWrite == BufferReadWrite.storage_read_write);
-    }
-
     dump(){
         this.structs.forEach(x => x.dump());
-        this.vars.forEach(x => msg(`${x.str()};`))
-        this.fns.forEach(x => msg(`${x.str()}`))
+        this.vars.forEach(x => msg(`${x};`))
+        this.fns.forEach(x => msg(`${x}`))
     }
 
     getUniformVar() : Variable {
@@ -424,6 +435,7 @@ export enum BufferReadWrite {
 }
 
 export class Modifier {
+    variable : Variable | undefined;
     group : number | undefined;
     binding : number | undefined;
     location : number | undefined;
@@ -445,21 +457,43 @@ export class Modifier {
         return v.every(x => x == undefined) && this.usage == BufferUsage.unknown;
     }
 
-    str() : string {
-        return this.toString();
-    }
-
     toString() : string {
         let s = "";
 
         if(this.group != undefined){
 
-            s += ` group(${this.group})`
+            s += ` @group(${this.group})`
         }
 
         if(this.binding != undefined){
 
-            s += ` binding(${this.binding})`
+            s += ` @binding(${this.binding})`
+        }
+
+        if(this.usage == BufferUsage.uniform){
+            s += " var<uniform>";
+        }
+        else if(this.usage == BufferUsage.storage){
+            if(this.readWrite == BufferReadWrite.storage_read){
+
+                s += " var<storage, read>";
+            }
+            else if(this.readWrite == BufferReadWrite.storage_read_write){
+                
+                s += " var<storage, read_write>";
+            }
+            else{
+                
+                s += " var<storage>";
+            }
+        }
+        else{
+            if(this.variable != undefined && this.variable.varKind != ""){
+                s += ` ${this.variable.varKind}`;
+            }
+            else{
+                s += " var"
+            }
         }
 
         if(this.location != undefined){
@@ -474,7 +508,7 @@ export class Modifier {
 
         if(this.builtin != undefined){
 
-            s += ` builtin(${this.builtin})`
+            s += ` @builtin(${this.builtin})`
         }
 
         if(this.fnType != undefined){
@@ -513,8 +547,12 @@ export abstract class Type extends AbstractSyntaxNode {
         alls.push(this);
     }
 
+    name() : string {
+        return this.typeName;
+    }
+
     toString() : string {
-        return `${this.mod.str()} ${this.typeName}`;
+        return `${this.mod} ${this.typeName}`;
     }
 
     size() : number {
@@ -547,6 +585,10 @@ export class ArrayType extends Type {
         this.dimensions  = dimensions.slice();
     }
 
+    name() : string {
+        return `${this.typeName}<${this.elementType.typeName}>`;
+    }
+
     setParent(parent : AbstractSyntaxNode){
         super.setParent(parent);
         setParentSub(this, this.elementType, this.dimensions);
@@ -572,11 +614,11 @@ export class ShaderType extends Type {
     }
 
     name() : string {
-        return `${this.typeName}<${this.typeName}>`;
+        return `${this.typeName}<${this.elementType.typeName}>`;
     }
 
     toString() : string {
-        return `${this.mod.str()} ${this.typeName}<${this.typeName}>`;
+        return `${this.mod} ${this.typeName}<${this.typeName}>`;
     }
 
     size() : number {
@@ -630,9 +672,9 @@ export class Struct extends Type {
     }
 
     dump(){
-        msg(`${this.mod.str()} struct ${this.typeName}{`);
+        msg(`${this.mod} struct ${this.typeName}{`);
         for(const va of this.members){
-            msg(`    ${va.str()};`);
+            msg(`    ${va};`);
         }
         msg("}")
     }
@@ -641,20 +683,29 @@ export class Struct extends Type {
         assert(this.members.every(x => x.type != undefined));
         return sum( this.members.map(x => x.type!.size()) );
     }
+
+    toString() : string{
+        const s1 = this.members.map(x => `${x}`).join(",\n");
+        return `struct ${this.typeName} {\n${s1}\n}\n`;
+    }
 }
 
 export class Variable extends AbstractSyntaxNode {
+    varKind : string;
     mod : Modifier;
     name : string;
     type : Type | undefined;
     initializer : Term | undefined;
 
-    constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined){
+    constructor(varKind: string, mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined){
         super();
+        this.varKind = varKind;
         this.mod = mod;
         this.name = name;
         this.type = type;
         this.initializer = initializer;
+
+        this.mod.variable = this;
     }
 
     setParent(parent : AbstractSyntaxNode){
@@ -667,15 +718,26 @@ export class Variable extends AbstractSyntaxNode {
         getAllSub(alls, this.type, this.initializer);
     }
 
+    argStr() : string {
+        if(this.mod.builtin != undefined){
+            return `@builtin(${this.mod.builtin}) ${this}`;
+        }
+        else{
+            return this.toString();
+        }
+    }
+
     toString() : string {
-        assert(this.type != undefined);
-        return `${this.mod.str()} ${this.name} : ${this.type!.str()}`
+        const s1 = this.type        == undefined ? "" : ` : ${this.type.name()}`;
+        const s2 = this.initializer == undefined ? "" : ` = ${this.initializer}`;
+
+        return `${this.name}${s1}${s2}`;
     }
 }
 
 export class Field extends Variable {
     constructor(mod : Modifier, name : string, type : Type | undefined, initializer : Term | undefined, parent : Struct){
-        super(mod, name, type, initializer);
+        super("", mod, name, type, initializer);
         this.parent = parent;
     }
 
@@ -717,14 +779,21 @@ export class Fn extends AbstractSyntaxNode {
     }
 
     toString() : string {
-        const vars_s = this.args.map(x => x.str()).join(", ");
-        const type_s = this.type == undefined ? "" : `-> ${this.type.str()}`;
+        let modStr = "";
+
+        if(this.mod.fnType != undefined){
+            modStr += `${this.mod.fnType} @workgroup_size(64) `;
+        }
+
+        const vars_s = this.args.map(x => x.argStr()).join(", ");
+        const type_s = this.type == undefined ? "" : `-> ${this.type.name()}`;
         
-        return `${this.mod.str()} fn ${this.name}(${vars_s}) ${type_s}`;
+        return `${modStr}fn ${this.name}(${vars_s}) ${type_s}${this.block}`;
     }
 }
 
-export class Domain extends AbstractSyntaxNode {
+export class Domain extends AbstractSyntaxNode implements IDomain {
+    structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Fn[] = [];
 
@@ -742,6 +811,14 @@ export class Domain extends AbstractSyntaxNode {
         this.vars.forEach(x => x.getAll(alls));
         this.fns.forEach(x => x.getAll(alls));
         return alls;
+    }
+
+    toString() : string {
+        const s1 = this.structs.map(x => `${x}\n`).join("");
+        const s2 = this.vars.map(x => `${x.mod} ${x};`).join("\n") + "\n";
+        const s3 = this.fns.map(x => `${x}\n`).join("");
+
+        return formatCode(s1 + s2 + s3);
     }
 }
 

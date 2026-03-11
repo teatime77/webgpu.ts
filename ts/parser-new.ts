@@ -75,13 +75,15 @@ export class Rational{
 }
 
 export abstract class AbstractSyntaxNode {
+    static objCount = 0;
+    objIdx : number;
     parent : AbstractSyntaxNode | undefined;
 
-    abstract getAll(alls: AbstractSyntaxNode[]) : void;
-
-    str() : string {
-        return this.toString();
+    constructor(){
+        this.objIdx = AbstractSyntaxNode.objCount++;
     }
+
+    abstract getAll(alls: AbstractSyntaxNode[]) : void;
 
     setParent(parentNode : AbstractSyntaxNode){
         this.parent = parentNode;
@@ -156,14 +158,25 @@ export class Str extends Term{
 
 export class RefVar extends Term{
     name: string;
-    refVar! : Variable | undefined;
+    refVar : Variable | undefined;
+    refType : Type | undefined;
 
-    constructor(name: string){
+    constructor(target: string | Type){
         super();
-        this.name = name;
+        if(typeof target == "string"){
+            this.name = target;
+        }
+        else{
+            this.name    = target.name();
+            this.refType = target;
+        }
     }
 
     resolveVariable(domains:Domain[]){
+        if(this.refVar != undefined || this.refType != undefined){
+            return;
+        }
+
         const blocks = this.ancestorBlocks();
         this.refVar = blocks.map(x => x.findVariable(this.name)).find(x => x != undefined);
         if(this.refVar == undefined){
@@ -172,7 +185,7 @@ export class RefVar extends Term{
 
             if(this.refVar == undefined && !predifined.has(this.name)){
 
-                msg(`ref no var:${this.name} parent:[${this.parent!.str()}]`);
+                msg(`ref no var:${this.name} parent:[${this.parent!}]`);
             }
         }
     }
@@ -188,17 +201,38 @@ export class RefVar extends Term{
 
 
 export class ConstNum extends Term{
+    text : string;
+
     static zero() : ConstNum {
-        return new ConstNum(0);
+        return new ConstNum("0");
     }
 
-    constructor(numerator : number, denominator : number = 1){
+    constructor(text : string){
         super();
-        this.value = new Rational(numerator, denominator);
+        this.text = text;
+
+        let n : number;
+
+        if(text[0] == "#"){
+            n = parseInt(text.substring(1), 16);
+        }
+        else{
+            n = parseFloat(text);
+        }
+
+        if(isNaN(n)){
+            throw new MyError();
+        }
+
+        this.value = new Rational(n, 1);
     }
 
     dumpTerm() : void {
         msg(`pre-pare:${this.constructor.name}:${this.value}`);
+    }
+
+    toString() : string {
+        return this.text;
     }
 }
 
@@ -253,15 +287,13 @@ export class App extends Term{
         case "^": 
             return 0;
 
+        case "*": 
         case "/": 
             return 1;
 
-        case "*": 
-            return 2;
-
         case "+": 
         case "-": 
-            return 3;
+            return 2;
         }
 
         return -1;
@@ -283,7 +315,7 @@ export class App extends Term{
 
             return `${args[0]}[${args.slice(1).join(", ")}]`
         }
-        else if(isLetter(this.fncName[0])){
+        else if(isLetter(this.fncName[0]) || this.fnc.refType != undefined){
             const args_s = args.join(", ");
             text = `${this.fncName}(${args_s})`;
         }
@@ -362,6 +394,10 @@ export class VariableDeclaration extends Statement {
         alls.push(this);
         getAllSub(alls, this.variable.initializer);
     }
+
+    toString() : string {
+        return `${this.variable.mod} ${this.variable};\n`;
+    }
 }
 
 export class CallStatement extends Statement {
@@ -386,6 +422,10 @@ export class CallStatement extends Statement {
         alls.push(this);
         getAllSub(alls, this.app);
     }
+
+    toString() : string {
+        return `${this.app};`;
+    }
 }
 
 export class ReturnStatement extends Statement {
@@ -404,6 +444,15 @@ export class ReturnStatement extends Statement {
     getAll(alls: AbstractSyntaxNode[]) : void{     
         alls.push(this);
         getAllSub(alls, this.value);
+    }
+
+    toString() : string {
+        if(this.value == undefined){
+            return `return;`;
+        }
+        else{
+            return `return ${this.value};`;
+        }
     }
 }
 
@@ -441,6 +490,12 @@ export class BlockStatement extends Statement {
         alls.push(this);
         getAllSub(alls, this.statements);
     }
+
+    toString() : string {
+        const s1 = this.statements.map(x => `${x}`).join("\n") + "\n";
+
+        return `{\n${s1}}\n`;
+    }
 }
 
 export class IfStatement extends Statement {
@@ -465,6 +520,18 @@ export class IfStatement extends Statement {
     getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.condition, this.ifBlock, this.elseIf, this.elseBlock);
+    }
+
+    toString() : string {
+        var s1 = `if( ${this.condition})${this.ifBlock}`;
+        if(this.elseIf != undefined){
+            s1 += `else ${this.elseIf}`;
+        }
+        if(this.elseBlock != undefined){
+            s1 += `else${this.elseBlock}`;
+        }
+
+        return s1;
     }
 }
 
@@ -492,6 +559,10 @@ export class WhileStatement extends Statement {
     getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.condition, this.block);
+    }
+
+    toString() : string {
+        return `while(${this.condition})${this.block}\n`;
     }
 }
 
@@ -749,26 +820,6 @@ export class FncParser {
         }
     }
 
-    readGenericType(app : App){
-        this.nextToken("<");
-
-        while(true){
-            const typeName = this.readToken(TokenType.type);
-            const refVar = new RefVar(typeName);
-            app.args.push(refVar);
-
-            if(this.token.text == ","){
-                this.nextToken(",");
-            }
-            else{
-                break;
-            }
-        }
-
-        this.nextToken(">");
-    }
-
-
     structDeclaration(ctx : Context) : Struct {
         this.nextToken("struct");
 
@@ -787,7 +838,7 @@ export class FncParser {
             }
 
             const mod = this.readModifiers();
-            const field  = this.readVariable(ctx, mod, struct) as Field;
+            const field  = this.readVariable(ctx, "", mod, struct) as Field;
             struct.members.push(field);
 
             if(this.current() == ","){
@@ -824,7 +875,7 @@ export class FncParser {
             }
 
             const modVar = this.readModifiers();
-            const variable  = this.readVariable(ctx, modVar, undefined);
+            const variable  = this.readVariable(ctx, "", modVar, undefined);
             fn.args.push(variable);
 
             if(this.current() == ","){
@@ -916,13 +967,16 @@ export class FncParser {
 
     readId(ctx : Context) : RefVar | App {
         const idType = this.token.typeTkn;
-        const name = this.readName();
 
-        let term : RefVar | App = new RefVar(name);
+        let term : RefVar | App;
 
-        if(idType == TokenType.type && this.token.text == '<'){
-            term = new App(operator("<>"), [term]);
-            this.readGenericType(term);
+        if(idType == TokenType.type && this.peek() == "<"){
+            const tp = this.readType(ctx);
+            term = new RefVar(tp);
+        }
+        else{
+            const name = this.readName();
+            term = new RefVar(name);
         }
 
         while(true){
@@ -966,20 +1020,8 @@ export class FncParser {
             return id;
         }
         else if(this.token.typeTkn == TokenType.Number){
-            let n : number;
 
-            if(this.token.text[0] == "#"){
-                n = parseInt(this.token.text.substring(1), 16);
-            }
-            else{
-                n = parseFloat(this.token.text);
-            }
-
-            if(isNaN(n)){
-                throw new MyError();
-            }
-
-            trm = new ConstNum(n);
+            trm = new ConstNum(this.token.text);
             this.next();
         }
         else if(this.token.typeTkn == TokenType.String){
@@ -1119,16 +1161,7 @@ export class FncParser {
     }
     
     AdditiveExpression(ctx : Context) : Term {
-        let nagative : boolean = false;
-        if(this.token.text == "-"){
-            nagative = true;
-            this.next();
-        }
-
         const trm1 = this.MultiplicativeExpression(ctx);
-        if(nagative){
-            trm1.value.numerator *= -1;
-        }
 
         if(this.token.text == "+" || this.token.text == "-"){
             let app = new App(operator("+"), [trm1]);
@@ -1236,7 +1269,7 @@ export class FncParser {
         }
     }
 
-    readVariable(ctx : Context, mod : Modifier, parent : Struct | undefined) : Variable {
+    readVariable(ctx : Context, varKind:string, mod : Modifier, parent : Struct | undefined) : Variable {
         const name = this.readToken(TokenType.identifier);
         
         let type : Type | undefined;
@@ -1253,7 +1286,7 @@ export class FncParser {
         
         if(parent == undefined){
 
-            return  new Variable(mod, name, type, initializer);
+            return  new Variable(varKind, mod, name, type, initializer);
         }
         else{
 
@@ -1266,6 +1299,7 @@ export class FncParser {
         const mod = this.readModifiers();
 
         assert(["let", "var", "const"].includes(this.token.text));
+        const varKind = this.token.text;
         this.next();
 
         if(this.current() == "<"){
@@ -1300,7 +1334,7 @@ export class FncParser {
             this.nextToken(">");
         }
 
-        return this.readVariable(ctx, mod, undefined);
+        return this.readVariable(ctx, varKind, mod, undefined);
     }
 
     parseReturn(ctx : Context) : ReturnStatement {
@@ -1318,11 +1352,12 @@ export class FncParser {
         const trm1 = this.PrimaryExpression(ctx);
 
         if(isAssignmentToken(this.current())){
+            const opr = this.current();
             this.next();
             const trm2 = this.ArithmeticExpression(ctx);
 
             this.nextToken(";");
-            return new App(operator("="), [trm1, trm2]);
+            return new App(operator(opr), [trm1, trm2]);
         }
         else if(trm1 instanceof App){
             this.nextToken(";");

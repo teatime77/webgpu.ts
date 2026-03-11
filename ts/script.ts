@@ -1,8 +1,9 @@
 import { assert, fetchText, msg, MyError, unique } from "@i18n";
-import { lexicalAnalysis, Fn as Fn, Variable, BufferUsage, Domain } from "./parser";
+import { lexicalAnalysis, Fn as Fn, Variable, BufferUsage, Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars } from "./parser";
 import { App, BlockStatement, CallStatement, ConstNum, Context, FncParser, indexOpr, RefVar, Statement, Str, Term, VariableDeclaration, WhileStatement } from "./parser-new";
 import { ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
+import { makeShaderModule } from "./util";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -59,14 +60,6 @@ export class Script {
 
         const parser = new FncParser(tokens, 0);
         this.parseScript(parser);
-
-        for(const domain of [this.commonDomain, this.cpuDomain, this.gpuDomain]){            
-            domain.setParent();
-            const alls = domain.getAllInDomain();
-            const refs = alls.filter(x => x instanceof RefVar);
-            const domains = domain == this.commonDomain ? [domain] : [this.commonDomain, domain];
-            refs.forEach(x => x.resolveVariable(domains));
-        }
     }
 
     parseScript(parser : FncParser){
@@ -82,9 +75,10 @@ export class Script {
 
             if(parser.current() == "struct"){
 
-                parser.structDeclaration(ctx);
+                const struct = parser.structDeclaration(ctx);
+                domain.structs.push(struct);
             }
-            else if(parser.current() == "fn"){
+            else if(["fn", "@compute"].includes(parser.current())){
 
                 const fn = parser.readFn(ctx);
                 domain.fns.push(fn);
@@ -101,19 +95,52 @@ export class Script {
             }
         }
 
+        for(const domain of [this.commonDomain, this.cpuDomain, this.gpuDomain]){            
+            domain.setParent();
+            const alls = domain.getAllInDomain();
+            const refs = alls.filter(x => x instanceof RefVar);
+            const domains = domain == this.commonDomain ? [domain] : [this.commonDomain, domain];
+            refs.forEach(x => x.resolveVariable(domains));
+        }
+
         const alls = this.gpuDomain.getAllInDomain();
 
         const asns = alls.filter(x => x instanceof CallStatement && x.isAssignmentCall()) as CallStatement[];
         for(const asn of asns){
             const ref = getAssignmentTarget(asn.app);
+            assert(ref.refVar != undefined);
+            ref.refVar!.mod.readWrite = BufferReadWrite.storage_read_write;
             msg(`target:${ref}`);
         }
 
-        const commonVariableNames = this.commonDomain.vars.map(x => x.name);
-        let   refs = alls.filter(x => x instanceof RefVar && commonVariableNames.includes(x.name)) as RefVar[];
-        const usedcommonVariableNames = unique(refs).map(x => x.name);
-        const usedcommonVariables = this.commonDomain.vars.filter(x => usedcommonVariableNames.includes(x.name));
-        msg(`com vars:${usedcommonVariables.map(x => x.name + ":" + BufferUsage[x.mod.usage]).join(", ")}`);
+        getStorageVars(this.commonDomain)
+            .filter( x => x.mod.readWrite == BufferReadWrite.unknown)
+            .forEach(x => x.mod.readWrite = BufferReadWrite.storage_read);
+
+        const uniformVars      = getUniformVars(this.commonDomain);
+        const readStorageVars  = getReadStorageVars(this.commonDomain);
+        const writeStorageVars = getWriteStorageVars(this.commonDomain);
+
+        const uniformStorageVars = uniformVars.concat(readStorageVars, writeStorageVars);
+        let binding = 0;
+        for(const va of uniformStorageVars){
+            va.mod.group = 0;
+            va.mod.binding = binding;
+            binding++;
+        }
+
+        msg("---------------------------------------- CPU");
+        msg(`cpu domain:${this.cpuDomain}`);
+        msg("---------------------------------------- Common");
+
+        const compText = 
+              `${this.commonDomain}` 
+            + "\n//" + "-".repeat(50) + " GPU\n"
+            + `${this.gpuDomain}`;
+
+        msg(`${compText}`);
+
+        const module = makeShaderModule(compText);
     }
 
 

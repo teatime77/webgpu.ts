@@ -1,6 +1,6 @@
 declare var glMatrix: any;
 
-import { $div, fetchText } from "@i18n";
+import { $div, assert, fetchText } from "@i18n";
 import { testGalois } from "@algebra"
 import { initEditor } from "./editor.js";
 import { Module, parseAll } from "./parser.js";
@@ -37,6 +37,28 @@ export async function fetchModule(shader_name: string) : Promise<Module> {
     return module;
 }
 
+export function formatCode(test:string) : string {
+    const lines = test.split("\n").map(x => x.trim());
+    let nest = 0;
+    const outputs : string[] = [];
+    const tab = "    ";
+    for(const line of lines){
+        if(line.endsWith("{")){
+            outputs.push(tab.repeat(nest) + line);
+            nest++;
+        }
+        else if(line.endsWith("}")){
+            nest--;
+            assert(0 <= nest);
+            outputs.push(tab.repeat(nest) + line);
+        }
+        else{
+            outputs.push(tab.repeat(nest) + line);
+        }
+    }
+
+    return outputs.join("\n");
+}
 
 export async function asyncBodyOnLoad(){
     console.log("body is loaded\n");

@@ -1,5 +1,5 @@
 import { fetchText, range, assert, MyError, msg } from "@i18n";
-import { Module, Struct } from "./parser.js";
+import { Module, getReadStorageVars, Struct, getUniformVars, getWriteStorageVars } from "./parser.js";
 import { ui3D } from "./ui.js";
 import { makeShaderModule, g_device, fetchModule, number123 } from "./util.js";
 
@@ -171,7 +171,7 @@ export class ComputePipeline extends AbstractPipeline {
 
         let binding = 0;
         const entries : GPUBindGroupLayoutEntry[] = [];
-        if(this.compModule.uniformVars().length == 1){
+        if(getUniformVars(this.compModule).length == 1){
             entries.push({
                 binding,
                 visibility: GPUShaderStage.COMPUTE,
@@ -181,7 +181,7 @@ export class ComputePipeline extends AbstractPipeline {
             binding++;
         }
 
-        if(this.compModule.readStorageVars().length == 1){
+        if(getReadStorageVars(this.compModule).length == 1){
             entries.push({
                 binding,
                 visibility: GPUShaderStage.COMPUTE,
@@ -191,7 +191,7 @@ export class ComputePipeline extends AbstractPipeline {
             binding++;
         }
 
-        if(this.compModule.writeStorageVars().length == 1){
+        if(getWriteStorageVars(this.compModule).length == 1){
             entries.push({
                 binding,
                 visibility: GPUShaderStage.COMPUTE,
@@ -223,11 +223,11 @@ export class ComputePipeline extends AbstractPipeline {
     }
 
     makeUpdateBuffers(){
-        assert(this.compModule.readStorageVars().length == 1 && this.compModule.writeStorageVars().length == 1);
+        assert(getReadStorageVars(this.compModule).length == 1 && getWriteStorageVars(this.compModule).length == 1);
         this.updateBuffers = [];
         this.bindGroups    = [];
 
-        const storageCount = this.compModule.readStorageVars().length + this.compModule.writeStorageVars().length;
+        const storageCount = getReadStorageVars(this.compModule).length + getWriteStorageVars(this.compModule).length;
     
         for (let i = 0; i < storageCount; ++i) {
             this.updateBuffers[i] = g_device.createBuffer({
@@ -250,7 +250,7 @@ export class ComputePipeline extends AbstractPipeline {
             const entries : GPUBindGroupEntry[] = [];
             let binding = 0;
 
-            if(this.compModule.uniformVars().length == 1){
+            if(getUniformVars(this.compModule).length == 1){
                 entries.push({
                     binding,
                     resource: {
@@ -261,7 +261,7 @@ export class ComputePipeline extends AbstractPipeline {
                 binding++;
             }
 
-            if(this.compModule.readStorageVars().length == 1){
+            if(getReadStorageVars(this.compModule).length == 1){
                 entries.push({
                     binding,
                     resource: {
@@ -274,7 +274,7 @@ export class ComputePipeline extends AbstractPipeline {
                 binding++;
             }
 
-            if(this.compModule.writeStorageVars().length == 1){
+            if(getWriteStorageVars(this.compModule).length == 1){
                 entries.push({
                     binding,
                     resource: {
