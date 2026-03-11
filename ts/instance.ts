@@ -1,8 +1,8 @@
 import { msg, fetchText, sleep, assert, MyError, zip } from "@i18n";
+import { BufferUsage, ShaderType, Struct } from "./syntax"
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, makeMesh } from "./package.js";
-import { BufferUsage, ShaderType, Struct } from "./parser.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { initContext, g_device, number123 } from "./util.js";

@@ -1,9 +1,10 @@
 declare var glMatrix: any;
 
 import { Vec3, MyError, range, msg, assert } from "@i18n";
+import { Struct } from "./syntax"
 import { AbstractPipeline, ComputePipeline } from "./compute.js";
 import { ShapeInfo } from "./package.js";
-import { Module, Struct } from "./parser.js";
+import { Module } from "./parser.js";
 import { mat4fromMat3, ui3D } from "./ui.js";
 import { g_device, fetchModule, g_presentationFormat, makeShaderModule } from "./util.js";
 

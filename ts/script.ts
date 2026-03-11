@@ -1,6 +1,7 @@
 import { assert, fetchText, msg, MyError, unique } from "@i18n";
-import { lexicalAnalysis, Fn as Fn, Variable, BufferUsage, Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars } from "./parser";
-import { App, BlockStatement, CallStatement, ConstNum, Context, FncParser, indexOpr, RefVar, Statement, Str, Term, VariableDeclaration, WhileStatement } from "./parser-new";
+import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration } from "./syntax"
+import { lexicalAnalysis } from "./parser";
+import { Context, FncParser } from "./parser-new";
 import { ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
 import { makeShaderModule } from "./util";
