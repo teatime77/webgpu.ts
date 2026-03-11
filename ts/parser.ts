@@ -1,9 +1,7 @@
 import { assert, msg, MyError  } from "@i18n";
-import { Modifier, Struct, Type, Variable, Fn, Field, BufferUsage, ShaderType, isLetter, BufferReadWrite, SimpleType, ArrayType, Domain, RefVar, App, Term, indexOpr, ConstNum, Str, ReturnStatement, isAssignmentToken, BlockStatement, Statement, IfStatement, WhileStatement, ForStatement, ParallelStatement, VariableDeclaration, CallStatement } from "./syntax"
-import { Token, TokenSubType, TokenType, Module } from "./parser.js";
 import { error } from "./util.js";
-
-
+import { Token, TokenSubType, TokenType } from "./lex.js";
+import { Modifier, Struct, Type, Variable, Fn, Field, BufferUsage, ShaderType, BufferReadWrite, SimpleType, ArrayType, Domain, RefVar, App, Term, indexOpr, ConstNum, Str, ReturnStatement, isAssignmentToken, BlockStatement, Statement, IfStatement, WhileStatement, ForStatement, ParallelStatement, VariableDeclaration, CallStatement, Module } from "./syntax"
 
 function isRelationToken(text : string){
     return [ "==", "=", "!=", "<", ">", "<=", ">=", "in", "notin", "subset" ].includes(text);
@@ -18,7 +16,7 @@ export enum Context {
     Object
 }
 
-export class FncParser {
+export class Parser {
     tokenPos:number;
     tokens: Token[];
     token: Token;
@@ -949,3 +947,4 @@ export class FncParser {
         }
     }
 }
+

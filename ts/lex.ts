@@ -1,8 +1,4 @@
-import { assert, msg, MyError, sum, fetchText  } from "@i18n";
-import { BufferUsage, Fn, IDomain, isLetter, Struct, Variable } from "./syntax.js"
-import { FncParser } from "./parser-new.js";
-import { makeShaderModule, error, formatCode } from "./util.js";
-import { Script } from "./script.js";
+import { assert, msg  } from "@i18n";
 
 let unknownToken  = new Set();
 
@@ -129,6 +125,10 @@ const TypeName : string[] = [
     "sampler"
 ]
 
+export function isLetter(s : string) : boolean {
+    return s.length == 1 && ("a" <= s && s <= "z" || "A" <= s && s <= "Z");
+}
+
 function isDigit(s : string) : boolean {
     return s.length == 1 && "0123456789".indexOf(s) != -1;
 }
@@ -160,66 +160,6 @@ export class Token{
         this.subType = sub_type;
         this.text = text;
         this.charPos = char_pos;
-    }
-}
-
-export class Module implements IDomain {
-    name : string;
-    text : string;
-    structs : Struct[] = [];
-    vars : Variable[] = [];
-    fns : Fn[] = [];
-
-    constructor(name : string, text : string){
-        this.name = name;
-        this.text = text;
-
-        const tokens = lexicalAnalysis(text);
-
-        const parser = new FncParser(tokens, 0);
-        parser.parseSource();
-        [this.structs, this.vars, this.fns] = [parser.structs, parser.vars, parser.fns];
-
-        assert(this.fns.length == 1);
-        const main = this.fns[0];
-        switch(main.mod.fnType){
-        case "@compute":
-            break;
-        case "@vertex":
-            break;
-        case "@fragment":
-            break;
-        default:
-            throw new MyError();
-        }
-    }
-
-    dump(){
-        this.structs.forEach(x => x.dump());
-        this.vars.forEach(x => msg(`${x};`))
-        this.fns.forEach(x => msg(`${x}`))
-    }
-
-    getUniformVar() : Variable {
-        const uniform_var = this.vars.find(x => x.mod.usage == BufferUsage.uniform);
-        if(uniform_var == undefined){
-            throw new Error("no uniform var");
-        }
-
-        return uniform_var;;
-    }
-
-    uniformSize() : number {
-        const uniform_var = this.getUniformVar();
-
-        if(uniform_var.type instanceof Struct){
-
-            return uniform_var.type.size();
-        }
-        else{
-
-            throw new Error("no uniform type");
-        }
     }
 }
 
@@ -396,34 +336,3 @@ export function lexicalAnalysis(text : string) : Token[] {
 }
 
 const eotToken : Token = new Token(TokenType.eot, TokenSubType.unknown, "", -1);
-
-export async function parseAll(){
-    const shader_names = [
-        "arrow-comp",
-        "arrow-instance-vert",
-        "mesh-comp",
-        "mesh-instance-vert",
-        "phong-frag",
-        "line-vert",
-        "maxwell",
-        "compute",
-        "demo",
-        "depth-frag",
-        "point-vert",
-        "surface-vert",
-        "texture-frag",
-        "texture-vert",
-        "electric-field"
-    ];
-
-    for(const shader_name of shader_names){
-        msg(`\n------------------------------ ${shader_name}`);
-        const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
-        const module = new Module(shader_name, text);
-        const shaderModule = makeShaderModule(module.text);
-        // mod.dump();
-    }
-
-    const script = new Script();
-    await script.init();
-}

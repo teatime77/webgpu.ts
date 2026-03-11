@@ -1,5 +1,7 @@
 import { assert, msg, MyError, sum } from "@i18n";
 import { error, formatCode } from "./util";
+import { isLetter, lexicalAnalysis } from "./lex";
+import { Parser } from "./parser";
 
 export enum BufferUsage {
     unknown,
@@ -21,10 +23,6 @@ const predifined = new Set<string>([
 
 export function isAssignmentToken(text : string){
     return ["=", "+=", "-=", "*=", "/=", "%="].includes(text);
-}
-
-export function isLetter(s : string) : boolean {
-    return s.length == 1 && ("a" <= s && s <= "z" || "A" <= s && s <= "Z");
 }
 
 export function setParentSub(parent : AbstractSyntaxNode, ...args:(AbstractSyntaxNode | AbstractSyntaxNode[] | undefined)[]){
@@ -968,5 +966,66 @@ export class ParallelStatement extends Statement {
     getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
         getAllSub(alls, this.blocks);
+    }
+}
+
+
+export class Module implements IDomain {
+    name : string;
+    text : string;
+    structs : Struct[] = [];
+    vars : Variable[] = [];
+    fns : Fn[] = [];
+
+    constructor(name : string, text : string){
+        this.name = name;
+        this.text = text;
+
+        const tokens = lexicalAnalysis(text);
+
+        const parser = new Parser(tokens, 0);
+        parser.parseSource();
+        [this.structs, this.vars, this.fns] = [parser.structs, parser.vars, parser.fns];
+
+        assert(this.fns.length == 1);
+        const main = this.fns[0];
+        switch(main.mod.fnType){
+        case "@compute":
+            break;
+        case "@vertex":
+            break;
+        case "@fragment":
+            break;
+        default:
+            throw new MyError();
+        }
+    }
+
+    dump(){
+        this.structs.forEach(x => x.dump());
+        this.vars.forEach(x => msg(`${x};`))
+        this.fns.forEach(x => msg(`${x}`))
+    }
+
+    getUniformVar() : Variable {
+        const uniform_var = this.vars.find(x => x.mod.usage == BufferUsage.uniform);
+        if(uniform_var == undefined){
+            throw new Error("no uniform var");
+        }
+
+        return uniform_var;;
+    }
+
+    uniformSize() : number {
+        const uniform_var = this.getUniformVar();
+
+        if(uniform_var.type instanceof Struct){
+
+            return uniform_var.type.size();
+        }
+        else{
+
+            throw new Error("no uniform type");
+        }
     }
 }

@@ -1,10 +1,10 @@
 import { assert, fetchText, msg, MyError, unique } from "@i18n";
-import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration } from "./syntax"
-import { lexicalAnalysis } from "./parser";
-import { Context, FncParser } from "./parser-new";
+import { makeShaderModule } from "./util";
+import { lexicalAnalysis } from "./lex";
+import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module } from "./syntax"
+import { Context, Parser } from "./parser";
 import { ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
-import { makeShaderModule } from "./util";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -59,11 +59,11 @@ export class Script {
         const text = await fetchText(`./script/test.wgsl`);
         const tokens = lexicalAnalysis(text);
 
-        const parser = new FncParser(tokens, 0);
+        const parser = new Parser(tokens, 0);
         this.parseScript(parser);
     }
 
-    parseScript(parser : FncParser){
+    parseScript(parser : Parser){
         const ctx = Context.unknown;
 
         let domain = this.commonDomain;
@@ -143,4 +143,36 @@ export class Script {
 
         const module = makeShaderModule(compText);
     }
+}
+
+
+export async function parseAll(){
+    const shader_names = [
+        "arrow-comp",
+        "arrow-instance-vert",
+        "mesh-comp",
+        "mesh-instance-vert",
+        "phong-frag",
+        "line-vert",
+        "maxwell",
+        "compute",
+        "demo",
+        "depth-frag",
+        "point-vert",
+        "surface-vert",
+        "texture-frag",
+        "texture-vert",
+        "electric-field"
+    ];
+
+    for(const shader_name of shader_names){
+        msg(`\n------------------------------ ${shader_name}`);
+        const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
+        const module = new Module(shader_name, text);
+        const shaderModule = makeShaderModule(module.text);
+        // mod.dump();
+    }
+
+    const script = new Script();
+    await script.init();
 }

@@ -1,13 +1,10 @@
 declare var glMatrix: any;
 
 import { $div, assert, fetchText } from "@i18n";
-import { testGalois } from "@algebra"
 import { initEditor } from "./editor.js";
-import { Module, parseAll } from "./parser.js";
-import { asyncBodyOnLoadPackage, asyncBodyOnLoadTestAll, stopAnimation } from "./instance.js";
-import { asyncBodyOnLoadDemo } from "./demo.js";
-import { asyncBodyOnLoadCom } from "./compute.js";
-import { asyncBodyOnLoadTex } from "./texture.js";
+import { asyncBodyOnLoadTestAll, stopAnimation } from "./instance.js";
+import { Module } from "./syntax.js";
+import { parseAll } from "./script.js";
 
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;

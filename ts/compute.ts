@@ -1,8 +1,7 @@
 import { fetchText, range, assert, MyError, msg } from "@i18n";
-import { getReadStorageVars, Struct, getUniformVars, getWriteStorageVars } from "./syntax"
-import { Module } from "./parser.js";
-import { ui3D } from "./ui.js";
 import { makeShaderModule, g_device, fetchModule, number123 } from "./util.js";
+import { getReadStorageVars, Struct, getUniformVars, getWriteStorageVars, Module } from "./syntax"
+import { ui3D } from "./ui.js";
 
 export async function asyncBodyOnLoadCom() {
     const shader = await fetchText('./wgsl/compute.wgsl');
