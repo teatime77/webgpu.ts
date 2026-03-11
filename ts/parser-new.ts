@@ -46,34 +46,6 @@ export function getAllSub(alls: AbstractSyntaxNode[], ...args:(AbstractSyntaxNod
 
 }
 
-export class Rational{
-    numerator : number = 1;
-    denominator : number = 1;
-    parent : Term | null = null;
-
-    constructor(numerator : number, denominator : number = 1){
-        this.numerator = numerator;
-        this.denominator = denominator;
-    }
-
-
-    int() : number {
-        assert(this.denominator == 1);
-        return this.numerator;
-    }
-
-    toString() : string {
-        if(this.denominator == 1){
-
-            return `${this.numerator}`;
-        }
-        else{
-
-            return `${this.numerator} / ${this.denominator}`;
-        }
-    }
-}
-
 export abstract class AbstractSyntaxNode {
     static objCount = 0;
     objIdx : number;
@@ -104,12 +76,7 @@ export abstract class AbstractSyntaxNode {
 }
 
 export abstract class Term extends AbstractSyntaxNode {
-    // 係数
-    value : Rational = new Rational(1);
-
-    dumpTerm() : void {
-        throw new MyError();
-    }
+    sign : number = 1;
 
     isOperator() : boolean {
         return this instanceof App && this.precedence() != -1;
@@ -133,10 +100,25 @@ export abstract class Term extends AbstractSyntaxNode {
 
     int() : number {
         if(this instanceof ConstNum){
-            return this.value.int()
+            return this.int()
         }
         throw new MyError();
     }
+
+
+    abstract str() : string;
+
+    toString() : string {
+        const s = this.str();
+        if(this.sign == -1){
+
+            return `- ${s}`;
+        }
+        else{
+            return s;
+        }
+    }
+
 }
 
 export class Str extends Term{
@@ -147,11 +129,7 @@ export class Str extends Term{
         this.text = text;
     }
 
-    dumpTerm() : void {
-        msg(`pre-pare:${this.constructor.name}:${this.text}`);
-    }
-
-    toString() : string {
+    str() : string {
         return `"${this.text}"`;
     }
 }
@@ -190,11 +168,7 @@ export class RefVar extends Term{
         }
     }
 
-    dumpTerm() : void {
-        msg(`pre-pare:${this.constructor.name}:${this.name}`);
-    }
-
-    toString() : string {
+    str() : string {
         return this.name;
     }
 }
@@ -202,6 +176,7 @@ export class RefVar extends Term{
 
 export class ConstNum extends Term{
     text : string;
+    value : number;
 
     static zero() : ConstNum {
         return new ConstNum("0");
@@ -211,27 +186,26 @@ export class ConstNum extends Term{
         super();
         this.text = text;
 
-        let n : number;
-
         if(text[0] == "#"){
-            n = parseInt(text.substring(1), 16);
+            this.value = parseInt(text.substring(1), 16);
         }
         else{
-            n = parseFloat(text);
+            this.value = parseFloat(text);
         }
 
-        if(isNaN(n)){
+        if(isNaN(this.value)){
             throw new MyError();
         }
-
-        this.value = new Rational(n, 1);
     }
 
-    dumpTerm() : void {
-        msg(`pre-pare:${this.constructor.name}:${this.value}`);
+    int() : number {
+        if(Math.floor(this.value) == this.value){
+            return this.value;
+        }
+        throw new MyError();
     }
 
-    toString() : string {
+    str() : string {
         return this.text;
     }
 }
@@ -299,14 +273,7 @@ export class App extends Term{
         return -1;
     }
 
-    dumpTerm() : void {
-        msg(`pre-pare:${this.constructor.name}:${this.value}`);
-        this.fnc.dumpTerm();
-        this.args.forEach(x => x.dumpTerm());
-    }
-
-
-    toString() : string {
+    str() : string {
         const args = this.args.map(x => x.toString());
         
         let text : string;
@@ -319,16 +286,24 @@ export class App extends Term{
             const args_s = args.join(", ");
             text = `${this.fncName}(${args_s})`;
         }
-        else{
+        else if(this.fncName == "+"){
+            text = "";
+            for(const [i, s] of args.entries()){
+                if(this.args[i].sign == -1){
+                    text += ` ${s}`;
+                }
+                else if(i == 0){
 
+                    text += `${s}`;
+                }
+                else{
+
+                    text += ` + ${s}`;
+                }
+            }
+        }
+        else{
             switch(this.fncName){
-                case "+":
-                    switch(args.length){
-                    case 0: return " +[] ";
-                    case 1: return ` +[${args[0]}] `;
-                    }
-                    break
-    
                 case "/":
                     if(this.args.length != 2){
                         throw new MyError();
@@ -363,10 +338,6 @@ export class App extends Term{
 
 
 export abstract class Statement extends AbstractSyntaxNode {
-    dumpStatement() : void {
-        throw new MyError();
-    }
-
     isAssignmentCall() : boolean {
         return this instanceof CallStatement && this.app.isAssignmentApp();
     }
@@ -384,10 +355,6 @@ export class VariableDeclaration extends Statement {
     setParent(parent : AbstractSyntaxNode){
         super.setParent(parent);
         setParentSub(this, this.variable);
-    }
-
-    dumpStatement() : void {
-        msg(`pre-pare:${this.constructor.name}`);
     }
 
     getAll(alls: AbstractSyntaxNode[]) : void{ 
@@ -411,11 +378,6 @@ export class CallStatement extends Statement {
     setParent(parent : AbstractSyntaxNode){
         super.setParent(parent);
         setParentSub(this, this.app);
-    }
-
-    dumpStatement() : void {
-        msg(`pre-pare:${this.constructor.name}:${this.app}`);
-        this.app.dumpTerm();
     }
 
     getAll(alls: AbstractSyntaxNode[]) : void{  
@@ -481,11 +443,6 @@ export class BlockStatement extends Statement {
         return decl == undefined ? undefined : decl.variable;
     }
 
-    dumpStatement() : void {
-        msg(`pre-pare:${this.constructor.name}`);
-        this.statements.forEach(x => x.dumpStatement());
-    }
-
     getAll(alls: AbstractSyntaxNode[]) : void{  
         alls.push(this);
         getAllSub(alls, this.statements);
@@ -548,12 +505,6 @@ export class WhileStatement extends Statement {
     setParent(parent : AbstractSyntaxNode){
         super.setParent(parent);
         setParentSub(this, this.condition, this.block);
-    }
-
-    dumpStatement() : void {
-        msg(`pre-pare:${this.constructor.name}`);
-        this.condition.dumpTerm();
-        this.block.dumpStatement();
     }
 
     getAll(alls: AbstractSyntaxNode[]) : void{        
@@ -1096,7 +1047,7 @@ export class FncParser {
             const t1 = this.PowerExpression(ctx);
 
             // 符号を反転します。
-            t1.value.numerator *= -1;
+            t1.sign *= -1;
 
             return t1;
         }
@@ -1172,7 +1123,7 @@ export class FncParser {
 
                 const trm2 = this.MultiplicativeExpression(ctx);
                 if(opr == "-"){
-                    trm2.value.numerator *= -1;
+                    trm2.sign *= -1;
                 }
 
                 app.addArgs(trm2);

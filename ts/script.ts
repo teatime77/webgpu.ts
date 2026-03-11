@@ -142,40 +142,4 @@ export class Script {
 
         const module = makeShaderModule(compText);
     }
-
-
-    prepareTerm(term : Term){
-        if(term instanceof Str){
-            
-        }
-        else if(term instanceof ConstNum){
-
-        }
-        else if(term instanceof RefVar){
-
-        }
-        else if(term instanceof App){
-            this.prepareTerm(term.fnc);
-            term.args.forEach(x => this.prepareTerm(x));
-        }
-        else{
-            throw new MyError();
-        }
-    }
-
-    prepareStatement(stmt : Statement){
-        if(stmt instanceof VariableDeclaration){
-
-        }
-        else if(stmt instanceof BlockStatement){
-            stmt.statements.forEach(x => this.prepareStatement(x));
-        }
-        else if(stmt instanceof WhileStatement){
-            this.prepareTerm(stmt.condition);
-            this.prepareStatement(stmt.block);
-        }
-        else if(stmt instanceof CallStatement){
-
-        }
-    }
 }

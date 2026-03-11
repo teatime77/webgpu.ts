@@ -326,13 +326,13 @@ export function lexicalAnalysis(text : string) : Token[] {
                 token_type = TokenType.identifier;
             }
         }
-        else if (isDigit(ch1)) {
+        else if (isDigit(ch1) || ch1 == "-" && isDigit(ch2)) {
             // 数字の場合
 
             token_type = TokenType.Number;
 
             // 10進数の終わりを探します。
-            for (; pos < text.length && isDigit(text[pos]); pos++);
+            for (pos++; pos < text.length && isDigit(text[pos]); pos++);
 
             if (pos < text.length && text[pos] == '.') {
                 // 小数点の場合
