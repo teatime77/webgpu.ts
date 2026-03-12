@@ -1,4 +1,5 @@
-import { Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
+import { ComputePipeline } from "./compute.js";
+import { CalcRenderPipeline, ComputeRenderPipeline, Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
 
 class ComputeInfo {
     compName!    : string;
@@ -20,19 +21,25 @@ export class Package {
     shapes   : ShapeInfo[] | undefined;
 }
 
-export function makeMesh(shape : ShapeInfo) : RenderPipeline[] {
+export function makeComputeRenderPipeline(compute  : ComputePipeline, shape : ShapeInfo) : ComputeRenderPipeline[] {
     switch(shape.type){
-        case "Rect"  : return [new Rect(shape)];
-        case "Cone"  : return [new Cone(shape)];
-        case "Tube"  : return [new Tube(shape)];
-        case "Cube"  : return [new Cube(shape)];
-        case "Disc"  : return [new Disc(shape)];
-        case "Point" : return [new Point(shape)];
-        case "Line"  : return [new Line(shape)];
-        case "arrow" : return makeArrow(shape);
-        case "GeodesicPolyhedron" : return [new GeodesicPolyhedron(shape)];
-        case "Surface": return [new Surface(shape)];
+        case "Rect"  : return [new Rect(compute, shape)];
+        case "Cone"  : return [new Cone(compute, shape)];
+        case "Tube"  : return [new Tube(compute, shape)];
+        case "Cube"  : return [new Cube(compute, shape)];
+        case "Disc"  : return [new Disc(compute, shape)];
+        case "arrow" : return makeArrow(compute, shape);
+        case "GeodesicPolyhedron" : return [new GeodesicPolyhedron(compute, shape)];
     }
     
+    throw Error("shape info");
+}
+
+export function makeCalcRenderPipeline(shape : ShapeInfo) : CalcRenderPipeline[] {
+    switch(shape.type){
+        case "Point" : return [new Point(shape)];
+        case "Line"  : return [new Line(shape)];
+        case "Surface": return [new Surface(shape)];
+    }
     throw Error("shape info");
 }

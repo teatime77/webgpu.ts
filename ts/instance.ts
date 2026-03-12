@@ -3,7 +3,7 @@ import { initContext, g_device, number123 } from "./util.js";
 import { BufferUsage, ShaderType, Struct } from "./syntax"
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
-import { Package, makeMesh } from "./package.js";
+import { Package, makeCalcRenderPipeline, makeComputeRenderPipeline } from "./package.js";
 import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { asyncBodyOnLoadDemo } from "./demo.js";
@@ -87,13 +87,12 @@ class Run {
 
         ui3D.setEnv();
 
-        const bindGroupIdx = this.tick % 2;
         for(const comp of this.comps){
             comp.writeUniform();
 
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(comp.pipeline);
-            passEncoder.setBindGroup(0, comp.bindGroups[bindGroupIdx]);
+            passEncoder.setBindGroup(0, comp.bindGroups[0]);
             if(comp.workgroupCounts != null){
 
                 const v = comp.workgroupCounts;
@@ -118,12 +117,15 @@ class Run {
 
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
-            this.meshes.forEach(mesh => mesh.render(this.tick, bindGroupIdx, passEncoder));
+            this.meshes.forEach(mesh => mesh.render(passEncoder));
 
             passEncoder.end();
         }
 
         g_device.queue.submit([commandEncoder.finish()]);
+
+        [this.comps, this.meshes].flat().forEach(x => x.swapBindGroups());
+
         ++this.tick;
 
         requestId = requestAnimationFrame(this.frame.bind(this));
@@ -196,15 +198,14 @@ export async function asyncBodyOnLoadPackage(package_name : string){
                 comp.workgroupCounts = workgroupCounts as number123;
                 msg(`workgroup-Counts ${comp.workgroupCounts}`);
             
-                const comp_meshes = info.shapes.map(shape => makeMesh(shape)).flat();
-                comp_meshes.forEach(x => x.compute = comp);
+                const comp_meshes = info.shapes.map(shape => makeComputeRenderPipeline(comp, shape)).flat();
 
                 meshes = meshes.concat(comp_meshes);
             }
         }
 
         if(pkg.shapes != undefined){
-            const pkg_meshes = pkg.shapes.map(shape => makeMesh(shape)).flat();
+            const pkg_meshes = pkg.shapes.map(shape => makeCalcRenderPipeline(shape)).flat();
             meshes = meshes.concat(pkg_meshes);
         }
         

@@ -109,7 +109,7 @@ export async function asyncBodyOnLoadCom() {
 
 export abstract class AbstractPipeline {
     bindGroupLayout!: GPUBindGroupLayout;
-    bindGroups    : GPUBindGroup[] = new Array(2);
+    bindGroups    : GPUBindGroup[] = [];
     uniformBuffer! : GPUBuffer;
 
     constructor(){
@@ -142,6 +142,14 @@ export abstract class AbstractPipeline {
         g_device.queue.writeBuffer(this.uniformBuffer, offset, buffer);
 
         return offset + 4;
+    }
+
+    swapBindGroups(){
+        if(this.bindGroups.length == 2){
+            const tmp = this.bindGroups[0];
+            this.bindGroups[0] = this.bindGroups[1];
+            this.bindGroups[1] = tmp;
+        }
     }
 }
 

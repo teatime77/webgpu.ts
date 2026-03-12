@@ -107,8 +107,7 @@ class Triangle {
     }
 }
 
-
-export class RenderPipeline extends AbstractPipeline {
+export abstract class RenderPipeline extends AbstractPipeline {
     vertName : string;
     fragName : string
 
@@ -120,8 +119,6 @@ export class RenderPipeline extends AbstractPipeline {
 
     materialColor = new Float32Array([1.0, 1.0, 1.0, 1.0]);
     shapeInfo     = new Float32Array([0,0,0,0]);
-
-    compute  : ComputePipeline | null = null;
 
     pipeline!         : GPURenderPipeline;
     vertModule!       : Module;
@@ -165,38 +162,7 @@ export class RenderPipeline extends AbstractPipeline {
         return uniform_buffer_size;
     }
 
-    makeBindGroup(){
-        for (let i = 0; i < 2; ++i){
-            this.bindGroups[i] = g_device.createBindGroup({
-                layout: this.bindGroupLayout,
-                entries: [
-                    {
-                        binding: 0,
-                        resource: {
-                            buffer: this.uniformBuffer,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        resource: {
-                            buffer: this.compute!.updateBuffers[(i + 1) % 2],
-                            offset: 0,
-                            size: this.compute!.instanceArray.byteLength,
-                        },
-                    },
-                    {
-                        binding: 2,
-                        resource: {
-                            buffer: this.vertexBuffer,
-                            offset: 0,
-                            size: this.vertexArray2.byteLength,
-                        },
-                    },
-                ],
-            });
-
-        }
-    }
+    abstract makeBindGroup() : void;
 
     makeVertexBuffer(){
         assert(this.vertexCount * 6 == this.vertexArray.length);
@@ -361,30 +327,54 @@ export class RenderPipeline extends AbstractPipeline {
         }
     }
     
-    render(tick : number, bindGroupIdx : number, passEncoder : GPURenderPassEncoder){
+    abstract render(passEncoder : GPURenderPassEncoder) : void;
+}
+
+export class ComputeRenderPipeline extends RenderPipeline {
+    compute  : ComputePipeline;
+
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(shape);
+        this.compute = compute;
+    }
+
+    makeBindGroup() : void {
+        for (let i = 0; i < 2; ++i){
+            this.bindGroups[i] = g_device.createBindGroup({
+                layout: this.bindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: this.uniformBuffer,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: {
+                            buffer: this.compute.updateBuffers[(i + 1) % 2],
+                            offset: 0,
+                            size: this.compute.instanceArray.byteLength,
+                        },
+                    },
+                    {
+                        binding: 2,
+                        resource: {
+                            buffer: this.vertexBuffer,
+                            offset: 0,
+                            size: this.vertexArray2.byteLength,
+                        },
+                    },
+                ],
+            });
+
+        }
+    }
+
+    render(passEncoder : GPURenderPassEncoder) : void {
         passEncoder.setPipeline(this.pipeline);
-        if(this instanceof Point){
-            passEncoder.setBindGroup(0, this.bindGroups[0]);
-
-            passEncoder.draw(this.vertexCount);
-        }
-        else if(this instanceof CalcRenderPipeline){
-            passEncoder.setBindGroup(0, this.bindGroups[0]);
-
-            passEncoder.draw(this.vertexCount, this.renderInstanceCount);
-        }
-        else{
-            passEncoder.setBindGroup(0, this.bindGroups[bindGroupIdx]);
-
-            if(this.compute != null){
-
-                passEncoder.draw(this.vertexCount, this.compute.instanceCount);
-            }
-            else{
-
-                passEncoder.draw(this.vertexCount);
-            }
-        }
+        passEncoder.setBindGroup(0, this.bindGroups[0]);
+        passEncoder.draw(this.vertexCount, this.compute.instanceCount);
     }
 }
 
@@ -451,8 +441,8 @@ export class CalcRenderPipeline extends RenderPipeline {
         });
     }
 
-    makeBindGroup(){
-        this.bindGroups[0] = g_device.createBindGroup({
+    makeBindGroup() : void {
+        const bindGroup = g_device.createBindGroup({
             layout: this.bindGroupLayout,
             entries: [
                 {
@@ -463,6 +453,14 @@ export class CalcRenderPipeline extends RenderPipeline {
                 }
             ],
         });
+
+        this.bindGroups = [bindGroup];
+    }
+    
+    render(passEncoder : GPURenderPassEncoder) : void {
+        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setBindGroup(0, this.bindGroups[0]);
+        passEncoder.draw(this.vertexCount, this.renderInstanceCount);
     }
 }
 
@@ -486,6 +484,12 @@ export class Point extends CalcRenderPipeline {
 
         this.topology = 'point-list';
     }
+    
+    render(passEncoder : GPURenderPassEncoder) : void {
+        passEncoder.setPipeline(this.pipeline);
+        passEncoder.setBindGroup(0, this.bindGroups[0]);
+        passEncoder.draw(this.vertexCount);
+    }
 }
 
 
@@ -499,9 +503,9 @@ export class Line extends CalcRenderPipeline {
     }
 }
 
-export class Tube extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class Tube extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
         const num_division = 16;
         
         this.vertexCount = (num_division + 1) * 2;
@@ -526,9 +530,9 @@ export class Tube extends RenderPipeline {
     }
 }
 
-export class Cube extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class Cube extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
 
         // position: vec3<f32>, norm: vec3<f32>
         // prettier-ignore
@@ -583,9 +587,9 @@ export class Cube extends RenderPipeline {
 
 
 
-export class Rect extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class Rect extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
 
         const num_triangles = 2;
 
@@ -625,9 +629,9 @@ export class Rect extends RenderPipeline {
 
 
 
-export class Disc extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class Disc extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
 
         const num_division = 16;
 
@@ -675,9 +679,9 @@ export class Disc extends RenderPipeline {
     }
 }
 
-export class Cone extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class Cone extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
 
         const num_division = 16;
 
@@ -752,38 +756,38 @@ export class Cone extends RenderPipeline {
 }
 
 
-export class CompositeRenderPipeline extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class CompositeRenderPipeline extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
     }
 }
 
 export class Axis extends CompositeRenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
     }
 }
 
-export function makeArrow(shape : ShapeInfo) : RenderPipeline[] {
+export function makeArrow(compute  : ComputePipeline, shape : ShapeInfo) : ComputeRenderPipeline[] {
 
-    const disc1 = new Disc(shape);
+    const disc1 = new Disc(compute, shape);
     disc1.shapeInfo  = new Float32Array([ 1, 1, 0, 0]);
 
-    const disc2 = new Disc(shape);
+    const disc2 = new Disc(compute, shape);
     disc2.shapeInfo  = new Float32Array([ 1, 2, 0, 0]);
     
-    const tube  = new Tube(shape);
+    const tube  = new Tube(compute, shape);
     tube.shapeInfo   = new Float32Array([ 1, 3, 0, 0]);
     
-    const cone  = new Cone(shape);
+    const cone  = new Cone(compute, shape);
     cone.shapeInfo   = new Float32Array([ 1, 4, 0, 0]);
 
     return [ disc1, tube, disc2, cone ];
 }
 
-export class GeodesicPolyhedron extends RenderPipeline {
-    constructor(shape : ShapeInfo){
-        super(shape);
+export class GeodesicPolyhedron extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);
 
         this.topology = 'triangle-list';
 
