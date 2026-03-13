@@ -451,15 +451,21 @@ export class Parser {
                 return new RefVar("arrow");
             }
             else{
-                const cmTerm = new App(operator(","), terms);
+                let trm2 : Term;
+                if(terms.length == 1){
+                    trm2 = terms[0];
+                }
+                else{
+                    trm2 = new App(operator(","), terms);
+                }
 
                 if(this.current() == "."){
                     this.nextToken(".");
                     const id = this.readId(ctx);
-                    return new App(operator("."), [cmTerm, id]);
+                    return new App(operator("."), [trm2, id]);
                 }
                 else{
-                    return cmTerm;
+                    return trm2;
                 }
             }
         }
@@ -513,59 +519,25 @@ export class Parser {
         }
     }
 
-    
-    DivExpression(ctx : Context) : Term {
-        let trm1 = this.UnaryExpression(ctx);
-        while(this.token.text == "/" || this.token.text == "%"){
-            let app = new App(operator(this.token.text), [trm1]);
-            this.next();
-
-            while(true){
-                let trm2 = this.
-                UnaryExpression(ctx);
-                app.args.push(trm2);
-                
-                if(this.token.text == app.fncName){
-                    this.next();
-                }
-                else{
-                    trm1 = app;
-                    break;
-                }
-            }
-        }
-    
-        return trm1;
-    }
-
-    
     MultiplicativeExpression(ctx : Context) : Term {
-        let trm1 = this.DivExpression(ctx);
-        if(this.current() != "*"){
+        let trm1 = this.UnaryExpression(ctx);
+        if(! ["*", "/", "%"].includes(this.current())){
             return trm1;
         }
 
-        while(this.current() == "*"){
-            let app = new App(operator(this.token.text), [trm1]);
-            this.next();
+        let app = new App(operator(this.token.text), [trm1]);
 
-            while(true){
-                let trm2 = this.DivExpression(ctx);
-                app.args.push(trm2);
-                
-                if(this.token.text == app.fncName){
-                    this.next();
-                }
-                else{
-                    trm1 = app;
-                    break;
-                }
+        while(["*", "/", "%"].includes(this.current())){
+            if(app.fncName != this.current()){
+                app = new App(operator(this.current()), [app]);
             }
+            this.next();
+            app.addArgs(this.UnaryExpression(ctx));
         }
     
-        return trm1;
+        return app;
     }
-    
+
     AdditiveExpression(ctx : Context) : Term {
         const trm1 = this.MultiplicativeExpression(ctx);
 

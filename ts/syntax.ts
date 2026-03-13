@@ -676,6 +676,7 @@ export class App extends Term{
 
         case "*": 
         case "/": 
+        case "%": 
             return 1;
 
         case "+": 
@@ -731,8 +732,12 @@ export class App extends Term{
             text = args.join(` ${this.fncName} `);
         }
 
+        assert(this.parent != undefined);
         if(this.isOperator() && this.parent instanceof App && this.parent.isOperator()){
-            if(this.parent.precedence() <= this.precedence()){
+            if(this.fncName == "*" && this.parent.fncName == "/" && this.parent.args[0] == this){                
+                // 乗算が被除数の場合
+            }
+            else if(this.parent.precedence() <= this.precedence()){
                 return `(${text})`;
             }            
         }
