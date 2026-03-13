@@ -27,11 +27,9 @@ export function getColor(name : string){
     return glMatrix.vec4.fromValues(rgb[0], rgb[1], rgb[2], 1.0);
 }
 
-export async function fetchModule(shader_name: string) : Promise<Module> {
+export async function fetchShaderText(shader_name: string) : Promise<string> {
     const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
-    const module = new Module(shader_name, text);
-
-    return module;
+    return text;
 }
 
 export function formatCode(test:string) : string {

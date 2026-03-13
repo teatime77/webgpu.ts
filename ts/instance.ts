@@ -1,10 +1,10 @@
 import { msg, fetchText, sleep, assert, MyError, zip } from "@i18n";
-import { initContext, g_device, number123 } from "./util.js";
+import { initContext, g_device, number123, fetchShaderText } from "./util.js";
 import { BufferUsage, ShaderType, Struct } from "./syntax"
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
-import { Package, makeCalcRenderPipeline, makeComputeRenderPipeline } from "./package.js";
-import { CalcRenderPipeline, RenderPipeline } from "./primitive.js";
+import { Package, ShapeInfo, makeCalcRenderPipeline, makeComputeRenderPipeline } from "./package.js";
+import { CalcRenderPipeline, ComputeRenderPipeline, RenderPipeline } from "./primitive.js";
 import { initUI3D, ui3D } from "./ui.js";
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
@@ -141,7 +141,7 @@ export function stopAnimation(){
     }
 }
 
-async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[]){
+export async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[]){
     stopAnimation();
     validFrame = false;
 
@@ -149,6 +149,44 @@ async function startAnimation(comps : ComputePipeline[], meshes: RenderPipeline[
     await run.init(comps, meshes);
     validFrame = true;
     requestId = requestAnimationFrame(run.frame.bind(run));
+}
+
+export function makeComputeRenderPipelines(compShaderText : string, globalGrid : number[], shapes: ShapeInfo[]) : [ComputePipeline, ComputeRenderPipeline[]]{
+    assert(globalGrid != undefined);
+
+    const comp = new ComputePipeline(compShaderText);
+    if(comp.compModule == undefined || comp.compModule.vars == undefined){
+        throw new MyError();
+    }
+
+    const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage);
+    assert(storages.length != 0);
+    assert(storages.every(x => x.type instanceof ShaderType && x.type.elementType instanceof Struct));
+    const elementTypeSizes = storages.map(x => (x.type as ShaderType).elementType.size());
+    elementTypeSizes.every(x => x == elementTypeSizes[0]);
+    const instance_size  = elementTypeSizes[0] / 4;
+
+    comp.instanceCount = globalGrid.reduce((acc, cur) => acc * cur, 1);
+    msg(`instance-Count:${comp.instanceCount}`);
+
+    comp.instanceArray = new Float32Array(comp.instanceCount * instance_size);
+
+    const workgroupSize = comp.compModule.fns[0].mod.workgroup_size!;
+    console.log("workgroup-size", workgroupSize);
+    assert(workgroupSize != undefined)
+
+    assert(workgroupSize.length == globalGrid.length);
+
+    const workgroupCounts = Array.from( zip(globalGrid, workgroupSize).map(([i,a,b])=> a / b) );
+    assert(zip(workgroupCounts, workgroupSize).every(([i,a,b]) => a * b == (globalGrid as number[])[i]));
+
+    comp.workgroupCounts = workgroupCounts as number123;
+    msg(`workgroup-Counts ${comp.workgroupCounts}`);
+
+    const comp_meshes = shapes.map(shape => makeComputeRenderPipeline(comp, shape)).flat();
+
+    return [comp, comp_meshes];
+
 }
 
 export async function asyncBodyOnLoadPackage(package_name : string){
@@ -163,43 +201,10 @@ export async function asyncBodyOnLoadPackage(package_name : string){
 
         if(pkg.computes != undefined){
             for(const info of pkg.computes){
+                const compShaderText = await fetchShaderText(info.compName);
 
-                const comp = new ComputePipeline(info.compName);
-                await comp.makeComputePipeline();
-                if(comp.compModule == undefined || comp.compModule.vars == undefined){
-                    throw new MyError();
-                }
-
-                const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage);
-                assert(storages.length != 0);
-                assert(storages.every(x => x.type instanceof ShaderType && x.type.elementType instanceof Struct));
-                const elementTypeSizes = storages.map(x => (x.type as ShaderType).elementType.size());
-                elementTypeSizes.every(x => x == elementTypeSizes[0]);
-                const instance_size  = elementTypeSizes[0] / 4;
-
-                assert(info.globalGrid != undefined);
-
-                comp.instanceCount = info.globalGrid.reduce((acc, cur) => acc * cur, 1);
-                msg(`instance-Count:${comp.instanceCount}`);
-
-                comp.instanceArray = new Float32Array(comp.instanceCount * instance_size);
-
+                const [comp, comp_meshes] = makeComputeRenderPipelines(compShaderText, info.globalGrid, info.shapes);
                 comps.push(comp);
-
-                const workgroupSize = comp.compModule.fns[0].mod.workgroup_size!;
-                console.log("workgroup-size", workgroupSize);
-                assert(workgroupSize != undefined)
-
-                assert(workgroupSize.length == info.globalGrid!.length);
-
-                const workgroupCounts = Array.from( zip(info.globalGrid, workgroupSize).map(([i,a,b])=> a / b) );
-                assert(zip(workgroupCounts, workgroupSize).every(([i,a,b]) => a * b == (info.globalGrid as number[])[i]));
-
-                comp.workgroupCounts = workgroupCounts as number123;
-                msg(`workgroup-Counts ${comp.workgroupCounts}`);
-            
-                const comp_meshes = info.shapes.map(shape => makeComputeRenderPipeline(comp, shape)).flat();
-
                 meshes = meshes.concat(comp_meshes);
             }
         }

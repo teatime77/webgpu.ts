@@ -8,12 +8,12 @@ class ComputeInfo {
 }
 
 export class ShapeInfo {
-    type!    : string;
-    scale    : [ number, number, number ] | undefined;
-    position : [ number, number, number ] | undefined;
-    gridSize : number[] | undefined;
-    vertName : string | undefined = undefined;
-    fragName : string | undefined = undefined;
+    type!     : string;
+    scale?    : [ number, number, number ] | undefined;
+    position? : [ number, number, number ] | undefined;
+    gridSize? : number[] | undefined;
+    vertName  : string | undefined = undefined;
+    fragName  : string | undefined = undefined;
 }
 
 export class Package {

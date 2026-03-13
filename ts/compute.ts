@@ -1,5 +1,5 @@
 import { fetchText, range, assert, MyError, msg } from "@i18n";
-import { makeShaderModule, g_device, fetchModule, number123 } from "./util.js";
+import { makeShaderModule, g_device, fetchShaderText, number123 } from "./util.js";
 import { getReadStorageVars, Struct, getUniformVars, getWriteStorageVars, Module } from "./syntax"
 import { ui3D } from "./ui.js";
 
@@ -35,9 +35,8 @@ export async function asyncBodyOnLoadCom() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
 
-    const comp = new ComputePipeline("compute");
-
-    await comp.makeComputePipeline();
+    const compShaderText = await fetchShaderText("compute");
+    const comp = new ComputePipeline(compShaderText);
 
     // ComputePipelineを生成
 
@@ -154,7 +153,6 @@ export abstract class AbstractPipeline {
 }
 
 export class ComputePipeline extends AbstractPipeline {
-    compName : string;
     globalGrid : number | [number, number] | [number, number, number] | undefined;
     instanceArray! : Float32Array;
     instanceCount! : number;
@@ -164,18 +162,9 @@ export class ComputePipeline extends AbstractPipeline {
     compModule!   : Module;
     updateBuffers : GPUBuffer[] = [];
 
-    constructor(comp_name : string){
+    constructor(shaderText : string){
         super();
-        this.compName = comp_name;
-    }
-
-    async initCompute(){
-        this.makeUniformBuffer();
-        this.makeUpdateBuffers();
-    }
-
-    async makeComputePipeline(){
-        this.compModule = await fetchModule(this.compName);
+        this.compModule  = new Module(shaderText);
 
         let binding = 0;
         const entries : GPUBindGroupLayoutEntry[] = [];
@@ -228,6 +217,11 @@ export class ComputePipeline extends AbstractPipeline {
                 entryPoint: 'main'
             }
         });
+    }
+
+    async initCompute(){
+        this.makeUniformBuffer();
+        this.makeUpdateBuffers();
     }
 
     makeUpdateBuffers(){

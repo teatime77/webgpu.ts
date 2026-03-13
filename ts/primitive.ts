@@ -1,7 +1,7 @@
 declare var glMatrix: any;
 
 import { Vec3, MyError, range, assert } from "@i18n";
-import { g_device, fetchModule, g_presentationFormat, makeShaderModule } from "./util.js";
+import { g_device, fetchShaderText, g_presentationFormat, makeShaderModule } from "./util.js";
 import { Struct, Module } from "./syntax"
 import { AbstractPipeline, ComputePipeline } from "./compute.js";
 import { ShapeInfo } from "./package.js";
@@ -193,8 +193,11 @@ export abstract class RenderPipeline extends AbstractPipeline {
     }
 
     async makeRenderPipeline(){
-        this.vertModule = await fetchModule(this.vertName);
-        this.fragModule = await fetchModule(this.fragName);
+        const vertShaderText = await fetchShaderText(this.vertName);
+        this.vertModule = new Module(vertShaderText);
+
+        const fragWhaderText = await fetchShaderText(this.fragName);
+        this.fragModule = new Module(fragWhaderText);
 
         if(this instanceof CalcRenderPipeline){
             await this.makeCalcRenderPipeline();

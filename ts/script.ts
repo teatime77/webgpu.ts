@@ -1,10 +1,12 @@
 import { assert, fetchText, msg, MyError, unique } from "@i18n";
 import { makeShaderModule } from "./util";
 import { lexicalAnalysis } from "./lex";
-import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module } from "./syntax"
+import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module, ConstNum } from "./syntax"
 import { Context, Parser } from "./parser";
 import { ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
+import { makeComputeRenderPipelines, startAnimation } from "./instance";
+import { ShapeInfo } from "./package";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -44,6 +46,7 @@ export class Script {
     commonDomain : Domain;
     cpuDomain    : Domain;
     gpuDomain    : Domain;
+    compShaderText! : string;
 
     comps : ComputePipeline[] = [];
     meshes: RenderPipeline[] = [];
@@ -61,6 +64,8 @@ export class Script {
 
         const parser = new Parser(tokens, 0);
         this.parseScript(parser);
+        this.prepare();
+        await this.startScript();
     }
 
     parseScript(parser : Parser){
@@ -95,7 +100,9 @@ export class Script {
                 }
             }
         }
+    }
 
+    prepare(){
         for(const domain of [this.commonDomain, this.cpuDomain, this.gpuDomain]){            
             domain.setParent();
             const alls = domain.getAllInDomain();
@@ -128,20 +135,38 @@ export class Script {
             va.mod.group = 0;
             va.mod.binding = binding;
             binding++;
-        }
+        }       
 
         msg("---------------------------------------- CPU");
         msg(`cpu domain:${this.cpuDomain}`);
         msg("---------------------------------------- Common");
 
-        const compText = 
+        this.compShaderText = 
               `${this.commonDomain}` 
             + "\n//" + "-".repeat(50) + " GPU\n"
             + `${this.gpuDomain}`;
 
-        msg(`${compText}`);
+        msg(`${this.compShaderText}`);
+    }
 
-        const module = makeShaderModule(compText);
+    async startScript(){
+        const gridSizeVar = this.commonDomain.vars.find(x => x.name == "gridSize");
+        if(gridSizeVar == undefined || !(gridSizeVar.initializer instanceof ConstNum)) throw new MyError();
+        const gridSize = gridSizeVar.initializer.int();
+        const globalGrid = [gridSize];
+        msg(`grid-size:${gridSize}`);
+
+        const shapes : ShapeInfo[] = [
+            {
+                "type" : "Tube",
+                "vertName" : "mesh-instance-vert",
+                "fragName" : "phong-frag"
+            }
+        ]
+
+        const [comp, comp_meshes] = makeComputeRenderPipelines(this.compShaderText, globalGrid, shapes);
+        const comps : ComputePipeline[] = [comp];
+        await startAnimation(comps, comp_meshes);
     }
 }
 
@@ -168,7 +193,7 @@ export async function parseAll(){
     for(const shader_name of shader_names){
         msg(`\n------------------------------ ${shader_name}`);
         const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
-        const module = new Module(shader_name, text);
+        const module = new Module(text);
         const shaderModule = makeShaderModule(module.text);
         // mod.dump();
     }

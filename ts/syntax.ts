@@ -971,14 +971,12 @@ export class ParallelStatement extends Statement {
 
 
 export class Module implements IDomain {
-    name : string;
     text : string;
     structs : Struct[] = [];
     vars : Variable[] = [];
     fns : Fn[] = [];
 
-    constructor(name : string, text : string){
-        this.name = name;
+    constructor(text : string){
         this.text = text;
 
         const tokens = lexicalAnalysis(text);
