@@ -76,8 +76,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var x   = r * cos(phi);
         var y   = r * sin(phi);
 
-        particlesB[index].position = 24.0 * vec4<f32>(x, y, z, 1.0);
-        particlesB[index].scale    = vec4<f32>(4.0, 4.0, 4.0, 1.0);
+        particlesB[index].position = 4.0 * vec4<f32>(x, y, z, 1.0);
+        particlesB[index].scale    = vec4<f32>(1.0, 1.0, 1.0, 1.0);
         particlesB[index].color    = rgba(theta);
     }
     else{

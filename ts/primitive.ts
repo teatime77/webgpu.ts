@@ -1,6 +1,6 @@
 declare var glMatrix: any;
 
-import { Vec3, MyError, range, assert } from "@i18n";
+import { Vec3, MyError, range, assert, msg } from "@i18n";
 import { g_device, fetchShaderText, g_presentationFormat, makeShaderModule } from "./util.js";
 import { Struct, Module } from "./syntax"
 import { AbstractPipeline, ComputePipeline } from "./compute.js";
@@ -525,7 +525,7 @@ export class Tube extends ComputeRenderPipeline {
             for(const z of [0, 1]){
 
                 setPosNorm(this.vertexArray, base, x, y, z, x, y, 0);
-                base++;
+                base += 3 + 3;
             }
         }
     
@@ -1033,9 +1033,7 @@ function divideTriangle(points1: Vertex[], triangles: Triangle[], sphere_r: numb
     return [ points2, triangles, edges ];
 }
 
-function setPosNorm(v : Float32Array, idx : number, x : number, y : number, z : number, nx : number, ny : number, nz : number){
-    const base = idx * (3 + 3);
-
+function setPosNorm(v : Float32Array, base : number, x : number, y : number, z : number, nx : number, ny : number, nz : number){
     v[base    ] = x;
     v[base + 1] = y;
     v[base + 2] = z;

@@ -36,7 +36,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       var x   = r * cos(phi);
       var y   = r * sin(phi);
 
-      particlesB[index].meshPos = 6.0 * vec4<f32>(x, y, z, 0.0);
+      particlesB[index].meshPos = 4.0 * vec4<f32>(x, y, z, 0.0);
       particlesB[index].meshVec = vec4<f32>(x, y, z, 0.0);
     }
     else{

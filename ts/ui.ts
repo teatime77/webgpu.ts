@@ -2,7 +2,6 @@ declare var glMatrix: any;
 
 import { assert } from "@i18n";
 import { editor } from "./editor.js";
-import { getColor } from "./util.js";
 
 const $dic = new Map<string, HTMLElement>();
 
@@ -54,7 +53,7 @@ class UI3D {
     ambientColor!      : Float32Array;
     directionalColor!  : Float32Array;
     lightingDirection! : Float32Array;
-    lightPosition      : Float32Array = new Float32Array([5,5,5,0]);
+    lightPosition      : Float32Array = new Float32Array([100.0, 100.0, 100.0, 1.0]);
     cameraPosition!    : Float32Array;
 
     startTime          : number;
@@ -130,8 +129,8 @@ class UI3D {
         // @uniform
         this.getTransformationMatrix();
 
-        this.ambientColor      = getColor("ambient");
-        this.directionalColor  = getColor("directional");
+        this.ambientColor      = glMatrix.vec4.fromValues(0.8, 0.8, 0.8, 0);
+        this.directionalColor  = glMatrix.vec4.fromValues(0.8, 0.8, 0.8, 0);
         this.lightingDirection = glMatrix.vec4.create();
         glMatrix.vec3.normalize( this.lightingDirection, glMatrix.vec4.fromValues(0.25, 0.25, 1, 0) );
     }
