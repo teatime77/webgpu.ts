@@ -1,4 +1,4 @@
-import { assert, fetchText, msg, MyError, unique } from "@i18n";
+import { assert, fetchText, msg, MyError, sleep, unique } from "@i18n";
 import { makeShaderModule } from "./util";
 import { lexicalAnalysis } from "./lex";
 import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module, ConstNum } from "./syntax"
@@ -43,6 +43,8 @@ function getAssignmentTarget(app : App) : RefVar {
 }
 
 export class Script {
+    scriptName   : string;
+    vertName     : string;
     commonDomain : Domain;
     cpuDomain    : Domain;
     gpuDomain    : Domain;
@@ -51,15 +53,17 @@ export class Script {
     comps : ComputePipeline[] = [];
     meshes: RenderPipeline[] = [];
 
-    constructor(){
+    constructor(scriptName : string, vertName : string){
+        this.scriptName       = scriptName;
+        this.vertName     = vertName;
         this.commonDomain = new Domain();
         this.cpuDomain    = new Domain();
         this.gpuDomain    = new Domain();
     }
 
     async init(){
-        msg(`\n------------------------------ test`);
-        const text = await fetchText(`./script/test.wgsl`);
+        msg(`\n------------------------------ ${this.scriptName}`);
+        const text = await fetchText(`./script/${this.scriptName}.wgsl`);
         const tokens = lexicalAnalysis(text);
 
         const parser = new Parser(tokens, 0);
@@ -159,7 +163,7 @@ export class Script {
         const shapes : ShapeInfo[] = [
             {
                 "type" : "Tube",
-                "vertName" : "mesh-instance-vert",
+                "vertName" : this.vertName,
                 "fragName" : "phong-frag"
             }
         ]
@@ -173,6 +177,7 @@ export class Script {
 
 export async function parseAll(){
     const shader_names = [
+        "tube-instance-vert",
         "arrow-comp",
         "arrow-instance-vert",
         "mesh-comp",
@@ -198,6 +203,9 @@ export async function parseAll(){
         // mod.dump();
     }
 
-    const script = new Script();
-    await script.init();
+    for(const [scriptName, vertName] of [["test", "mesh-instance-vert"], ["test2", "tube-instance-vert"]]){
+        const script = new Script(scriptName, vertName);
+        await script.init();
+        await sleep(3000);
+    }
 }
