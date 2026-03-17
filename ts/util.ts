@@ -1,10 +1,7 @@
 declare var glMatrix: any;
 
-import { $div, assert, fetchText } from "@i18n";
+import { assert, fetchText } from "@i18n";
 import { initEditor } from "./editor.js";
-import { asyncBodyOnLoadTestAll, stopAnimation } from "./instance.js";
-import { Module } from "./syntax.js";
-import { parseAll } from "./script.js";
 
 export let g_device : GPUDevice;
 export let g_presentationFormat : GPUTextureFormat;
@@ -76,8 +73,6 @@ export async function asyncBodyOnLoad(){
     console.log("device is ready\n");
 
     g_presentationFormat = navigator.gpu.getPreferredCanvasFormat();
-
-    await parseAll();
 }
 
 let g_context : GPUCanvasContext | null = null;
@@ -164,23 +159,3 @@ export function makeShaderModule( text : string) : GPUShaderModule {
 
     return module;
 }
-
-// app/src/main.ts
-
-window.addEventListener('load', async() => {
-    console.log('画像も含めてすべてのロードが完了しました');
-    await asyncBodyOnLoad();
-    console.log('初期化完了');
-});
-
-let divButtons = $div("div-buttons");
-function makeButton( text : string) : HTMLButtonElement {
-    const button = document.createElement("button");
-    button.innerText = text;
-    divButtons.appendChild(button);
-
-    return button;
-}
-
-makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
-makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });

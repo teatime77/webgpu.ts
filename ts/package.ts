@@ -14,6 +14,7 @@ export class ShapeInfo {
     gridSize? : number[] | undefined;
     vertName  : string | undefined = undefined;
     fragName  : string | undefined = undefined;
+    renderBufferPair? : boolean | undefined = undefined;
 }
 
 export class Package {

@@ -1,5 +1,22 @@
 [
     {
+        "computes" : [
+            {
+                "compName" : "fdtd-comp",
+                "globalGrid" : [32,32],
+                "shapes" : [
+                    {
+                        "type" : "Tube",
+                        "vertName" : "tube-instance-vert2",
+                        "fragName" : "phong-frag",
+                        "renderBufferPair" : true
+                    }
+                ]
+            }
+        ]
+    }
+    ,
+    {
         "shapes" : [
             {
                 "type" : "Line",
@@ -168,22 +185,6 @@
             {
                 "compName" : "electric-field",
                 "globalGrid" : [16, 16, 4],
-                "shapes" : [
-                    {
-                        "type" : "arrow",
-                        "vertName" : "arrow-instance-vert",
-                        "fragName" : "phong-frag"
-                    }
-                ]
-            }
-        ]
-    }
-    ,
-    {
-        "computes" : [
-            {
-                "compName" : "maxwell",
-                "globalGrid" : [16, 16, 2],
                 "shapes" : [
                     {
                         "type" : "arrow",

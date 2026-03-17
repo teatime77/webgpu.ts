@@ -69,6 +69,7 @@ var SymbolTable : Array<string> = new  Array<string> (
     "%=",
 
     "==",
+    "!=",
     "<=",
     ">=",
 

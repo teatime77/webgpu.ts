@@ -5,7 +5,7 @@ import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
 import { editor } from "./editor.js";
 import { Package, ShapeInfo, makeCalcRenderPipeline, makeComputeRenderPipeline } from "./package.js";
 import { CalcRenderPipeline, ComputeRenderPipeline, RenderPipeline } from "./primitive.js";
-import { initUI3D, ui3D } from "./ui.js";
+import { initUI3D, ui3D, waitClick } from "./ui.js";
 import { asyncBodyOnLoadDemo } from "./demo.js";
 import { asyncBodyOnLoadTex } from "./texture.js";
 
@@ -22,7 +22,6 @@ class Run {
     meshes: RenderPipeline[] = [];
     depthTexture!: GPUTexture;
     comps : ComputePipeline[] = [];
-    tick : number = 0;
 
     async init(inst : ComputePipeline[], meshes: RenderPipeline[]){
         this.meshes = meshes.splice(0);
@@ -126,8 +125,6 @@ class Run {
 
         [this.comps, this.meshes].flat().forEach(x => x.swapBindGroups());
 
-        ++this.tick;
-
         requestId = requestAnimationFrame(this.frame.bind(this));
     }
 }
@@ -167,7 +164,7 @@ export function makeComputeRenderPipelines(compShaderText : string, globalGrid :
     const instance_size  = elementTypeSizes[0] / 4;
 
     comp.instanceCount = globalGrid.reduce((acc, cur) => acc * cur, 1);
-    msg(`instance-Count:${comp.instanceCount}`);
+    msg(`instance-Count:${comp.instanceCount} instance-size:${instance_size}`);
 
     comp.instanceArray = new Float32Array(comp.instanceCount * instance_size);
 
@@ -216,13 +213,6 @@ export async function asyncBodyOnLoadPackage(package_name : string){
         
         await startAnimation(comps, meshes);
 
-        await sleep(3000);
+        await waitClick("next-button");
     }
-}
-
-export async function asyncBodyOnLoadTestAll(){
-    await asyncBodyOnLoadDemo();
-    await asyncBodyOnLoadCom();
-    await asyncBodyOnLoadTex();
-    await asyncBodyOnLoadPackage("test");
 }

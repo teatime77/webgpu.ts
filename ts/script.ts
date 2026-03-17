@@ -1,12 +1,15 @@
-import { assert, fetchText, msg, MyError, sleep, unique } from "@i18n";
-import { makeShaderModule } from "./util";
+import { $div, assert, fetchText, msg, MyError, sleep, unique } from "@i18n";
+import { asyncBodyOnLoad, g_device, g_presentationFormat, makeShaderModule } from "./util";
 import { lexicalAnalysis } from "./lex";
 import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module, ConstNum } from "./syntax"
 import { Context, Parser } from "./parser";
-import { ComputePipeline } from "./compute";
+import { asyncBodyOnLoadCom, ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
-import { makeComputeRenderPipelines, startAnimation } from "./instance";
+import { asyncBodyOnLoadPackage, makeComputeRenderPipelines, startAnimation, stopAnimation } from "./instance";
 import { ShapeInfo } from "./package";
+import { asyncBodyOnLoadDemo } from "./demo";
+import { asyncBodyOnLoadTex } from "./texture";
+import { waitClick } from "./ui";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -202,10 +205,37 @@ export async function parseAll(){
         const shaderModule = makeShaderModule(module.text);
         // mod.dump();
     }
+}
+
+
+export async function asyncBodyOnLoadTestAll(){
+    await asyncBodyOnLoadPackage("test");
+    await asyncBodyOnLoadDemo();
+    await asyncBodyOnLoadCom();
+    await asyncBodyOnLoadTex();
 
     for(const [scriptName, vertName] of [["test", "mesh-instance-vert"], ["test2", "tube-instance-vert"]]){
         const script = new Script(scriptName, vertName);
         await script.init();
-        await sleep(3000);
+        await waitClick("next-button");
     }
 }
+
+window.addEventListener('load', async() => {
+    console.log('画像も含めてすべてのロードが完了しました');
+    await asyncBodyOnLoad();
+    await parseAll();
+    console.log('初期化完了');
+});
+
+let divButtons = $div("span-buttons");
+function makeButton( text : string) : HTMLButtonElement {
+    const button = document.createElement("button");
+    button.innerText = text;
+    divButtons.appendChild(button);
+
+    return button;
+}
+
+makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
+makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });

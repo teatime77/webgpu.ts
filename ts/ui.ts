@@ -154,3 +154,16 @@ export function makeLightDir(){
 
     return v;
 }
+
+export function waitClick(id:string): Promise<void> {
+    return new Promise((resolve) => {
+        const button = $(id);
+
+        const handler = (ev: MouseEvent) => {
+            button.removeEventListener("click", handler);
+            resolve();
+        };
+
+        button.addEventListener("click", handler);
+    });
+}

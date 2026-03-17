@@ -124,6 +124,7 @@ export abstract class RenderPipeline extends AbstractPipeline {
     vertModule!       : Module;
     fragModule!       : Module;
     vertexBuffer!     : GPUBuffer;
+    renderBufferPair : boolean | undefined = undefined;;
 
     constructor(shape : ShapeInfo){
         super();
@@ -134,6 +135,7 @@ export abstract class RenderPipeline extends AbstractPipeline {
 
         this.vertName = shape.vertName;
         this.fragName = shape.fragName;
+        this.renderBufferPair = shape.renderBufferPair;
     }
 
     red() : RenderPipeline {
@@ -378,6 +380,11 @@ export class ComputeRenderPipeline extends RenderPipeline {
         passEncoder.setPipeline(this.pipeline);
         passEncoder.setBindGroup(0, this.bindGroups[0]);
         passEncoder.draw(this.vertexCount, this.compute.instanceCount);
+
+        if(this.renderBufferPair == true && this.bindGroups.length == 2){
+            passEncoder.setBindGroup(0, this.bindGroups[1]);
+            passEncoder.draw(this.vertexCount, this.compute.instanceCount);
+        }
     }
 }
 
