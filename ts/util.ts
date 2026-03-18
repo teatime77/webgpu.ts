@@ -89,8 +89,8 @@ export function initContext(canvas: HTMLCanvasElement, alpha_mode : GPUCanvasAlp
 
     const devicePixelRatio = window.devicePixelRatio || 1;
 
-    canvas.width  = canvas.clientWidth  * devicePixelRatio;
-    canvas.height = canvas.clientHeight * devicePixelRatio;
+    // canvas.width  = canvas.clientWidth  * devicePixelRatio;
+    // canvas.height = canvas.clientHeight * devicePixelRatio;
 
     context.configure({
         device: g_device,
