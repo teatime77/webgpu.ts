@@ -95,8 +95,12 @@ export class Parser {
         return this.token.text;
     }
 
-    peek() : string {
+    peekText() : string {
         return this.tokenPos + 1 < this.tokens.length ? this.tokens[this.tokenPos + 1].text : ""; 
+    }
+
+    peekType() : TokenType {
+        return this.tokenPos + 1 < this.tokens.length ? this.tokens[this.tokenPos + 1].typeTkn : TokenType.unknown; 
     }
 
     readInt(){
@@ -376,7 +380,7 @@ export class Parser {
 
         let term : RefVar | App;
 
-        if(idType == TokenType.type && this.peek() == "<"){
+        if(idType == TokenType.type && this.peekText() == "<"){
             const tp = this.readType(ctx);
             term = new RefVar(tp);
         }
@@ -476,6 +480,11 @@ export class Parser {
         else if(this.token.text == '['){
             const terms = this.readComma(ctx, "[", "]");
             return new App(operator("[]"), terms);
+        }
+        else if(this.token.text == '&' && this.peekType() == TokenType.identifier){
+            this.nextToken("&");
+            const id = this.readId(ctx);
+            return new App(operator("&"), [id]);
         }
         else{
             throw new MyError();

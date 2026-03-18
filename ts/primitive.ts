@@ -516,7 +516,7 @@ export class Line extends CalcRenderPipeline {
 export class Tube extends ComputeRenderPipeline {
     constructor(compute  : ComputePipeline, shape : ShapeInfo){
         super(compute, shape);
-        const num_division = 16;
+        const num_division = shape.numDivision ?? 16;
         
         this.vertexCount = (num_division + 1) * 2;
     
@@ -643,7 +643,7 @@ export class Disc extends ComputeRenderPipeline {
     constructor(compute  : ComputePipeline, shape : ShapeInfo){
         super(compute, shape);
 
-        const num_division = 16;
+        const num_division = shape.numDivision ?? 16;
 
         this.topology = 'triangle-list';
         this.vertexCount = num_division * 3;
@@ -693,7 +693,7 @@ export class Cone extends ComputeRenderPipeline {
     constructor(compute  : ComputePipeline, shape : ShapeInfo){
         super(compute, shape);
 
-        const num_division = 16;
+        const num_division = shape.numDivision ?? 16;
 
         this.topology = 'triangle-list';
         this.vertexCount = num_division * 3;
@@ -801,8 +801,8 @@ export class GeodesicPolyhedron extends ComputeRenderPipeline {
 
         this.topology = 'triangle-list';
 
-        const divide_cnt = 3;
-
+        // Use the subdivision level from shape.divideCount, with a fallback to 2.
+        const divide_cnt = shape.divideCount ?? 2;
         const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
         const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
     

@@ -9,7 +9,9 @@ import { asyncBodyOnLoadPackage, makeComputeRenderPipelines, startAnimation, sto
 import { ShapeInfo } from "./package";
 import { asyncBodyOnLoadDemo } from "./demo";
 import { asyncBodyOnLoadTex } from "./texture";
-import { waitClick } from "./ui";
+import { ui3D, waitClick } from "./ui";
+import { showElectrons } from "./electrons";
+import { showHopfFibration } from "./hopf.js";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -239,3 +241,5 @@ function makeButton( text : string) : HTMLButtonElement {
 
 makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
 makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
+makeButton("electrons").addEventListener("click", async()=>{ await showElectrons() });
+makeButton("Hopf Fibration").addEventListener("click", async()=>{ await showHopfFibration() });
