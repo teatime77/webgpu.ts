@@ -158,7 +158,7 @@ export function makeComputeRenderPipelines(compShaderText : string, globalGrid :
 
     const storages = comp.compModule.vars.filter(x => x.mod.usage == BufferUsage.storage);
     assert(storages.length != 0);
-    assert(storages.every(x => x.type instanceof ShaderType && x.type.elementType instanceof Struct));
+    assert(storages.every(x => x.type instanceof ShaderType && (x.type.elementType instanceof Struct || x.type.elementType instanceof ShaderType)));
     const elementTypeSizes = storages.map(x => (x.type as ShaderType).elementType.size());
     elementTypeSizes.every(x => x == elementTypeSizes[0]);
     const instance_size  = elementTypeSizes[0] / 4;

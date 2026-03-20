@@ -12,6 +12,7 @@ import { asyncBodyOnLoadTex } from "./texture";
 import { ui3D, waitClick } from "./ui";
 import { showElectrons } from "./electrons";
 import { showHopfFibration } from "./hopf.js";
+import { showLiouville } from "./liouville.js";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -197,7 +198,10 @@ export async function parseAll(){
         "surface-vert",
         "texture-frag",
         "texture-vert",
-        "electric-field"
+        "electric-field",
+        "hamiltonian-vert",
+        "liouville-comp",
+        "point-instance-vert"
     ];
 
     for(const shader_name of shader_names){
@@ -243,3 +247,4 @@ makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoa
 makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
 makeButton("electrons").addEventListener("click", async()=>{ await showElectrons() });
 makeButton("Hopf Fibration").addEventListener("click", async()=>{ await showHopfFibration() });
+makeButton("Liouville").addEventListener("click", async()=>{ await showLiouville() });

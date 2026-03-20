@@ -668,7 +668,7 @@ export class Parser {
         let initializer: Term | undefined;
         if (this.current() === '=') {
             this.nextToken("=");
-            initializer = this.ArithmeticExpression(ctx);
+            initializer = this.LogicalExpression(ctx);
         }
         
         if(parent == undefined){
