@@ -51,8 +51,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let dp_dt = -sin(q);
     let vector = vec3<f32>(dq_dt, dp_dt, 0.0);
 
+    // Calculate Hamiltonian H = 1/2 * p^2 - cos(q)
+    let h = 0.5 * p * p - cos(q);
+
     // 3. Store arrow position, vector, and color for the instanced renderer
-    particlesB[idx].meshPos = vec4<f32>(q, p, 0.0, 1.0);
+    particlesB[idx].meshPos = vec4<f32>(q, p, h, 1.0);
 
     let vec_len = length(vector);
 

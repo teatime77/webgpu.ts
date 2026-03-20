@@ -7,7 +7,7 @@
                 "shapes" : [
                     {
                         "type" : "Tube",
-                        "vertName" : "tube-instance-vert2",
+                        "vertName" : "tube-instance-vert",
                         "fragName" : "phong-frag",
                         "renderBufferPair" : true
                     }

@@ -145,13 +145,13 @@ fn main(
     if(uniforms.shapeInfo.x == arrow){
         if(uniforms.shapeInfo.y == cone){
 
-            pos.x *= 0.2;
-            pos.y *= 0.2;
+            pos.x *= 0.04;
+            pos.y *= 0.04;
         }
         else{
 
-            pos.x *= 0.1;
-            pos.y *= 0.1;
+            pos.x *= 0.02;
+            pos.y *= 0.02;
         }
 
         var len = length(meshVec.xyz);
@@ -186,7 +186,7 @@ fn main(
 
     var output : VertexOutput;
 
-    let worldPos = meshPos + vec4<f32>(pos, 1);
+    let worldPos = vec4<f32>(meshPos.xyz + pos, 1);
 
     output.Position    = uniforms.viewMatrix * worldPos;
     output.worldPos    = worldPos.xyz;
