@@ -16,6 +16,7 @@ struct Uniforms {
 struct Particle {
     meshPos : vec4<f32>,
     meshVec : vec4<f32>,
+    color   : vec4<f32>,
 }
 
 struct Vertex {
@@ -190,7 +191,7 @@ fn main(
     output.Position    = uniforms.viewMatrix * worldPos;
     output.worldPos    = worldPos.xyz;
     output.worldNormal = (uniforms.normMatrix * vec4<f32>(vertNorm, 0.0)).xyz;
-    output.fragColor   = uniforms.materialColor;
+    output.fragColor   = particle.color;
     
     return output;
 }

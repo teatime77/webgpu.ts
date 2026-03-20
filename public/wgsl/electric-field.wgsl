@@ -1,6 +1,7 @@
 struct Particle {
     meshPos : vec4<f32>,
     meshVec : vec4<f32>,
+    color   : vec4<f32>,
 }
 struct SimParams {
     env : vec4<f32>
@@ -59,11 +60,14 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
     var v = 10.0 * v1 / (l1 * l1 * l1) - 10.0 * v2 / (l2 * l2 * l2);
 
+    let color = vec4<f32>(0.0, 1.0, 1.0, 1.0); // Cyan
+
     if(tick == 0){
       
 
         particlesB[index].meshPos = vec4<f32>(p, 0.0);
         particlesB[index].meshVec = vec4<f32>(v, 0.0);
+        particlesB[index].color   = color;
     }
     else{
 
@@ -71,5 +75,6 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         // Write back
         particlesB[index].meshPos = vec4<f32>(p, 0.0);
         particlesB[index].meshVec = vec4<f32>(v, 0.0);
+        particlesB[index].color   = color;
     }
 }

@@ -13,6 +13,7 @@ import { ui3D, waitClick } from "./ui";
 import { showElectrons } from "./electrons";
 import { showHopfFibration } from "./hopf.js";
 import { showLiouville } from "./liouville.js";
+import { showVectorField } from "./vectorfield";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -248,3 +249,4 @@ makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
 makeButton("electrons").addEventListener("click", async()=>{ await showElectrons() });
 makeButton("Hopf Fibration").addEventListener("click", async()=>{ await showHopfFibration() });
 makeButton("Liouville").addEventListener("click", async()=>{ await showLiouville() });
+makeButton("Vector Field").addEventListener("click", async()=>{ await showVectorField() });

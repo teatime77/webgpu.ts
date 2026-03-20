@@ -1,6 +1,7 @@
 struct Particle {
   meshPos : vec4<f32>,
   meshVec : vec4<f32>,
+  color   : vec4<f32>,
 }
 struct Env {
     time   : f32,
@@ -38,6 +39,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
       particlesB[index].meshPos = 4.0 * vec4<f32>(x, y, z, 0.0);
       particlesB[index].meshVec = vec4<f32>(x, y, z, 0.0);
+      particlesB[index].color = vec4<f32>(0.0, 1.0, 1.0, 1.0); // Cyan
     }
     else{
 
@@ -51,5 +53,6 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
       // Write back
       particlesB[index].meshPos = pos;
       particlesB[index].meshVec = dist * vec4<f32>(v1, 0.0);
+      particlesB[index].color = vec4<f32>(0.0, 1.0, 1.0, 1.0); // Cyan
     }
 }

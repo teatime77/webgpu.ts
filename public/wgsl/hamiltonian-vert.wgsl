@@ -18,12 +18,12 @@ struct VertexOutput {
     @location(2) fragColor: vec4<f32>,
 };
 
-const PI = 3.14159265359;
+fn rgba(theta_arg : f32) -> vec4<f32>{
+    const pi = 3.14159265359;
 
-fn rgba(theta_arg: f32) -> vec4<f32> {
     var theta = theta_arg;
-    if (theta < 0.0) {
-        theta += 2.0 * PI;
+    if(theta < 0.0){
+        theta += 2.0 * pi;
     }
 
     var r : f32 = 0.0;
@@ -31,12 +31,12 @@ fn rgba(theta_arg: f32) -> vec4<f32> {
     var b : f32 = 0.0;
 
     // Map theta (0 to 2*pi) to t (0 to 3)
-    var t = theta * 3.0 / (2.0 * PI);
-    if (t <= 1.0) {
+    var t = theta * 3.0 / (2.0 * pi);
+    if(t <= 1.0){
         // Red to Green
         r = (1.0 - t);
         g = t;
-    } else if (t <= 2.0) {
+    } else if(t <= 2.0){
         // Green to Blue
         t -= 1.0;
         g = (1.0 - t);
@@ -50,16 +50,6 @@ fn rgba(theta_arg: f32) -> vec4<f32> {
 
     return vec4<f32>(r, g, b, 1.0);
 }
-
-const Q_RANGE = 2.0 * PI;
-const P_RANGE = 5.0;
-const P_MAX = P_RANGE / 2.0;
-
-// H = 0.5 * p^2 - cos(q)
-// With p in [-2.5, 2.5] and q in [-PI, PI]:
-const H_MIN = -1.0; // at p=0, cos(q)=1
-const H_MAX = 0.5 * P_MAX * P_MAX - (-1.0); // at p=P_MAX, cos(q)=-1 -> 4.125
-const H_RANGE = H_MAX - H_MIN; // 5.125
 
 @vertex
 fn main(
@@ -78,11 +68,13 @@ fn main(
 
     // Map indices to q and p coordinates in phase space
     // q in [-PI, PI], p in [-2.5, 2.5]
+    let q_range = 2.0 * 3.14159;
+    let p_range = 5.0;
     let u = col_idx / num_cols;
     let v = q_row_idx / num_rows;
 
-    let q = -Q_RANGE / 2.0 + u * Q_RANGE;
-    let p = -P_RANGE / 2.0 + v * P_RANGE;
+    let q = -q_range/2.0 + u * q_range;
+    let p = -p_range/2.0 + v * p_range;
 
     // Calculate Hamiltonian H = 1/2 * p^2 - cos(q)
     let h = 0.5 * p * p - cos(q);
@@ -95,10 +87,9 @@ fn main(
 
     // Calculate color based on Hamiltonian height (h)
     // h is in approx [-1, 4.125]. Normalize to [0, 1].
-    let h_norm = (h - H_MIN) / H_RANGE;
+    let h_norm = (h + 1.0) / 5.125;
     // Map to a color spectrum (Red -> Green -> Blue)
-    // Map normalized h to a phase angle for color. (2/3) of the way through 2*PI.
-    let color = rgba(h_norm * (4.0 / 3.0 * PI));
+    let color = rgba(h_norm * 4.2); // 4.2 is approx 2/3 of 2*PI
 
     var output: VertexOutput;
     output.Position = uniforms.viewMatrix * vec4<f32>(pos, 1.0);
