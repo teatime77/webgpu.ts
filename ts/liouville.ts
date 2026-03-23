@@ -1,10 +1,12 @@
-import { fetchText } from "@i18n";
+import { $, fetchText } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { startAnimation, makeComputeRenderPipelines } from "./instance.js";
 import { ShapeInfo } from "./package.js";
 import { Surface, RenderPipeline } from "./primitive.js";
 
 export async function showLiouville() {
+    $("orbital-panel").style.display = "none";
+
     // --- Configuration ---
     const points_side = 23;
     const num_points = points_side * points_side; // Total number of points for the phase space plot

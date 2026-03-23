@@ -1,4 +1,4 @@
-import { msg, fetchText, sleep, assert, MyError, zip } from "@i18n";
+import { msg, fetchText, sleep, assert, MyError, zip, $ } from "@i18n";
 import { initContext, g_device, number123, fetchShaderText } from "./util.js";
 import { BufferUsage, ShaderType, Struct } from "./syntax"
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute.js";
@@ -183,7 +183,34 @@ export function makeComputeRenderPipelines(compShaderText : string, globalGrid :
     const comp_meshes = shapes.map(shape => makeComputeRenderPipeline(comp, shape)).flat();
 
     return [comp, comp_meshes];
+}
 
+export async function startPackage(pkg : Package){
+    $("orbital-panel").style.display = "none";
+
+    const comps : ComputePipeline[] = [];
+    let  meshes : RenderPipeline[] = [];
+
+    if(pkg.computes != undefined){
+        for(const info of pkg.computes){
+            msg(`-------------------------------------------------- ${info.compName}`);
+
+            const compShaderText = await fetchShaderText(info.compName);
+
+            const [comp, comp_meshes] = makeComputeRenderPipelines(compShaderText, info.globalGrid, info.shapes);
+            comps.push(comp);
+            meshes = meshes.concat(comp_meshes);
+        }
+    }
+
+    if(pkg.shapes != undefined){
+        const pkg_meshes = pkg.shapes.map(shape => makeCalcRenderPipeline(shape)).flat();
+        meshes = meshes.concat(pkg_meshes);
+    }
+    
+    await startAnimation(comps, meshes);
+
+    await waitClick("next-button");
 }
 
 export async function asyncBodyOnLoadPackage(package_name : string){
@@ -192,27 +219,6 @@ export async function asyncBodyOnLoadPackage(package_name : string){
     const packages = JSON.parse(test_text) as Package[];
 
     for(const pkg of packages){
-        msg("--------------------------------------------------");
-        const comps : ComputePipeline[] = [];
-        let  meshes : RenderPipeline[] = [];
-
-        if(pkg.computes != undefined){
-            for(const info of pkg.computes){
-                const compShaderText = await fetchShaderText(info.compName);
-
-                const [comp, comp_meshes] = makeComputeRenderPipelines(compShaderText, info.globalGrid, info.shapes);
-                comps.push(comp);
-                meshes = meshes.concat(comp_meshes);
-            }
-        }
-
-        if(pkg.shapes != undefined){
-            const pkg_meshes = pkg.shapes.map(shape => makeCalcRenderPipeline(shape)).flat();
-            meshes = meshes.concat(pkg_meshes);
-        }
-        
-        await startAnimation(comps, meshes);
-
-        await waitClick("next-button");
+        await startPackage(pkg);
     }
 }

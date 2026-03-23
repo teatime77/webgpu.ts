@@ -3,10 +3,6 @@ import { error } from "./util.js";
 import { Token, TokenSubType, TokenType } from "./lex.js";
 import { Modifier, Struct, Type, Variable, Fn, Field, BufferUsage, ShaderType, BufferReadWrite, SimpleType, ArrayType, Domain, RefVar, App, Term, indexOpr, ConstNum, Str, ReturnStatement, isAssignmentToken, BlockStatement, Statement, IfStatement, WhileStatement, ForStatement, ParallelStatement, VariableDeclaration, CallStatement, Module } from "./syntax"
 
-function isRelationToken(text : string){
-    return [ "==", "=", "!=", "<", ">", "<=", ">=", "in", "notin", "subset" ].includes(text);
-}
-
 function operator(opr : string) : RefVar {
     return new RefVar(opr);
 }
@@ -64,6 +60,22 @@ export class Parser {
 
     isEoT() : boolean {
         return this.token.typeTkn == TokenType.eot;
+    }
+
+    isShiftToken(){
+        const text = this.current();
+        const next = this.peekText();
+
+        return ["<", ">"].includes(text) && next == text;
+    }
+
+    isRelationToken(){
+        const text = this.current();
+        const next = this.peekText();
+        if(["<", ">"].includes(text) && next == text){
+            return false;
+        }
+        return [ "==", "=", "!=", "<", ">", "<=", ">=", "in", "notin", "subset" ].includes(text);
     }
 
     showError(text : string){
@@ -571,14 +583,31 @@ export class Parser {
         return trm1;
     }
 
+    ShiftExpression(ctx : Context) : Term {
+        let trm1 = this.AdditiveExpression(ctx);
+
+        while(this.isShiftToken()){
+            const opr = this.current();
+
+            this.nextToken(opr);
+            this.nextToken(opr);
+
+            const trm2 = this.AdditiveExpression(ctx);
+
+            trm1 = new App(operator(opr + opr), [trm1, trm2]);
+        }
+
+        return trm1;
+    }
+
     ArithmeticExpression(ctx : Context) : Term {
-        return this.AdditiveExpression(ctx);
+        return this.ShiftExpression(ctx);
     }
 
     RelationalExpression(ctx : Context) : Term {
         let trm1 = this.ArithmeticExpression(ctx);
 
-        while(isRelationToken(this.token.text)){
+        while(this.isRelationToken()){
             let app = new App(operator(this.token.text), [trm1]);
             this.next();
 

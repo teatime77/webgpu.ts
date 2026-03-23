@@ -209,6 +209,7 @@ function setupRender(
 }
 
 export async function showElectrons(){
+    $("orbital-panel").style.display = "inline-block";
 
     const canvas = $('world') as HTMLCanvasElement;
     const context = initContext(canvas, 'opaque');

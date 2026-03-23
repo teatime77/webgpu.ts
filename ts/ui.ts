@@ -64,8 +64,11 @@ class UI3D {
         this.startTime = Date.now();
 
         this.canvas = canvas;
+        canvas.addEventListener('pointerdown', this.pointerdown.bind(this));
+        canvas.addEventListener('pointerup', this.pointerup.bind(this));
         canvas.addEventListener('pointermove', this.pointermove.bind(this));
         canvas.addEventListener("wheel", this.wheel.bind(this), { passive: false });
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
 
         $inp("auto-rotate").addEventListener("click", this.click.bind(this));
 
@@ -74,6 +77,14 @@ class UI3D {
 
     click(ev : MouseEvent){
         this.autoRotate = $inp("auto-rotate").checked;
+    }
+
+    pointerdown(ev: PointerEvent){
+        editor.tool.pointerdown(ev);
+    }
+
+    pointerup(ev: PointerEvent){
+        editor.tool.pointerup(ev);
     }
 
     pointermove(ev: PointerEvent){
@@ -121,6 +132,7 @@ class UI3D {
         const elapsed_time = Math.round(Date.now() - this.startTime);
         this.env[0] = elapsed_time;
         this.env[1] = this.tick;
+        this.env[2] = Math.random();
 
         this.tick++;
     }

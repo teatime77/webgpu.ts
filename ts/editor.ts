@@ -37,25 +37,69 @@ class Camera extends Tool {
     camTheta : number = 0.5 * Math.PI;
     camDistance    : number = -5.0;
 
+    private pointerCache = new Map<number, PointerEvent>();
+    private prevPinchDist: number | null = null;
+
+    pointerdown(ev: PointerEvent) {
+        this.lastMouseX = ev.clientX;
+        this.lastMouseY = ev.clientY;
+        this.pointerCache.set(ev.pointerId, ev);
+    }
+
     pointermove(ev: PointerEvent){
-        // タッチによる画面スクロールを止める
-        // ev.preventDefault(); 
+        ev.preventDefault();
 
-        var newX = ev.clientX;
-        var newY = ev.clientY;
-
-        if (ev.buttons != 0 && this.lastMouseX != null && this.lastMouseY != null) {
-
-            this.camTheta += (newY - this.lastMouseY) / 300;
-            this.camPhi -= (newX - this.lastMouseX) / 300;
+        // Update the pointer's position in the cache
+        if (this.pointerCache.has(ev.pointerId)) {
+            this.pointerCache.set(ev.pointerId, ev);
         }
-        // console.log(`phi:${this.camPhi} theta:${this.camTheta}`)
 
-        this.lastMouseX = newX
-        this.lastMouseY = newY;
+        if (this.pointerCache.size === 2) {
+            // Two-finger pinch for zooming
+            const pointers = Array.from(this.pointerCache.values());
+            const p1 = pointers[0];
+            const p2 = pointers[1];
+
+            const dx = p1.clientX - p2.clientX;
+            const dy = p1.clientY - p2.clientY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (this.prevPinchDist !== null) {
+                const delta = dist - this.prevPinchDist;
+                this.camDistance += delta * 0.02; // Sensitivity factor
+            }
+
+            this.prevPinchDist = dist;
+            
+            // Reset one-finger drag state to prevent rotation while pinching
+            this.lastMouseX = null;
+            this.lastMouseY = null;
+        } else if (this.pointerCache.size === 1 && ev.buttons !== 0) {
+            // One-finger drag for rotation
+            this.prevPinchDist = null; // Ensure pinch state is reset
+
+            if (this.lastMouseX !== null && this.lastMouseY !== null) {
+                const newX = ev.clientX;
+                const newY = ev.clientY;
+                this.camTheta += (newY - this.lastMouseY) / 300;
+                this.camPhi -= (newX - this.lastMouseX) / 300;
+            }
+            
+            // For the next move event
+            this.lastMouseX = ev.clientX;
+            this.lastMouseY = ev.clientY;
+        }
     }
 
     pointerup(ev: PointerEvent){
+        this.pointerCache.delete(ev.pointerId);
+        if (this.pointerCache.size < 2) {
+            this.prevPinchDist = null;
+        }
+        if (this.pointerCache.size < 1) {
+            this.lastMouseX = null;
+            this.lastMouseY = null;
+        }
     }
 
     wheel(ev: WheelEvent){

@@ -1,12 +1,12 @@
-import { $div, assert, fetchText, msg, MyError, sleep, unique } from "@i18n";
-import { asyncBodyOnLoad, g_device, g_presentationFormat, makeShaderModule } from "./util";
+import { $, $div, assert, fetchText, msg, MyError, parseURL } from "@i18n";
+import { asyncBodyOnLoad, makeShaderModule } from "./util";
 import { lexicalAnalysis } from "./lex";
 import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module, ConstNum } from "./syntax"
 import { Context, Parser } from "./parser";
 import { asyncBodyOnLoadCom, ComputePipeline } from "./compute";
 import { RenderPipeline } from "./primitive";
-import { asyncBodyOnLoadPackage, makeComputeRenderPipelines, startAnimation, stopAnimation } from "./instance";
-import { ShapeInfo } from "./package";
+import { asyncBodyOnLoadPackage, makeComputeRenderPipelines, startAnimation, startPackage, stopAnimation } from "./instance";
+import { Package, ShapeInfo } from "./package";
 import { asyncBodyOnLoadDemo } from "./demo";
 import { asyncBodyOnLoadTex } from "./texture";
 import { ui3D, waitClick } from "./ui";
@@ -19,6 +19,7 @@ const common = "@common";
 const cpu    = "@cpu";
 const gpu    = "@gpu";
 type ScriptMode = "@common" | "@cpu" | "@gpu";
+let testPackages : Package[];
 
 function getAssignmentTarget(app : App) : RefVar {
     assert(app.isAssignmentApp());
@@ -184,6 +185,7 @@ export class Script {
 
 export async function parseAll(){
     const shader_names = [
+        "three-body-com",
         "tube-instance-vert",
         "arrow-comp",
         "arrow-instance-vert",
@@ -229,9 +231,16 @@ export async function asyncBodyOnLoadTestAll(){
 }
 
 window.addEventListener('load', async() => {
+    const [ origin, pathname, params, url_base] = parseURL();
+    
     console.log('画像も含めてすべてのロードが完了しました');
     await asyncBodyOnLoad();
     await parseAll();
+
+    const test_text = await fetchText(`./package/test.json`);
+    testPackages = JSON.parse(test_text) as Package[];
+
+    makeButtons(params);
     console.log('初期化完了');
 });
 
@@ -244,9 +253,18 @@ function makeButton( text : string) : HTMLButtonElement {
     return button;
 }
 
-makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
-makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
-makeButton("electrons").addEventListener("click", async()=>{ await showElectrons() });
-makeButton("Hopf Fibration").addEventListener("click", async()=>{ await showHopfFibration() });
-makeButton("Liouville").addEventListener("click", async()=>{ await showLiouville() });
-makeButton("Vector Field").addEventListener("click", async()=>{ await showVectorField() });
+function makeButtons(params: Map<string, string>){
+    makeButton("電磁波").addEventListener("click", async()=>{ await startPackage(testPackages[1]) });
+    makeButton("電子雲").addEventListener("click", async()=>{ await showElectrons() });
+    makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await showHopfFibration() });
+    makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await showLiouville() });
+    makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await showVectorField() });
+    makeButton("三体").addEventListener("click", async()=>{ await startPackage(testPackages[0]) });
+
+    if(params.has("debug")){
+        makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
+        makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
+        $("div-color").style.display = "block";
+        $("next-button").style.display = "inline-block";
+    }
+}

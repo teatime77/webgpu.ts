@@ -1,10 +1,12 @@
-import { fetchText } from "@i18n";
+import { $, fetchText } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { startAnimation, makeComputeRenderPipelines } from "./instance.js";
 import { ShapeInfo } from "./package.js";
 import { Surface, RenderPipeline } from "./primitive.js";
 
 export async function showVectorField() {
+    $("orbital-panel").style.display = "none";
+    
     // --- Configuration ---
     const grid_dim_q = 32;
     const grid_dim_p = 32;

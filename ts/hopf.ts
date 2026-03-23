@@ -1,10 +1,12 @@
-import { fetchText } from "@i18n";
+import { $, fetchText } from "@i18n";
 import { ComputePipeline } from "./compute.js";
 import { startAnimation, makeComputeRenderPipelines } from "./instance.js";
 import { ShapeInfo } from "./package.js";
 import { Line, RenderPipeline } from "./primitive.js";
 
 export async function showHopfFibration() {
+    $("orbital-panel").style.display = "none";
+
     // --- Configuration ---
     // NOTE: If you change these, you must also change the hardcoded values in hopf-comp.wgsl
     const num_segments_per_circle = 64;
@@ -33,7 +35,8 @@ export async function showHopfFibration() {
         type: "GeodesicPolyhedron",
         vertName: "mesh-instance-vert", // Use the standard instanced mesh shader
         fragName: "phong-frag",         // Use a lit shader for a 3D look
-        divideCount: 2                  // Subdivision level for the sphere primitive
+        divideCount: 2,                 // Subdivision level for the sphere primitive
+        scale : [0.2, 0.2, 0.2]
     }];
 
     const [sphereCompute, sphereMeshes] = makeComputeRenderPipelines(

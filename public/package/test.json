@@ -2,6 +2,23 @@
     {
         "computes" : [
             {
+                "compName" : "three-body-com",
+                "globalGrid" : [256],
+                "shapes" : [
+                    {
+                        "type" : "GeodesicPolyhedron",
+                        "vertName" : "mesh-instance-vert",
+                        "fragName" : "phong-frag",
+                        "divideCount": 2
+                    }
+                ]
+            }
+        ]
+    }
+    ,
+    {
+        "computes" : [
+            {
                 "compName" : "fdtd-comp",
                 "globalGrid" : [32,32],
                 "shapes" : [
