@@ -11,6 +11,7 @@ import { asyncBodyOnLoadDemo } from "./demo";
 import { asyncBodyOnLoadTex } from "./texture";
 import { waitClick } from "./ui";
 import { showElectrons } from "./electrons";
+import { runHMC } from "./hmc";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -263,6 +264,7 @@ function makeButtons(params: Map<string, string>){
     makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await startTestPackage("liouville") });
     makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await startTestPackage("vector-field") });
     makeButton("三体").addEventListener("click", async()=>{ await startTestPackage("three-body") });
+    makeButton("HMC").addEventListener("click", async()=>{ await runHMC() });
 
     if(params.has("debug")){
         makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
