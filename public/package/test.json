@@ -1,5 +1,31 @@
 [
     {
+        "name" : "vector-field",
+        "computes" : [
+            {
+                "compName" : "vector-field-comp",
+                "globalGrid" : [32, 32],
+                "shapes" : [
+                    {
+                        "type" : "arrow",
+                        "vertName" : "arrow-instance-vert",
+                        "fragName" : "phong-frag"
+                    }
+                ]
+            }
+        ]
+        ,
+        "shapes" : [
+            {
+                "type" : "Surface",
+                "vertName" : "hamiltonian-vert",
+                "fragName" : "phong-frag",
+                "gridSize": [64, 64]
+            }
+        ]
+    }
+    ,
+    {
         "name" : "liouville",
         "computes" : [
             {

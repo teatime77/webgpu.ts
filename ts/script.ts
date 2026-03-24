@@ -11,7 +11,6 @@ import { asyncBodyOnLoadDemo } from "./demo";
 import { asyncBodyOnLoadTex } from "./texture";
 import { waitClick } from "./ui";
 import { showElectrons } from "./electrons";
-import { showVectorField } from "./vectorfield";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -262,7 +261,7 @@ function makeButtons(params: Map<string, string>){
     makeButton("電子雲").addEventListener("click", async()=>{ await showElectrons() });
     makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await startTestPackage("hopf") });
     makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await startTestPackage("liouville") });
-    makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await showVectorField() });
+    makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await startTestPackage("vector-field") });
     makeButton("三体").addEventListener("click", async()=>{ await startTestPackage("three-body") });
 
     if(params.has("debug")){
