@@ -513,6 +513,26 @@ export class Line extends CalcRenderPipeline {
     }
 }
 
+export class PointComp extends ComputeRenderPipeline {
+    constructor(compute  : ComputePipeline, shape : ShapeInfo){
+        super(compute, shape);       
+        this.vertexCount = 6;
+    
+        // 位置の配列
+        this.vertexArray = new Float32Array([
+            0.0, 0.0, 0.0,   0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,   0.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,   0.0, 0.0, 0.0,
+
+            1.0, 0.0, 0.0,   0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,   0.0, 0.0, 0.0,
+            1.0, 1.0, 0.0,   0.0, 0.0, 0.0
+        ]);
+    
+        this.topology = 'point-list';
+    }
+}
+
 export class Tube extends ComputeRenderPipeline {
     constructor(compute  : ComputePipeline, shape : ShapeInfo){
         super(compute, shape);

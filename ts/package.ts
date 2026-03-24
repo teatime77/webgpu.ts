@@ -1,5 +1,5 @@
 import { ComputePipeline } from "./compute.js";
-import { CalcRenderPipeline, ComputeRenderPipeline, Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
+import { CalcRenderPipeline, ComputeRenderPipeline, Cone, Cube, Disc, GeodesicPolyhedron, Line, makeArrow, Point, PointComp, Rect, RenderPipeline, Surface, Tube } from "./primitive.js";
 
 class ComputeInfo {
     compName!    : string;
@@ -27,6 +27,7 @@ export class Package {
 
 export function makeComputeRenderPipeline(compute  : ComputePipeline, shape : ShapeInfo) : ComputeRenderPipeline[] {
     switch(shape.type){
+        case "Point" : return [new PointComp(compute, shape)];
         case "Rect"  : return [new Rect(compute, shape)];
         case "Cone"  : return [new Cone(compute, shape)];
         case "Tube"  : return [new Tube(compute, shape)];

@@ -1,5 +1,32 @@
 [
     {
+        "name" : "liouville",
+        "computes" : [
+            {
+                "compName" : "liouville-comp",
+                "globalGrid" : [529],
+                "shapes" : [
+                    {
+                        "type" : "Point",
+                        "vertName" : "point-instance-vert",
+                        "fragName" : "color-frag",
+                        "scale" : [0.2, 0.2, 0.2]
+                    }
+                ]
+            }
+        ]
+        ,
+        "shapes" : [
+            {
+                "type" : "Surface",
+                "vertName" : "hamiltonian-vert",
+                "fragName" : "phong-frag",
+                "gridSize": [64, 64]
+            }
+        ]
+    }
+    ,
+    {
         "name" : "hopf",
         "computes" : [
             {
@@ -239,34 +266,6 @@
                         "fragName" : "phong-frag"
                     }
                 ]
-            }
-        ]
-    }
-    ,
-    {
-        "name" : "liouville",
-        "computes" : [
-            {
-                "compName" : "liouville-comp",
-                "globalGrid" : [529],
-                "shapes" : [
-                    {
-                        "type" : "Point",
-                        "vertName" : "point-instance-vert",
-                        "fragName" : "color-frag",
-                        "divideCount": 2,
-                        "scale" : [0.2, 0.2, 0.2]
-                    }
-                ]
-            }
-        ]
-        ,
-        "shapes" : [
-            {
-                "type" : "Surface",
-                "vertName" : "hamiltonian-vert",
-                "fragName" : "phong-frag",
-                "gridSize": [64, 64]
             }
         ]
     }

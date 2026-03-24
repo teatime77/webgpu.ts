@@ -9,9 +9,14 @@ struct Uniforms {
     env: Env,
 }
 
+struct Instance { 
+    position: vec4<f32>, 
+    color   : vec4<f32> 
+}
+
 @group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<storage, read> input_particles: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read_write> output_particles: array<vec4<f32>>;
+@group(0) @binding(1) var<storage, read> input_particles: array<Instance>;
+@group(0) @binding(2) var<storage, read_write> output_particles: array<Instance>;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -34,11 +39,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let q = 1.0 + (x_idx / (points_side - 1.0) - 0.5) * 1.0;
         let p = 0.0 + (y_idx / (points_side - 1.0) - 0.5) * 1.0;
 
-        output_particles[idx] = vec4<f32>(q, p, 0.0, 1.0);
+        var p_out : Instance;
+
+        p_out.position = vec4<f32>(q, p, 0.0, 1.0);
+        p_out.color    = vec4<f32>(0.0, 0.0, 1.0, 1.0);
+
+        output_particles[idx] = p_out;
     } else {
         let p_in = input_particles[idx];
-        var q = p_in.x;
-        var p = p_in.y;
+        var q = p_in.position.x;
+        var p = p_in.position.y;
 
         // Symplectic Euler integration for H = 1/2 p^2 - cos(q)
         // dq/dt = p
@@ -54,6 +64,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         if (q_wrapped > pi) { q_wrapped = q_wrapped - 2.0 * pi; }
         else if (q_wrapped < -pi) { q_wrapped = q_wrapped + 2.0 * pi; }
         
-        output_particles[idx] = vec4<f32>(q_wrapped, p_new, 0.0, 1.0);
+        var p_out : Instance;
+
+        p_out.position = vec4<f32>(q_wrapped, p_new, 0.0, 1.0);
+        p_out.color    = vec4<f32>(0.0, 0.0, 1.0, 1.0);
+
+        output_particles[idx] = p_out;
     }
 }

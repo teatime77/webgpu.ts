@@ -9,10 +9,8 @@ import { asyncBodyOnLoadPackage, makeComputeRenderPipelines, startAnimation, sta
 import { Package, ShapeInfo } from "./package";
 import { asyncBodyOnLoadDemo } from "./demo";
 import { asyncBodyOnLoadTex } from "./texture";
-import { ui3D, waitClick } from "./ui";
+import { waitClick } from "./ui";
 import { showElectrons } from "./electrons";
-import { showHopfFibration } from "./hopf.js";
-import { showLiouville } from "./liouville.js";
 import { showVectorField } from "./vectorfield";
 
 const common = "@common";
@@ -262,9 +260,8 @@ async function startTestPackage(name : string){
 function makeButtons(params: Map<string, string>){
     makeButton("電磁波").addEventListener("click", async()=>{ await startTestPackage("fdtd") });
     makeButton("電子雲").addEventListener("click", async()=>{ await showElectrons() });
-    // makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await showHopfFibration() });
     makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await startTestPackage("hopf") });
-    makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await showLiouville() });
+    makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await startTestPackage("liouville") });
     makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await showVectorField() });
     makeButton("三体").addEventListener("click", async()=>{ await startTestPackage("three-body") });
 
