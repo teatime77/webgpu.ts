@@ -43,8 +43,8 @@ fn main(
     let pi = 3.1415926535;
 
     // 1. Map instance_index to (theta, phi) on the S2 sphere
-    let num_theta = u.gridSize.x;
-    let num_phi = u.gridSize.y;
+    let num_theta = 30.0;
+    let num_phi = 40.0;
     let phi_idx = f32(instance_idx % u32(num_phi));
     let theta_idx = f32(instance_idx / u32(num_phi));
 

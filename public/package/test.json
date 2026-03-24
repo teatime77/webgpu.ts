@@ -1,5 +1,34 @@
 [
     {
+        "name" : "hopf",
+        "computes" : [
+            {
+                "compName" : "hopf-comp",
+                "globalGrid" : [1200],
+                "shapes" : [
+                    {
+                        "type" : "GeodesicPolyhedron",
+                        "vertName" : "mesh-instance-vert",
+                        "fragName" : "phong-frag",
+                        "divideCount": 2,
+                        "scale" : [0.2, 0.2, 0.2]
+                    }
+                ]
+            }
+        ]
+        ,
+        "shapes" : [
+            {
+                "type" : "Line",
+                "vertName" : "hopf-vert",
+                "fragName" : "color-frag",
+                "gridSize": [64, 1200]
+            }
+        ]
+    }
+    ,
+    {
+        "name" : "three-body",
         "computes" : [
             {
                 "compName" : "three-body-com",
@@ -17,6 +46,7 @@
     }
     ,
     {
+        "name" : "fdtd",
         "computes" : [
             {
                 "compName" : "fdtd-comp",
@@ -209,6 +239,34 @@
                         "fragName" : "phong-frag"
                     }
                 ]
+            }
+        ]
+    }
+    ,
+    {
+        "name" : "liouville",
+        "computes" : [
+            {
+                "compName" : "liouville-comp",
+                "globalGrid" : [529],
+                "shapes" : [
+                    {
+                        "type" : "Point",
+                        "vertName" : "point-instance-vert",
+                        "fragName" : "color-frag",
+                        "divideCount": 2,
+                        "scale" : [0.2, 0.2, 0.2]
+                    }
+                ]
+            }
+        ]
+        ,
+        "shapes" : [
+            {
+                "type" : "Surface",
+                "vertName" : "hamiltonian-vert",
+                "fragName" : "phong-frag",
+                "gridSize": [64, 64]
             }
         ]
     }

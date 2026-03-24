@@ -20,6 +20,7 @@ export class ShapeInfo {
 }
 
 export class Package {
+    name     : string | undefined;
     computes : ComputeInfo[] | undefined;
     shapes   : ShapeInfo[] | undefined;
 }

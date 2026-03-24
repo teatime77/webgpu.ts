@@ -253,13 +253,20 @@ function makeButton( text : string) : HTMLButtonElement {
     return button;
 }
 
+async function startTestPackage(name : string){
+    const pkg = testPackages.find(x => x.name == name);
+    if(pkg == undefined){throw new MyError()};
+    await startPackage(pkg);
+}
+
 function makeButtons(params: Map<string, string>){
-    makeButton("電磁波").addEventListener("click", async()=>{ await startPackage(testPackages[1]) });
+    makeButton("電磁波").addEventListener("click", async()=>{ await startTestPackage("fdtd") });
     makeButton("電子雲").addEventListener("click", async()=>{ await showElectrons() });
-    makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await showHopfFibration() });
+    // makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await showHopfFibration() });
+    makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await startTestPackage("hopf") });
     makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await showLiouville() });
     makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await showVectorField() });
-    makeButton("三体").addEventListener("click", async()=>{ await startPackage(testPackages[0]) });
+    makeButton("三体").addEventListener("click", async()=>{ await startTestPackage("three-body") });
 
     if(params.has("debug")){
         makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
