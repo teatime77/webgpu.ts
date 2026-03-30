@@ -24,6 +24,7 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     let betaSlider: HTMLInputElement;
     let betaValueSpan: HTMLSpanElement;
     let initialBeta = 5.5;
+    let vizMode: 'plaquette' | 'vortex' = 'vortex';
 
     const controlsContainerId = 'lgt-controls-container';
     let controlsContainer = document.getElementById(controlsContainerId);
@@ -53,11 +54,27 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         controlsContainer.appendChild(betaSlider);
         controlsContainer.appendChild(betaValueSpan);
 
+        // --- Create UI for visualization mode ---
+        const vizControlsContainer = document.createElement('div');
+        vizControlsContainer.id = 'lgt-viz-controls';
+        vizControlsContainer.style.margin = '10px';
+        vizControlsContainer.innerHTML = `
+            <span style="margin-right: 10px;">Visualization:</span>
+            <input type="radio" id="viz-vortex" name="viz-mode" value="vortex" checked>
+            <label for="viz-vortex" style="margin-right: 10px;">Vortices</label>
+            <input type="radio" id="viz-plaquette" name="viz-mode" value="plaquette">
+            <label for="viz-plaquette">Plaquette Energy</label>
+        `;
+
+        controlsContainer.appendChild(vizControlsContainer);
+
         document.getElementById('span-buttons')?.insertAdjacentElement('afterend', controlsContainer);
     } else {
         betaSlider = document.getElementById('beta-slider') as HTMLInputElement;
         betaValueSpan = document.getElementById('beta-value') as HTMLSpanElement;
         initialBeta = parseFloat(betaSlider.value);
+        const vortexRadio = document.getElementById('viz-vortex') as HTMLInputElement;
+        vizMode = vortexRadio.checked ? 'vortex' : 'plaquette';
     }
 
     if (!device) {
@@ -113,8 +130,8 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     rngBuffer.unmap();
 
     // Plaquette results buffer (for measurement)
-    const plaquetteBuffer = device.createBuffer({
-        size: L_squared * 4, // L*L sites * f32
+    const vizResultBuffer = device.createBuffer({
+        size: L_squared * 4, // L*L sites * f32 (can be bitcast from i32)
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
@@ -138,7 +155,7 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: { type: 'storage' }
             },
-            { // @binding(3) var<storage, read_write> plaquette_results
+            { // @binding(3) var<storage, read_write> viz_results
                 binding: 3,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: { type: 'storage' }
@@ -156,7 +173,11 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         layout: pipelineLayout,
         compute: { module: shaderModule, entryPoint: 'metropolis_update' },
     });
-    const measurePipeline = await device.createComputePipelineAsync({
+    const measureVortexPipeline = await device.createComputePipelineAsync({
+        layout: pipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'measure_vortices' },
+    });
+    const measurePlaquettePipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
         compute: { module: shaderModule, entryPoint: 'measure_plaquette' },
     });
@@ -167,7 +188,7 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
             { binding: 0, resource: { buffer: paramsBuffer } },
             { binding: 1, resource: { buffer: linksBuffer } },
             { binding: 2, resource: { buffer: rngBuffer } },
-            { binding: 3, resource: { buffer: plaquetteBuffer } },
+            { binding: 3, resource: { buffer: vizResultBuffer } },
         ],
     });
 
@@ -198,18 +219,41 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
 
     const renderBindGroupLayout = device.createBindGroupLayout({
         entries: [
-            { // @binding(0) var<storage, read> plaquette_results
+            { // @binding(0) var<storage, read> viz_results
                 binding: 0,
                 visibility: GPUShaderStage.VERTEX,
                 buffer: { type: 'read-only-storage' } // Best practice for read-only in render
+            },
+            { // @binding(1) var<uniform> render_params
+                binding: 1,
+                visibility: GPUShaderStage.VERTEX,
+                buffer: { type: 'uniform' }
             }
         ]
+    });
+
+    // Create a uniform buffer for render parameters (viz_mode)
+    const renderParams = new Uint32Array([vizMode === 'vortex' ? 1 : 0]); // 0=plaquette, 1=vortex
+    const renderParamsBuffer = device.createBuffer({
+        size: renderParams.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(renderParamsBuffer, 0, renderParams);
+
+    // Add event listeners for the radio buttons
+    document.querySelectorAll<HTMLInputElement>('input[name="viz-mode"]').forEach(radio => {
+        radio.onchange = () => {
+            vizMode = radio.value as 'plaquette' | 'vortex';
+            const vizModeValue = vizMode === 'vortex' ? 1 : 0;
+            device.queue.writeBuffer(renderParamsBuffer, 0, new Uint32Array([vizModeValue]));
+        };
     });
 
     const renderBindGroup = device.createBindGroup({
         layout: renderBindGroupLayout,
         entries: [
-            { binding: 0, resource: { buffer: plaquetteBuffer } }
+            { binding: 0, resource: { buffer: vizResultBuffer } },
+            { binding: 1, resource: { buffer: renderParamsBuffer } }
         ]
     });
 
@@ -234,26 +278,35 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     // 5. Start a custom animation loop to run the update shader
     let animationId: number | null = null;
     let frameCount = 0;
+    const sweepsPerFrame = 10; // Number of Monte Carlo sweeps per rendered frame
 
     function frame() {
-        // Update the 'update_subset' uniform to avoid race conditions.
-        // This cycles through 4 checkerboard patterns (0, 1, 2, 3).
-        device.queue.writeBuffer(
-            paramsBuffer,
-            4, // Offset of update_subset (f32 beta is 4 bytes)
-            new Uint32Array([frameCount % 4])
-        );
-
         const commandEncoder = device.createCommandEncoder();
         const passEncoder = commandEncoder.beginComputePass();
 
-        // 1. Evolve the system
-        passEncoder.setPipeline(updatePipeline);
-        passEncoder.setBindGroup(0, bindGroup);
-        passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+        // 1. Evolve the system with multiple sweeps
+        for (let i = 0; i < sweepsPerFrame; i++) {
+            // Update the 'update_subset' uniform to avoid race conditions.
+            // This cycles through 4 checkerboard patterns (0, 1, 2, 3).
+            // We need to ensure the subset index is unique for each update step.
+            const subsetIndex = (frameCount * sweepsPerFrame + i) % 4;
+            device.queue.writeBuffer(
+                paramsBuffer,
+                4, // Offset of update_subset (f32 beta is 4 bytes)
+                new Uint32Array([subsetIndex])
+            );
 
+            passEncoder.setPipeline(updatePipeline);
+            passEncoder.setBindGroup(0, bindGroup);
+            passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+        }
+        
         // 2. Measure the result of the evolution
-        passEncoder.setPipeline(measurePipeline);
+        if (vizMode === 'vortex') {
+            passEncoder.setPipeline(measureVortexPipeline);
+        } else {
+            passEncoder.setPipeline(measurePlaquettePipeline);
+        }
         passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
 
         passEncoder.end();

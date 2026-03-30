@@ -1,156 +1,205 @@
-const L = 32u; // Lattice size
-const L_squared = L * L;
+// File: ./wgsl/lgt_u1.wgsl
 
+// --- Constants ---
+// These must match the values in the TypeScript file.
+const L: u32 = 32u;
+const L_squared: u32 = L * L;
+const WORKGROUP_SIZE: u32 = 8u;
+
+const PI: f32 = 3.1415926535;
+const TWO_PI: f32 = 2.0 * PI;
+
+// --- Uniforms & Storage Buffers ---
 struct SimParams {
     beta: f32,
-    // A value that changes each frame to pick a different link subset to update.
-    // This avoids race conditions where adjacent threads update neighboring links.
-    // Can be 0, 1, 2, 3 for (even/odd x, even/odd y) subsets.
-    update_subset: u32, 
+    update_subset: u32,
 };
 
 @group(0) @binding(0) var<uniform> params: SimParams;
-
-// Link variables U are stored as vec2<f32>(cos(theta), sin(theta))
-// Layout: 2*L*L array.
-// First L*L for horizontal links (mu=0)
-// Second L*L for vertical links (mu=1)
-@group(0) @binding(1) var<storage, read_write> links: array<vec2<f32>>;
-
-// State for random number generator
+@group(0) @binding(1) var<storage, read_write> links: array<vec2<f32>>; // Stored as (cos, sin)
 @group(0) @binding(2) var<storage, read_write> rng_state: array<u32>;
+@group(0) @binding(3) var<storage, read_write> viz_results: array<f32>; // Can be bitcast from i32
 
-// Buffer to store results of measurements
-@group(0) @binding(3) var<storage, read_write> plaquette_results: array<f32>;
-
-// --- Complex number helpers ---
-fn cmul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+// --- Helper Functions ---
+fn get_site_idx(coord: vec2<u32>) -> u32 {
+    return coord.y * L + coord.x;
 }
 
-fn cconj(a: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(a.x, -a.y);
+fn get_link_idx(site_idx: u32, dir: u32) -> u32 {
+    return 2u * site_idx + dir;
 }
 
-// --- Lattice and Link helpers (with periodic boundary conditions) ---
-fn get_link_idx(x: u32, y: u32, mu: u32) -> u32 {
-    return mu * L_squared + (y % L) * L + (x % L);
+fn get_link(coord: vec2<u32>, dir: u32) -> vec2<f32> {
+    let site_idx = get_site_idx(coord);
+    let link_idx = get_link_idx(site_idx, dir);
+    return links[link_idx];
 }
 
-fn get_link(x: u32, y: u32, mu: u32) -> vec2<f32> {
-    return links[get_link_idx(x, y, mu)];
+fn set_link(coord: vec2<u32>, dir: u32, val: vec2<f32>) {
+    let site_idx = get_site_idx(coord);
+    let link_idx = get_link_idx(site_idx, dir);
+    links[link_idx] = val;
 }
 
-// --- Random number helpers ---
-fn pcg(state_in: u32) -> vec2<u32> {
-    let state = state_in * 747796405u + 2891336453u;
-    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    let result = (word >> 22u) ^ word;
-    return vec2<u32>(result, state);
+// PCG random number generator
+fn pcg(state: ptr<function, u32>) -> f32 {
+    let old_state = *state;
+    *state = old_state * 747796405u + 2891336453u;
+    let xorshifted = ((old_state >> 18u) ^ old_state) >> 27u;
+    let rot = old_state >> 27u; // For a 32-bit state, the rotation amount is taken from the high bits of the state.
+    let result = (xorshifted >> rot) | (xorshifted << ((0u - rot) & 31u));
+    return f32(result) / f32(0xFFFFFFFFu);
 }
 
-fn random_float(state: ptr<function, u32>) -> f32 {
-    let res = pcg(*state);
-    *state = res.y;
-    return f32(res.x) / 4294967295.0;
+// Complex multiplication: (a+ib) * (c+id)
+fn complex_mul(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Initialize links to a random configuration (hot start)
-@compute @workgroup_size(8, 8, 1)
-fn init_hot(@builtin(global_invocation_id) id: vec3<u32>) {
-    if (id.x >= L || id.y >= L) { return; }
+// Complex conjugate: (a+ib)* = (a-ib)
+fn complex_conj(a: vec2<f32>) -> vec2<f32> {
+    return vec2(a.x, -a.y);
+}
 
-    let idx = id.y * L + id.x;
-    var state = rng_state[idx];
+// --- Compute Kernels ---
 
-    let pi = 3.14159265;
-    // Init horizontal link
-    let angle_h = (random_float(&state) - 0.5) * 2.0 * pi;
-    links[get_link_idx(id.x, id.y, 0u)] = vec2<f32>(cos(angle_h), sin(angle_h));
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn init_hot(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let site_idx = get_site_idx(global_id.xy);
+    if (global_id.x >= L || global_id.y >= L) { return; }
     
-    // Init vertical link
-    let angle_v = (random_float(&state) - 0.5) * 2.0 * pi;
-    links[get_link_idx(id.x, id.y, 1u)] = vec2<f32>(cos(angle_v), sin(angle_v));
+    var site_rng_state = rng_state[site_idx];
 
-    rng_state[idx] = state;
+    let angle1 = pcg(&site_rng_state) * TWO_PI;
+    set_link(global_id.xy, 0u, vec2(cos(angle1), sin(angle1)));
+
+    let angle2 = pcg(&site_rng_state) * TWO_PI;
+    set_link(global_id.xy, 1u, vec2(cos(angle2), sin(angle2)));
+
+    rng_state[site_idx] = site_rng_state;
 }
 
-// One Metropolis update step
-@compute @workgroup_size(8, 8, 1)
-fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
-    let x = id.x;
-    let y = id.y;
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let x = global_id.x;
+    let y = global_id.y;
     if (x >= L || y >= L) { return; }
 
-    // Update only a subset of links to avoid race conditions.
-    if ((x % 2u) != (params.update_subset % 2u) || (y % 2u) != (params.update_subset / 2u)) {
-        return;
+    // Checkerboard update to avoid race conditions
+    let subset = (x + y) % 2u + 2u * (x % 2u);
+    if (subset != params.update_subset) { return; }
+
+    let site_idx = get_site_idx(global_id.xy);
+    let site_coord = global_id.xy;
+    var site_rng_state = rng_state[site_idx];
+
+    // --- Update U_1(x,y) link ---
+    // The link U_0(n) is part of two plaquettes: one starting at n (upper)
+    // and one starting at n-y (lower). We compute the staple for each.
+    let n_xp1 = vec2<u32>((x + 1u) % L, y);
+    let n_yp1 = vec2<u32>(x, (y + 1u) % L);
+    let n_ym1 = vec2<u32>(x, (y - 1u + L) % L);
+    let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y - 1u + L) % L);
+
+    // Staple from upper plaquette (at n)
+    let staple_up = complex_mul(complex_mul(get_link(site_coord, 1u), get_link(n_yp1, 0u)), complex_conj(get_link(n_xp1, 1u)));
+    // Staple from lower plaquette (at n-y). The staple path is U_y(n-y)^-1 * U_x(n-y) * U_y(n-y+x).
+    let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_ym1, 1u)), get_link(n_ym1, 0u)), get_link(n_xp1_ym1, 1u));
+
+    let staple_sum_1 = staple_up + staple_down;
+    let old_link_1 = get_link(site_coord, 0u);
+    let old_action_1 = staple_sum_1.x * old_link_1.x + staple_sum_1.y * old_link_1.y;
+
+    let rand_angle_1 = (pcg(&site_rng_state) - 0.5) * 2.0 * PI;
+    let new_link_1 = vec2(cos(rand_angle_1), sin(rand_angle_1));
+    let new_action_1 = staple_sum_1.x * new_link_1.x + staple_sum_1.y * new_link_1.y;
+
+    let dS_1 = new_action_1 - old_action_1;
+    if (dS_1 > 0.0 || exp(params.beta * dS_1) > pcg(&site_rng_state)) {
+        set_link(site_coord, 0u, new_link_1);
     }
 
-    let r_idx = y * L + x;
-    var state = rng_state[r_idx];
+    // --- Update U_2(x,y) link ---
+    // The link U_1(n) is part of two plaquettes: one starting at n (right)
+    // and one starting at n-x (left). We compute the staple for each.
+    let n_xm1 = vec2<u32>((x - 1u + L) % L, y);
+    let n_xm1_yp1 = vec2<u32>((x - 1u + L) % L, (y + 1u) % L);
 
-    // --- Update horizontal link U_0(x,y) ---
-    // The "staple" is the product of the 3 other links in the two plaquettes sharing U_0(x,y)
-    let staple_h1 = cmul(get_link(x + 1u, y, 1u), cconj(get_link(x, y + 1u, 0u)));
-    let staple_h1_full = cmul(staple_h1, cconj(get_link(x, y, 1u)));
+    // Staple from right plaquette (at n)
+    let staple_right = complex_mul(complex_mul(get_link(site_coord, 0u), get_link(n_xp1, 1u)), complex_conj(get_link(n_yp1, 0u)));
+    // Staple from left plaquette (at n-x)
+    let staple_left = complex_mul(complex_mul(complex_conj(get_link(n_xm1, 0u)), get_link(n_xm1, 1u)), get_link(n_xm1_yp1, 0u));
 
-    let staple_h2 = cmul(cconj(get_link(x, y - 1u, 0u)), get_link(x, y - 1u, 1u));
-    let staple_h2_full = cmul(staple_h2, cconj(get_link(x + 1u, y - 1u, 1u)));
+    let staple_sum_2 = staple_right + staple_left;
+    let old_link_2 = get_link(site_coord, 1u);
+    let old_action_2 = staple_sum_2.x * old_link_2.x + staple_sum_2.y * old_link_2.y;
 
-    let staple_h = staple_h1_full + staple_h2_full;
+    let rand_angle_2 = (pcg(&site_rng_state) - 0.5) * 2.0 * PI;
+    let new_link_2 = vec2(cos(rand_angle_2), sin(rand_angle_2));
+    let new_action_2 = staple_sum_2.x * new_link_2.x + staple_sum_2.y * new_link_2.y;
 
-    let old_link_h = get_link(x, y, 0u);
-    // Propose a new link by rotating the old one by a small random angle.
-    // The width of the change (2.0 here) should be tuned for ~50% acceptance rate.
-    let d_theta = (random_float(&state) - 0.5) * 2.0;
-    let d_link = vec2<f32>(cos(d_theta), sin(d_theta));
-    let new_link_h = cmul(old_link_h, d_link);
-
-    // The change in action is proportional to Re( (U_new - U_old) * Staple )
-    let delta_S_h = params.beta * (cmul(new_link_h, staple_h).x - cmul(old_link_h, staple_h).x);
-
-    if (exp(delta_S_h) > random_float(&state)) {
-        links[get_link_idx(x, y, 0u)] = new_link_h;
+    let dS_2 = new_action_2 - old_action_2;
+    if (dS_2 > 0.0 || exp(params.beta * dS_2) > pcg(&site_rng_state)) {
+        set_link(site_coord, 1u, new_link_2);
     }
 
-    // --- Update vertical link U_1(x,y) ---
-    let staple_v1 = cmul(get_link(x, y + 1u, 0u), cconj(get_link(x + 1u, y, 1u)));
-    let staple_v1_full = cmul(staple_v1, cconj(get_link(x, y, 0u)));
-
-    let staple_v2 = cmul(cconj(get_link(x - 1u, y, 1u)), get_link(x - 1u, y, 0u));
-    let staple_v2_full = cmul(staple_v2, cconj(get_link(x - 1u, y + 1u, 0u)));
-    
-    let staple_v = staple_v1_full + staple_v2_full;
-
-    let old_link_v = get_link(x, y, 1u);
-    let d_theta_v = (random_float(&state) - 0.5) * 2.0;
-    let d_link_v = vec2<f32>(cos(d_theta_v), sin(d_theta_v));
-    let new_link_v = cmul(old_link_v, d_link_v);
-
-    let delta_S_v = params.beta * (cmul(new_link_v, staple_v).x - cmul(old_link_v, staple_v).x);
-
-    if (exp(delta_S_v) > random_float(&state)) {
-        links[get_link_idx(x, y, 1u)] = new_link_v;
-    }
-
-    rng_state[r_idx] = state;
+    rng_state[site_idx] = site_rng_state;
 }
 
-// --- Observable: Average Plaquette Value ---
-@compute @workgroup_size(8, 8, 1)
-fn measure_plaquette(@builtin(global_invocation_id) id: vec3<u32>) {
-    let x = id.x;
-    let y = id.y;
+// =============================================================================
+// NEW KERNEL: Measure Vortices
+// This kernel calculates the integer vortex charge for each plaquette.
+// =============================================================================
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn measure_vortices(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let x = global_id.x;
+    let y = global_id.y;
+    let site_idx = get_site_idx(global_id.xy);
     if (x >= L || y >= L) { return; }
 
-    let u0 = get_link(x, y, 0u);
-    let u1 = get_link(x + 1u, y, 1u);
-    let u2 = cconj(get_link(x, y + 1u, 0u));
-    let u3 = cconj(get_link(x, y, 1u));
+    // A plaquette is defined by its bottom-left corner (x,y).
+    // The angle sum is theta_1(n) + theta_2(n+x) - theta_1(n+y) - theta_2(n)
+    let n = vec2<u32>(x, y);
+    let n_xp1 = vec2<u32>((x + 1u) % L, y);
+    let n_yp1 = vec2<u32>(x, (y + 1u) % L);
 
-    let plaquette = cmul(cmul(u0, u1), cmul(u2, u3));
+    // Get link variables (cos, sin) and convert to angles using atan2
+    let theta1_n = atan2(get_link(n, 0u).y, get_link(n, 0u).x);
+    let theta2_n = atan2(get_link(n, 1u).y, get_link(n, 1u).x);
+    let theta1_n_yp1 = atan2(get_link(n_yp1, 0u).y, get_link(n_yp1, 0u).x);
+    let theta2_n_xp1 = atan2(get_link(n_xp1, 1u).y, get_link(n_xp1, 1u).x);
 
-    let idx = y * L + x;
-    plaquette_results[idx] = plaquette.x; // Store Re(P)
+    // Sum of angles around the plaquette. This can be outside [-PI, PI].
+    let plaquette_angle_sum = theta1_n + theta2_n_xp1 - theta1_n_yp1 - theta2_n;
+
+    // The vortex charge is the integer winding number.
+    // We find it by seeing how many times 2*PI fits into the angle sum.
+    let vortex_charge = i32(round(plaquette_angle_sum / TWO_PI));
+
+    viz_results[site_idx] = bitcast<f32>(vortex_charge);
+}
+
+// =============================================================================
+// KERNEL: Measure Plaquette Energy
+// This kernel calculates the real part of the plaquette operator, Tr Re U_p.
+// =============================================================================
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn measure_plaquette(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let x = global_id.x;
+    let y = global_id.y;
+    let site_idx = get_site_idx(global_id.xy);
+    if (x >= L || y >= L) { return; }
+
+    // Plaquette operator U_p = U_1(n) U_2(n+x) U_1(n+y)* U_2(n)*
+    let n = vec2<u32>(x, y);
+    let n_xp1 = vec2<u32>((x + 1u) % L, y);
+    let n_yp1 = vec2<u32>(x, (y + 1u) % L);
+
+    let p1 = get_link(n, 0u);
+    let p2 = get_link(n_xp1, 1u);
+    let p3 = complex_conj(get_link(n_yp1, 0u));
+    let p4 = complex_conj(get_link(n, 1u));
+
+    let plaquette_val = complex_mul(complex_mul(complex_mul(p1, p2), p3), p4);
+    viz_results[site_idx] = plaquette_val.x; // Store the real part (cosine of the angle)
 }
