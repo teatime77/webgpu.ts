@@ -1,5 +1,5 @@
 import { $, $div, assert, fetchText, msg, MyError, parseURL } from "@i18n";
-import { asyncBodyOnLoad, makeShaderModule } from "./util";
+import { asyncBodyOnLoad, g_device, makeShaderModule } from "./util";
 import { lexicalAnalysis } from "./lex";
 import { Domain, BufferReadWrite, getUniformVars, getReadStorageVars, getWriteStorageVars, getStorageVars, App, CallStatement, indexOpr, RefVar, VariableDeclaration, Module, ConstNum } from "./syntax"
 import { Context, Parser } from "./parser";
@@ -12,6 +12,7 @@ import { asyncBodyOnLoadTex } from "./texture";
 import { waitClick } from "./ui";
 import { showElectrons } from "./electrons";
 import { runHMC } from "./hmc";
+import { runLGT } from "./lgt";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -251,24 +252,38 @@ function makeButton( text : string) : HTMLButtonElement {
     return button;
 }
 
+let currentStopFunction: () => void = () => {};
+
+function stopCurrentAnimation() {
+    stopAnimation(); // Stop the framework's default animation loop
+    currentStopFunction(); // Stop any custom animation loop (like LGT)
+    currentStopFunction = () => {}; // Reset the stopper
+}
+
 async function startTestPackage(name : string){
+    stopCurrentAnimation();
     const pkg = testPackages.find(x => x.name == name);
     if(pkg == undefined){throw new MyError()};
     await startPackage(pkg);
 }
 
 function makeButtons(params: Map<string, string>){
-    makeButton("電磁波").addEventListener("click", async()=>{ await startTestPackage("fdtd") });
-    makeButton("電子雲").addEventListener("click", async()=>{ await showElectrons() });
-    makeButton("Hopfのファイバー束").addEventListener("click", async()=>{ await startTestPackage("hopf") });
-    makeButton("Liouvilleの定理").addEventListener("click", async()=>{ await startTestPackage("liouville") });
-    makeButton("ハミルトンベクトル場").addEventListener("click", async()=>{ await startTestPackage("vector-field") });
-    makeButton("三体").addEventListener("click", async()=>{ await startTestPackage("three-body") });
-    makeButton("HMC").addEventListener("click", async()=>{ await runHMC() });
+    makeButton("電磁波").addEventListener("click", async() => { await startTestPackage("fdtd") });
+    makeButton("電子雲").addEventListener("click", async() => { stopCurrentAnimation(); await showElectrons() });
+    makeButton("Hopfのファイバー束").addEventListener("click", async() => { await startTestPackage("hopf") });
+    makeButton("Liouvilleの定理").addEventListener("click", async() => { await startTestPackage("liouville") });
+    makeButton("ハミルトンベクトル場").addEventListener("click", async() => { await startTestPackage("vector-field") });
+    makeButton("三体").addEventListener("click", async() => { await startTestPackage("three-body") });
+    makeButton("格子ゲージ理論").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        // @ts-ignore: globalDevice is initialized by asyncBodyOnLoad
+        currentStopFunction = await runLGT(g_device);
+    });
+    makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 
     if(params.has("debug")){
-        makeButton("test all").addEventListener("click", async()=>{ await asyncBodyOnLoadTestAll() });
-        makeButton("Stop").addEventListener("click", ()=>{ stopAnimation() });
+        makeButton("test all").addEventListener("click", async() => { stopCurrentAnimation(); await asyncBodyOnLoadTestAll() });
+        makeButton("Stop").addEventListener("click", () => { stopCurrentAnimation() });
         $("div-color").style.display = "block";
         $("next-button").style.display = "inline-block";
     }
