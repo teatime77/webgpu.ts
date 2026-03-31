@@ -93,50 +93,56 @@ fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let site_coord = global_id.xy;
     var site_rng_state = rng_state[site_idx];
 
-    // --- Update U_1(x,y) link ---
-    // The link U_0(n) is part of two plaquettes: one starting at n (upper)
-    // and one starting at n-y (lower). We compute the staple for each.
+    // --- Update U_0(n) link (x-direction) ---
+    // This link is part of two plaquettes: P(n) and P(n-y)
     let n_xp1 = vec2<u32>((x + 1u) % L, y);
     let n_yp1 = vec2<u32>(x, (y + 1u) % L);
     let n_ym1 = vec2<u32>(x, (y - 1u + L) % L);
     let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y - 1u + L) % L);
 
-    // Staple from upper plaquette (at n)
-    let staple_up = complex_mul(complex_mul(get_link(site_coord, 1u), get_link(n_yp1, 0u)), complex_conj(get_link(n_xp1, 1u)));
-    // Staple from lower plaquette (at n-y). The staple path is U_y(n-y)^-1 * U_x(n-y) * U_y(n-y+x).
-    let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_ym1, 1u)), get_link(n_ym1, 0u)), get_link(n_xp1_ym1, 1u));
+    // Staple from P(n) = U0(n) U1(n+x) U0(n+y)^-1 U1(n)^-1
+    // The staple is V_up = U1(n+x) U0(n+y)^-1 U1(n)^-1
+    let staple_up = complex_mul(complex_mul(get_link(n_xp1, 1u), complex_conj(get_link(n_yp1, 0u))), complex_conj(get_link(site_coord, 1u)));
+    
+    // Staple from P(n-y) = U0(n-y) U1(n-y+x) U0(n)^-1 U1(n-y)^-1.
+    // The action part is Re(U0(n)^-1 * Staple), which is Re(U0(n) * Staple^dagger)
+    // The staple^dagger is V_down_dag = U1(n-y+x)^-1 U0(n-y)^-1 U1(n-y)
+    let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_xp1_ym1, 1u)), complex_conj(get_link(n_ym1, 0u))), get_link(n_ym1, 1u));
 
     let staple_sum_1 = staple_up + staple_down;
     let old_link_1 = get_link(site_coord, 0u);
-    let old_action_1 = staple_sum_1.x * old_link_1.x + staple_sum_1.y * old_link_1.y;
+    let old_action_1 = dot(staple_sum_1, old_link_1);
 
     let rand_angle_1 = (pcg(&site_rng_state) - 0.5) * 2.0 * PI;
     let new_link_1 = vec2(cos(rand_angle_1), sin(rand_angle_1));
-    let new_action_1 = staple_sum_1.x * new_link_1.x + staple_sum_1.y * new_link_1.y;
+    let new_action_1 = dot(staple_sum_1, new_link_1);
 
     let dS_1 = new_action_1 - old_action_1;
     if (dS_1 > 0.0 || exp(params.beta * dS_1) > pcg(&site_rng_state)) {
         set_link(site_coord, 0u, new_link_1);
     }
 
-    // --- Update U_2(x,y) link ---
-    // The link U_1(n) is part of two plaquettes: one starting at n (right)
-    // and one starting at n-x (left). We compute the staple for each.
+    // --- Update U_1(n) link (y-direction) ---
+    // This link is part of two plaquettes: P(n) and P(n-x)
     let n_xm1 = vec2<u32>((x - 1u + L) % L, y);
     let n_xm1_yp1 = vec2<u32>((x - 1u + L) % L, (y + 1u) % L);
 
-    // Staple from right plaquette (at n)
-    let staple_right = complex_mul(complex_mul(get_link(site_coord, 0u), get_link(n_xp1, 1u)), complex_conj(get_link(n_yp1, 0u)));
-    // Staple from left plaquette (at n-x)
+    // Staple from P(n) = U0(n) U1(n+x) U0(n+y)^-1 U1(n)^-1
+    // Action part is Re(U1(n)^-1 * Staple), so we use Staple^dagger
+    // Staple^dagger is V_right_dag = U0(n+y) U1(n+x)^-1 U0(n)^-1
+    let staple_right = complex_mul(complex_mul(get_link(n_yp1, 0u), complex_conj(get_link(n_xp1, 1u))), complex_conj(get_link(site_coord, 0u)));
+    
+    // Staple from P(n-x) = U0(n-x) U1(n) U0(n-x+y)^-1 U1(n-x)^-1
+    // The staple is V_left = U0(n-x+y)^-1 U1(n-x)^-1 U0(n-x)
     let staple_left = complex_mul(complex_mul(complex_conj(get_link(n_xm1, 0u)), get_link(n_xm1, 1u)), get_link(n_xm1_yp1, 0u));
 
     let staple_sum_2 = staple_right + staple_left;
     let old_link_2 = get_link(site_coord, 1u);
-    let old_action_2 = staple_sum_2.x * old_link_2.x + staple_sum_2.y * old_link_2.y;
+    let old_action_2 = dot(staple_sum_2, old_link_2);
 
     let rand_angle_2 = (pcg(&site_rng_state) - 0.5) * 2.0 * PI;
     let new_link_2 = vec2(cos(rand_angle_2), sin(rand_angle_2));
-    let new_action_2 = staple_sum_2.x * new_link_2.x + staple_sum_2.y * new_link_2.y;
+    let new_action_2 = dot(staple_sum_2, new_link_2);
 
     let dS_2 = new_action_2 - old_action_2;
     if (dS_2 > 0.0 || exp(params.beta * dS_2) > pcg(&site_rng_state)) {

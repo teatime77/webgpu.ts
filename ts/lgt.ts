@@ -68,6 +68,13 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
 
         controlsContainer.appendChild(vizControlsContainer);
 
+        const avgPlaquetteSpan = document.createElement('span');
+        avgPlaquetteSpan.id = 'avg-plaquette-value';
+        avgPlaquetteSpan.style.display = 'block';
+        avgPlaquetteSpan.style.margin = '10px';
+        avgPlaquetteSpan.innerText = 'Avg Plaquette: ...';
+        controlsContainer.appendChild(avgPlaquetteSpan);
+
         document.getElementById('span-buttons')?.insertAdjacentElement('afterend', controlsContainer);
     } else {
         betaSlider = document.getElementById('beta-slider') as HTMLInputElement;
@@ -112,6 +119,71 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         );
     };
 
+    // --- Measurement Setup ---
+    // Bessel functions for theoretical calculation
+    function besselI0(x: number, terms = 15): number {
+        let sum = 1.0;
+        let term = 1.0;
+        for (let k = 1; k <= terms; k++) {
+            term *= (x * x) / (4 * k * k);
+            sum += term;
+        }
+        return sum;
+    }
+
+    function besselI1(x: number, terms = 15): number {
+        let sum = 0.0;
+        let term = x / 2.0;
+        sum += term;
+        for (let k = 1; k <= terms; k++) {
+            term *= (x * x) / (4 * k * (k + 1));
+            sum += term;
+        }
+        return sum;
+    }
+
+    // Debounce helper to avoid overwhelming the system with measurements
+    function debounce(func: (...args: any[]) => void, delay: number) {
+        let timeoutId: number;
+        return (...args: any[]) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                func(...args);
+            }, delay);
+        };
+    }
+
+    let measurementRequested = false;
+
+    const avgPlaquetteSpan = document.getElementById('avg-plaquette-value') as HTMLSpanElement;
+    async function performMeasurement() {
+        if (vizMode !== 'plaquette') {
+            avgPlaquetteSpan.innerText = 'Switch to Plaquette Energy view to measure.';
+            return;
+        }
+        
+        await readbackBuffer.mapAsync(GPUMapMode.READ);
+        const data = new Float32Array(readbackBuffer.getMappedRange());
+        let sum = 0;
+        for (let i = 0; i < L_squared; i++) {
+            sum += data[i];
+        }
+        const simulatedAvg = sum / L_squared;
+        readbackBuffer.unmap();
+
+        const currentBeta = parseFloat(betaSlider.value);
+        const theoreticalAvg = besselI1(currentBeta) / besselI0(currentBeta);
+        
+        const text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
+        avgPlaquetteSpan.innerText = text;
+        console.log(`Beta = ${currentBeta.toFixed(1)} -> ${text}`);
+    }
+
+    const debouncedRequestHandler = debounce(() => {
+        measurementRequested = true;
+    }, 500); // 500ms delay
+    betaSlider.addEventListener('input', debouncedRequestHandler);
+
     // Link variables: vec2<f32> per link
     const linksBuffer = device.createBuffer({
         size: 2 * L_squared * 2 * 4, // 2 directions * L*L sites * vec2<f32> (8 bytes)
@@ -133,6 +205,12 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     const vizResultBuffer = device.createBuffer({
         size: L_squared * 4, // L*L sites * f32 (can be bitcast from i32)
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    // A buffer on the CPU side to read back the results.
+    const readbackBuffer = device.createBuffer({
+        size: L_squared * 4,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
 
     // 3. Create Pipelines & Bind Group
@@ -246,6 +324,7 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
             vizMode = radio.value as 'plaquette' | 'vortex';
             const vizModeValue = vizMode === 'vortex' ? 1 : 0;
             device.queue.writeBuffer(renderParamsBuffer, 0, new Uint32Array([vizModeValue]));
+            debouncedRequestHandler(); // Trigger measurement when mode changes
         };
     });
 
@@ -311,6 +390,13 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
 
         passEncoder.end();
 
+        // --- Copy result for CPU readback ---
+        commandEncoder.copyBufferToBuffer(
+            vizResultBuffer, 0, // source
+            readbackBuffer, 0,  // destination
+            vizResultBuffer.size
+        );
+
         // --- Render Pass ---
         // Get the current texture from the canvas to render to.
         const textureView = context.getCurrentTexture().createView();
@@ -331,10 +417,19 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         renderPassEncoder.end();
         device.queue.submit([commandEncoder.finish()]);
 
+        // After submitting, check if a measurement is requested
+        if (measurementRequested) {
+            measurementRequested = false; // Reset the flag
+            // Wait for the submitted work to finish, then perform the measurement.
+            // This ensures the copy to readbackBuffer is complete before we try to map it.
+            device.queue.onSubmittedWorkDone().then(() => performMeasurement());
+        }
+
         frameCount++;
         animationId = requestAnimationFrame(frame);
     }
     frame(); // Start the loop
+    measurementRequested = true; // Perform an initial measurement
 
     // Return a "stopper" function to be called when this animation should end.
     return () => {
