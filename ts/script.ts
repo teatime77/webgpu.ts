@@ -274,10 +274,13 @@ function makeButtons(params: Map<string, string>){
     makeButton("Liouvilleの定理").addEventListener("click", async() => { await startTestPackage("liouville") });
     makeButton("ハミルトンベクトル場").addEventListener("click", async() => { await startTestPackage("vector-field") });
     makeButton("三体").addEventListener("click", async() => { await startTestPackage("three-body") });
-    makeButton("格子ゲージ理論").addEventListener("click", async() => { 
+    makeButton("2D U(1)").addEventListener("click", async() => { 
         stopCurrentAnimation();
-        // @ts-ignore: globalDevice is initialized by asyncBodyOnLoad
-        currentStopFunction = await runLGT(g_device);
+        currentStopFunction = await runLGT(g_device, "U1");
+    });
+    makeButton("2D SU(2)").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runLGT(g_device, "SU2");
     });
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 

@@ -1,6 +1,5 @@
 import { fetchText, msg } from "@i18n";
 import { stopAnimation } from "./instance";
-import { ComputePipeline } from "./compute";
 
 /**
  * This function sets up and runs a 2D U(1) Lattice Gauge Theory simulation.
@@ -12,8 +11,8 @@ import { ComputePipeline } from "./compute";
  * NOTE: This assumes a global `device: GPUDevice` object is available,
  * which is typical in WebGPU applications and seems to be the case in your framework.
  */
-export async function runLGT(device: GPUDevice): Promise<() => void> {
-    msg("Starting 2D U(1) Lattice Gauge Theory simulation.");
+export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Promise<() => void> {
+    msg(`Starting 2D ${theory} Lattice Gauge Theory simulation.`);
     stopAnimation(); // Stop any previous animation
 
     const L = 32; // Must match const in lgt_u1.wgsl
@@ -24,7 +23,7 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     let betaSlider: HTMLInputElement;
     let betaValueSpan: HTMLSpanElement;
     let initialBeta = 5.5;
-    let vizMode: 'plaquette' | 'vortex' = 'vortex';
+    let vizMode: 'plaquette' | 'vortex' = theory === 'U1' ? 'vortex' : 'plaquette';
 
     const controlsContainerId = 'lgt-controls-container';
     let controlsContainer = document.getElementById(controlsContainerId);
@@ -55,18 +54,20 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         controlsContainer.appendChild(betaValueSpan);
 
         // --- Create UI for visualization mode ---
-        const vizControlsContainer = document.createElement('div');
-        vizControlsContainer.id = 'lgt-viz-controls';
-        vizControlsContainer.style.margin = '10px';
-        vizControlsContainer.innerHTML = `
-            <span style="margin-right: 10px;">Visualization:</span>
-            <input type="radio" id="viz-vortex" name="viz-mode" value="vortex" checked>
-            <label for="viz-vortex" style="margin-right: 10px;">Vortices</label>
-            <input type="radio" id="viz-plaquette" name="viz-mode" value="plaquette">
-            <label for="viz-plaquette">Plaquette Energy</label>
-        `;
-
-        controlsContainer.appendChild(vizControlsContainer);
+        // Vortices are a U(1) concept.
+        if (theory === 'U1') {
+            const vizControlsContainer = document.createElement('div');
+            vizControlsContainer.id = 'lgt-viz-controls';
+            vizControlsContainer.style.margin = '10px';
+            vizControlsContainer.innerHTML = `
+                <span style="margin-right: 10px;">Visualization:</span>
+                <input type="radio" id="viz-vortex" name="viz-mode" value="vortex" checked>
+                <label for="viz-vortex" style="margin-right: 10px;">Vortices</label>
+                <input type="radio" id="viz-plaquette" name="viz-mode" value="plaquette">
+                <label for="viz-plaquette">Plaquette Energy</label>
+            `;
+            controlsContainer.appendChild(vizControlsContainer);
+        }
 
         const avgPlaquetteSpan = document.createElement('span');
         avgPlaquetteSpan.id = 'avg-plaquette-value';
@@ -80,8 +81,10 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         betaSlider = document.getElementById('beta-slider') as HTMLInputElement;
         betaValueSpan = document.getElementById('beta-value') as HTMLSpanElement;
         initialBeta = parseFloat(betaSlider.value);
-        const vortexRadio = document.getElementById('viz-vortex') as HTMLInputElement;
-        vizMode = vortexRadio.checked ? 'vortex' : 'plaquette';
+        if (theory === 'U1') {
+            const vortexRadio = document.getElementById('viz-vortex') as HTMLInputElement;
+            vizMode = vortexRadio.checked ? 'vortex' : 'plaquette';
+        }
     }
 
     if (!device) {
@@ -90,34 +93,17 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     }
 
     // 1. Fetch shader code
-    const shaderCode = await fetchText('./wgsl/lgt_u1.wgsl');
+    const shaderCode = await fetchText(theory === 'U1' ? './wgsl/lgt_u1.wgsl' : './wgsl/lgt_su2.wgsl');
     const shaderModule = device.createShaderModule({ code: shaderCode });
 
     // 2. Create Buffers
     // Uniforms: { beta: f32, update_subset: u32 }
-    // The 'beta' parameter controls the "order" of the system.
-    // beta > ~1.0 (weak coupling): System should be ordered (mostly red).
-    // beta < ~1.0 (strong coupling): System should be disordered (random red/blue static).
-    //
-    // TRY CHANGING THIS VALUE!
     const simParams = new Float32Array([initialBeta, 0]); 
     const paramsBuffer = device.createBuffer({
         size: simParams.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(paramsBuffer, 0, simParams);
-
-    // Add event listener to update beta in real-time
-    betaSlider.oninput = () => {
-        const newBeta = parseFloat(betaSlider.value);
-        betaValueSpan.innerText = newBeta.toFixed(1);
-        // Write the new beta value to the uniform buffer
-        device.queue.writeBuffer(
-            paramsBuffer,
-            0, // Offset of beta (it's the first value)
-            new Float32Array([newBeta])
-        );
-    };
 
     // --- Measurement Setup ---
     // Bessel functions for theoretical calculation
@@ -153,15 +139,11 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         };
     }
 
-    let measurementRequested = false;
-
     const avgPlaquetteSpan = document.getElementById('avg-plaquette-value') as HTMLSpanElement;
     async function performMeasurement() {
-        if (vizMode !== 'plaquette') {
-            avgPlaquetteSpan.innerText = 'Switch to Plaquette Energy view to measure.';
-            return;
-        }
-        
+        // This function now only reads the buffer and calculates the average.
+        // The caller is responsible for ensuring the correct data is in the readback buffer.
+
         await readbackBuffer.mapAsync(GPUMapMode.READ);
         const data = new Float32Array(readbackBuffer.getMappedRange());
         let sum = 0;
@@ -172,21 +154,24 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         readbackBuffer.unmap();
 
         const currentBeta = parseFloat(betaSlider.value);
-        const theoreticalAvg = besselI1(currentBeta) / besselI0(currentBeta);
-        
-        const text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
-        avgPlaquetteSpan.innerText = text;
+        let text: string;
+
+        if (theory === 'U1') {
+            const theoreticalAvg = besselI1(currentBeta) / besselI0(currentBeta);
+            text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
+            avgPlaquetteSpan.innerText = text;
+        } else { // SU(2) - theoretical value is harder to compute.
+            text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}`;
+            avgPlaquetteSpan.innerText = text;
+        }
         console.log(`Beta = ${currentBeta.toFixed(1)} -> ${text}`);
     }
 
-    const debouncedRequestHandler = debounce(() => {
-        measurementRequested = true;
-    }, 500); // 500ms delay
-    betaSlider.addEventListener('input', debouncedRequestHandler);
-
     // Link variables: vec2<f32> per link
+    const link_vec_size = theory === 'U1' ? 2 : 4; // U(1) uses vec2, SU(2) uses vec4
     const linksBuffer = device.createBuffer({
-        size: 2 * L_squared * 2 * 4, // 2 directions * L*L sites * vec2<f32> (8 bytes)
+        // 2 directions * L*L sites * vecN<f32> (vec2 for U(1), vec4 for SU(2))
+        size: 2 * L_squared * link_vec_size * 4,
         usage: GPUBufferUsage.STORAGE,
     });
 
@@ -251,10 +236,14 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         layout: pipelineLayout,
         compute: { module: shaderModule, entryPoint: 'metropolis_update' },
     });
-    const measureVortexPipeline = await device.createComputePipelineAsync({
-        layout: pipelineLayout,
-        compute: { module: shaderModule, entryPoint: 'measure_vortices' },
-    });
+    let measureVortexPipeline: GPUComputePipeline | null = null;
+    if (theory === 'U1') {
+        measureVortexPipeline = await device.createComputePipelineAsync({
+            layout: pipelineLayout,
+            compute: { module: shaderModule, entryPoint: 'measure_vortices' },
+        });
+    }
+
     const measurePlaquettePipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
         compute: { module: shaderModule, entryPoint: 'measure_plaquette' },
@@ -270,6 +259,90 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         ],
     });
 
+    // --- State, Constants, and New Simulation Logic ---
+    let animationId: number | null = null;
+    let isThermalizing = false;
+    const thermalizationSweeps = 1500; // Number of sweeps for equilibration
+    const sweepsPerFrame = 10; // Sweeps for live visualization
+
+    // Create a staging buffer for subset indices. This is more efficient than
+    // calling writeBuffer every time, as it allows us to schedule all uniform
+    // updates within a single command encoder.
+    const subsetStagingBuffer = device.createBuffer({
+        size: 16, // 4 * u32
+        usage: GPUBufferUsage.COPY_SRC,
+        mappedAtCreation: true,
+    });
+    new Uint32Array(subsetStagingBuffer.getMappedRange()).set([0, 1, 2, 3]);
+    subsetStagingBuffer.unmap();
+
+    // This new function handles the entire thermalization and measurement process.
+    async function thermalizeAndMeasure() {
+        if (isThermalizing) return; // Don't start a new process if one is running
+        isThermalizing = true;
+
+        // 1. Update UI to show we're busy and stop the animation loop.
+        // The animation loop will just idle by checking `isThermalizing`.
+        betaSlider.disabled = true;
+        avgPlaquetteSpan.innerText = `Thermalizing for ${thermalizationSweeps} sweeps...`;
+
+        // 2. Run thermalization sweeps. We do this in chunks to avoid making the
+        //    GPU unresponsive, which could cause the OS to reset the driver (TDR).
+        const sweepsPerChunk = 100;
+        const numChunks = Math.ceil(thermalizationSweeps / sweepsPerChunk);
+
+        for (let chunk = 0; chunk < numChunks; chunk++) {
+            const commandEncoder = device.createCommandEncoder();
+            for (let i = 0; i < sweepsPerChunk; i++) {
+                // A full Monte Carlo sweep requires updating all 4 checkerboard subsets.
+                for (let j = 0; j < 4; j++) {
+                    commandEncoder.copyBufferToBuffer(subsetStagingBuffer, j * 4, paramsBuffer, 4, 4);
+                    const pass = commandEncoder.beginComputePass();
+                    pass.setPipeline(updatePipeline);
+                    pass.setBindGroup(0, bindGroup);
+                    pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+                    pass.end();
+                }
+            }
+            device.queue.submit([commandEncoder.finish()]);
+            await device.queue.onSubmittedWorkDone(); // Wait for the chunk to complete.
+        }
+
+        // 3. Now that the system is in equilibrium, perform a measurement.
+        const commandEncoder = device.createCommandEncoder();
+        const pass = commandEncoder.beginComputePass();
+        pass.setPipeline(measurePlaquettePipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+        pass.end();
+
+        // Copy the measurement result to a buffer we can read on the CPU.
+        commandEncoder.copyBufferToBuffer(vizResultBuffer, 0, readbackBuffer, 0, vizResultBuffer.size);
+        device.queue.submit([commandEncoder.finish()]);
+        await device.queue.onSubmittedWorkDone();
+
+        // 4. Read the data and update the UI text.
+        await performMeasurement();
+
+        // 5. Re-enable the UI. The animation loop will resume its work automatically.
+        isThermalizing = false;
+        betaSlider.disabled = false;
+    }
+
+    // --- New Event Listeners ---
+    const debouncedThermalizer = debounce(() => {
+        thermalizeAndMeasure();
+    }, 500);
+
+    betaSlider.oninput = () => {
+        const newBeta = parseFloat(betaSlider.value);
+        betaValueSpan.innerText = newBeta.toFixed(1);
+        // Update the beta value in the uniform buffer.
+        device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([newBeta]));
+        // Trigger a new thermalization and measurement cycle.
+        debouncedThermalizer();
+    };
+
     // 4. Run Initialization
     let commandEncoder = device.createCommandEncoder();
     let passEncoder = commandEncoder.beginComputePass();
@@ -280,6 +353,9 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     device.queue.submit([commandEncoder.finish()]);
     await device.queue.onSubmittedWorkDone();
     msg("LGT: Lattice initialized.");
+
+    // Perform an initial thermalization and measurement on startup.
+    thermalizeAndMeasure();
 
     // --- Create Render Pipeline for Visualization ---
     const renderShaderCode = await fetchText('./wgsl/lgt_render.wgsl');
@@ -311,20 +387,20 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     });
 
     // Create a uniform buffer for render parameters (viz_mode)
-    const renderParams = new Uint32Array([vizMode === 'vortex' ? 1 : 0]); // 0=plaquette, 1=vortex
+    const renderParams = new Uint32Array([vizMode === 'vortex' ? 1 : 0]); // 0=plaquette, 1=vortex (U(1) only)
     const renderParamsBuffer = device.createBuffer({
         size: renderParams.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(renderParamsBuffer, 0, renderParams);
-
-    // Add event listeners for the radio buttons
+    
+    // Update vizMode and the render parameter when the radio button changes.
+    // This no longer triggers a measurement.
     document.querySelectorAll<HTMLInputElement>('input[name="viz-mode"]').forEach(radio => {
         radio.onchange = () => {
             vizMode = radio.value as 'plaquette' | 'vortex';
             const vizModeValue = vizMode === 'vortex' ? 1 : 0;
             device.queue.writeBuffer(renderParamsBuffer, 0, new Uint32Array([vizModeValue]));
-            debouncedRequestHandler(); // Trigger measurement when mode changes
         };
     });
 
@@ -355,50 +431,41 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
     });
 
     // 5. Start a custom animation loop to run the update shader
-    let animationId: number | null = null;
-    let frameCount = 0;
-    const sweepsPerFrame = 10; // Number of Monte Carlo sweeps per rendered frame
-
     function frame() {
+        // If thermalization is in progress, just idle and wait for the next frame.
+        if (isThermalizing) {
+            animationId = requestAnimationFrame(frame);
+            return;
+        }
+
         const commandEncoder = device.createCommandEncoder();
-        const passEncoder = commandEncoder.beginComputePass();
 
-        // 1. Evolve the system with multiple sweeps
+        // 1. Evolve the system for a few sweeps for live visualization.
+        // This loop is now correct, using multiple compute passes to update the
+        // checkerboard subsets properly.
         for (let i = 0; i < sweepsPerFrame; i++) {
-            // Update the 'update_subset' uniform to avoid race conditions.
-            // This cycles through 4 checkerboard patterns (0, 1, 2, 3).
-            // We need to ensure the subset index is unique for each update step.
-            const subsetIndex = (frameCount * sweepsPerFrame + i) % 4;
-            device.queue.writeBuffer(
-                paramsBuffer,
-                4, // Offset of update_subset (f32 beta is 4 bytes)
-                new Uint32Array([subsetIndex])
-            );
-
-            passEncoder.setPipeline(updatePipeline);
-            passEncoder.setBindGroup(0, bindGroup);
-            passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+            for (let j = 0; j < 4; j++) {
+                commandEncoder.copyBufferToBuffer(subsetStagingBuffer, j * 4, paramsBuffer, 4, 4);
+                const pass = commandEncoder.beginComputePass();
+                pass.setPipeline(updatePipeline);
+                pass.setBindGroup(0, bindGroup);
+                pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+                pass.end();
+            }
         }
         
-        // 2. Measure the result of the evolution
-        if (vizMode === 'vortex') {
-            passEncoder.setPipeline(measureVortexPipeline);
+        // 2. Run the measurement kernel for the current visualization mode.
+        const vizPass = commandEncoder.beginComputePass();
+        if (vizMode === 'vortex' && measureVortexPipeline) {
+            vizPass.setPipeline(measureVortexPipeline);
         } else {
-            passEncoder.setPipeline(measurePlaquettePipeline);
+            vizPass.setPipeline(measurePlaquettePipeline);
         }
-        passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
-
-        passEncoder.end();
-
-        // --- Copy result for CPU readback ---
-        commandEncoder.copyBufferToBuffer(
-            vizResultBuffer, 0, // source
-            readbackBuffer, 0,  // destination
-            vizResultBuffer.size
-        );
+        vizPass.setBindGroup(0, bindGroup);
+        vizPass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
+        vizPass.end();
 
         // --- Render Pass ---
-        // Get the current texture from the canvas to render to.
         const textureView = context.getCurrentTexture().createView();
         const renderPassDescriptor: GPURenderPassDescriptor = {
             colorAttachments: [
@@ -416,25 +483,20 @@ export async function runLGT(device: GPUDevice): Promise<() => void> {
         renderPassEncoder.draw(6, L_squared, 0, 0); // Draw L*L instances of a 6-vertex quad.
         renderPassEncoder.end();
         device.queue.submit([commandEncoder.finish()]);
-
-        // After submitting, check if a measurement is requested
-        if (measurementRequested) {
-            measurementRequested = false; // Reset the flag
-            // Wait for the submitted work to finish, then perform the measurement.
-            // This ensures the copy to readbackBuffer is complete before we try to map it.
-            device.queue.onSubmittedWorkDone().then(() => performMeasurement());
-        }
-
-        frameCount++;
+        
         animationId = requestAnimationFrame(frame);
     }
-    frame(); // Start the loop
-    measurementRequested = true; // Perform an initial measurement
 
+    frame(); // Start the animation loop.
+    
     // Return a "stopper" function to be called when this animation should end.
     return () => {
         if (animationId) {
             cancelAnimationFrame(animationId);
+            animationId = null;
         }
+        // Clean up GPU resources
+        subsetStagingBuffer.destroy();
+        // Other buffers are managed by the parent context that passed in the device.
     };
 }
