@@ -13,6 +13,8 @@ const TWO_PI: f32 = 2.0 * PI;
 struct SimParams {
     beta: f32,
     update_subset: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 @group(0) @binding(0) var<uniform> params: SimParams;
@@ -80,12 +82,32 @@ fn init_hot(@builtin(global_invocation_id) global_id: vec3<u32>) {
 }
 
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn init_cold(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let site_idx = get_site_idx(global_id.xy);
+    if (global_id.x >= L || global_id.y >= L) { return; }
+    
+    // 全てのリンクを角度0 (cos(0)=1, sin(0)=0) に揃える（真の真空状態）
+    set_link(global_id.xy, 0u, vec2(1.0, 0.0));
+    set_link(global_id.xy, 1u, vec2(1.0, 0.0));
+
+    // 乱数のシードは初期化しておく
+    var site_rng_state = rng_state[site_idx];
+    let dummy = pcg(&site_rng_state); 
+    rng_state[site_idx] = site_rng_state;
+}
+
+// --- 追加: 複素数の積 A * B の実部を計算するヘルパー ---
+fn re_dot(a: vec2<f32>, b: vec2<f32>) -> f32 {
+    // Re((a.x + i a.y)(b.x + i b.y)) = a.x*b.x - a.y*b.y
+    return a.x * b.x - a.y * b.y;
+}
+
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
 fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = global_id.x;
     let y = global_id.y;
     if (x >= L || y >= L) { return; }
 
-    // Checkerboard update to avoid race conditions
     let subset = (x + y) % 2u + 2u * (x % 2u);
     if (subset != params.update_subset) { return; }
 
@@ -93,54 +115,59 @@ fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let site_coord = global_id.xy;
     var site_rng_state = rng_state[site_idx];
 
-    let step_size = 2.0; // Tuning parameter for acceptance rate.
+    // --- 修正点1: 常に最新のリンクをローカル変数で追跡 ---
+    var current_u0 = get_link(site_coord, 0u);
+    var current_u1 = get_link(site_coord, 1u);
 
-    // --- Update U_0(n) link (x-direction) ---
-    // This link is part of two plaquettes: P(n) and P(n-y)
+    // ==========================================================
+    // Update U_0(n) link (x-direction)
+    // ==========================================================
     let n_xp1 = vec2<u32>((x + 1u) % L, y);
     let n_yp1 = vec2<u32>(x, (y + 1u) % L);
-    let n_ym1 = vec2<u32>(x, (y - 1u + L) % L);
-    let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y - 1u + L) % L);
+    let n_ym1 = vec2<u32>(x, (y + L - 1u) % L);
+    let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y + L - 1u) % L);
 
-    let staple_up = complex_mul(complex_mul(get_link(n_xp1, 1u), complex_conj(get_link(n_yp1, 0u))), complex_conj(get_link(site_coord, 1u)));
+    // Staple計算には `current_u1` を使用する
+    let staple_up = complex_mul(complex_mul(get_link(n_xp1, 1u), complex_conj(get_link(n_yp1, 0u))), complex_conj(current_u1));
     let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_xp1_ym1, 1u)), complex_conj(get_link(n_ym1, 0u))), get_link(n_ym1, 1u));
-
     let staple_sum_1 = staple_up + staple_down;
-    let old_link_1 = get_link(site_coord, 0u);
-    // The action is Re(U*V). dot(A,B) computes Re(A*B*). So we need dot(conj(V), U).
-    let old_action_1 = dot(complex_conj(staple_sum_1), old_link_1);
+    
+    // --- 修正点2: re_dot を使用 ---
+    let old_action_1 = re_dot(staple_sum_1, current_u0);
 
-    // Propose a new link by applying a small random rotation to the old one.
-    let d_theta_1 = (pcg(&site_rng_state) - 0.5) * step_size;
-    let rot_1 = vec2(cos(d_theta_1), sin(d_theta_1));
-    let new_link_1 = complex_mul(old_link_1, rot_1);
-    let new_action_1 = dot(complex_conj(staple_sum_1), new_link_1);
+    // --- 修正後：完全にランダムな新しいリンクを提案 ---
+    let angle_1 = pcg(&site_rng_state) * TWO_PI;
+    let new_link_1 = vec2(cos(angle_1), sin(angle_1));
+    let new_action_1 = re_dot(staple_sum_1, new_link_1);
 
     let dS_1 = new_action_1 - old_action_1;
     if (dS_1 > 0.0 || exp(params.beta * dS_1) > pcg(&site_rng_state)) {
-        set_link(site_coord, 0u, new_link_1);
+        current_u0 = new_link_1;
+        set_link(site_coord, 0u, current_u0);
     }
 
-    // --- Update U_1(n) link (y-direction) ---    
-    let n_xm1 = vec2<u32>((x - 1u + L) % L, y);
-    let n_xm1_yp1 = vec2<u32>((x - 1u + L) % L, (y + 1u) % L);
+    // ==========================================================
+    // Update U_1(n) link (y-direction)
+    // ==========================================================
+    let n_xm1 = vec2<u32>((x + L - 1u) % L, y);
+    let n_xm1_yp1 = vec2<u32>((x + L - 1u) % L, (y + 1u) % L);
 
-    let staple_right = complex_mul(complex_mul(get_link(n_yp1, 0u), complex_conj(get_link(n_xp1, 1u))), complex_conj(get_link(site_coord, 0u)));
-    let staple_left = complex_mul(complex_mul(complex_conj(get_link(n_xm1, 0u)), get_link(n_xm1, 1u)), get_link(n_xm1_yp1, 0u));
-
+    // Staple計算には、先ほど「更新されたかもしれない最新の current_u0」を使用する
+    let staple_right = complex_mul(complex_mul(get_link(n_yp1, 0u), complex_conj(get_link(n_xp1, 1u))), complex_conj(current_u0));
+    let staple_left = complex_mul(complex_mul(get_link(n_xm1, 0u), complex_conj(get_link(n_xm1, 1u))), complex_conj(get_link(n_xm1_yp1, 0u)));
     let staple_sum_2 = staple_right + staple_left;
-    let old_link_2 = get_link(site_coord, 1u);
-    let old_action_2 = dot(complex_conj(staple_sum_2), old_link_2);
+    
+    let old_action_2 = re_dot(staple_sum_2, current_u1);
 
-    // Propose a new link by applying a small random rotation to the old one.
-    let d_theta_2 = (pcg(&site_rng_state) - 0.5) * step_size;
-    let rot_2 = vec2(cos(d_theta_2), sin(d_theta_2));
-    let new_link_2 = complex_mul(old_link_2, rot_2);
-    let new_action_2 = dot(complex_conj(staple_sum_2), new_link_2);
+    // --- 修正後：完全にランダムな新しいリンクを提案 ---
+    let angle_2 = pcg(&site_rng_state) * TWO_PI;
+    let new_link_2 = vec2(cos(angle_2), sin(angle_2));
+    let new_action_2 = re_dot(staple_sum_2, new_link_2);
 
     let dS_2 = new_action_2 - old_action_2;
     if (dS_2 > 0.0 || exp(params.beta * dS_2) > pcg(&site_rng_state)) {
-        set_link(site_coord, 1u, new_link_2);
+        current_u1 = new_link_2;
+        set_link(site_coord, 1u, current_u1);
     }
 
     rng_state[site_idx] = site_rng_state;

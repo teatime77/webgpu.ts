@@ -70,6 +70,8 @@ fn random_su2_near_identity(epsilon: f32, seed: ptr<function, u32>) -> SU2Mat {
 struct SimParams {
     beta: f32,
     update_subset: u32,
+    filler1:f32,
+    filler2:f32,
 };
 
 const L = 32;

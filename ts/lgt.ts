@@ -102,18 +102,10 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     const shaderCode = await fetchText(theory === 'U1' ? './wgsl/lgt_u1.wgsl' : './wgsl/lgt_su2.wgsl');
     const shaderModule = device.createShaderModule({ code: shaderCode });
 
-    // 2. Create Buffers
-    // Uniforms: { beta: f32, update_subset: u32 }
-    const simParams = new Float32Array([initialBeta, 0]); 
-    const paramsBuffer = device.createBuffer({
-        size: simParams.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(paramsBuffer, 0, simParams);
 
     // --- Measurement Setup ---
     // Bessel functions for theoretical calculation
-    function besselI0(x: number, terms = 15): number {
+    function besselI0(x: number, terms = 30): number {
         let sum = 1.0;
         let term = 1.0;
         for (let k = 1; k <= terms; k++) {
@@ -123,7 +115,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         return sum;
     }
 
-    function besselI1(x: number, terms = 15): number {
+    function besselI1(x: number, terms = 30): number {
         let sum = 0.0;
         let term = x / 2.0;
         sum += term;
@@ -134,7 +126,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         return sum;
     }
 
-    function besselI2(x: number, terms = 15): number {
+    function besselI2(x: number, terms = 30): number {
         let sum = 0.0;
         // k=0 term: 1/(0! * 2!) * (x/2)^2 = (x*x)/8
         let term = (x * x) / 8.0;
@@ -238,7 +230,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
 
     const initPipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
-        compute: { module: shaderModule, entryPoint: 'init_hot' },
+        compute: { module: shaderModule, entryPoint: 'init_cold' },
     });
     const updatePipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
@@ -257,30 +249,37 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         compute: { module: shaderModule, entryPoint: 'measure_plaquette' },
     });
 
-    const bindGroup = device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: [
-            { binding: 0, resource: { buffer: paramsBuffer } },
-            { binding: 1, resource: { buffer: linksBuffer } },
-            { binding: 2, resource: { buffer: rngBuffer } },
-            { binding: 3, resource: { buffer: vizResultBuffer } },
-        ],
-    });
+    // 4つのサブセット用に独立したUniformバッファとBindGroupを作成
+    const paramsBuffers: GPUBuffer[] = [];
+    const bindGroups: GPUBindGroup[] = [];
+
+    for (let i = 0; i < 4; i++) {
+        // 16バイトアライメント: [beta, update_subset, pad, pad]
+        const pBuf = device.createBuffer({
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(pBuf, 0, new Float32Array([initialBeta])); // offset 0: beta
+        device.queue.writeBuffer(pBuf, 4, new Uint32Array([i]));            // offset 4: subset
+        paramsBuffers.push(pBuf);
+
+        const bg = device.createBindGroup({
+            layout: bindGroupLayout,
+            entries: [
+                { binding: 0, resource: { buffer: pBuf } },
+                { binding: 1, resource: { buffer: linksBuffer } },
+                { binding: 2, resource: { buffer: rngBuffer } },
+                { binding: 3, resource: { buffer: vizResultBuffer } },
+            ],
+        });
+        bindGroups.push(bg);
+    }
+    // --- 修正後（ここまで） ---
 
     // --- State, Constants, and New Simulation Logic ---
     let animationId: number | null = null;
     const sweepsPerFrame = 10; // Sweeps for live visualization
 
-    // Create a staging buffer for subset indices. This is more efficient than
-    // calling writeBuffer every time, as it allows us to schedule all uniform
-    // updates within a single command encoder.
-    const subsetStagingBuffer = device.createBuffer({
-        size: 16, // 4 * u32
-        usage: GPUBufferUsage.COPY_SRC,
-        mappedAtCreation: true,
-    });
-    new Uint32Array(subsetStagingBuffer.getMappedRange()).set([0, 1, 2, 3]);
-    subsetStagingBuffer.unmap();
 
     // This new function handles the entire thermalization and measurement process.
     async function MeasureAvgPlaquette() {
@@ -290,7 +289,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         const commandEncoder = device.createCommandEncoder();
         const pass = commandEncoder.beginComputePass();
         pass.setPipeline(measurePlaquettePipeline);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, bindGroups[0]);
         pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
         pass.end();
 
@@ -308,9 +307,11 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     betaSlider.oninput = () => {
         const newBeta = parseFloat(betaSlider.value);
         betaValueSpan.innerText = newBeta.toFixed(1);
-        // Update the beta value in the uniform buffer.
-        device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([newBeta]));
-
+        
+        // 4つのUniformバッファ全てに新しいBetaを書き込む
+        for (let i = 0; i < 4; i++) {
+            device.queue.writeBuffer(paramsBuffers[i], 0, new Float32Array([newBeta]));
+        }
         updatePipelineCnt = 0;
     };
 
@@ -318,7 +319,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     let commandEncoder = device.createCommandEncoder();
     let passEncoder = commandEncoder.beginComputePass();
     passEncoder.setPipeline(initPipeline);
-    passEncoder.setBindGroup(0, bindGroup);
+    passEncoder.setBindGroup(0, bindGroups[0]);
     passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
     passEncoder.end();
     device.queue.submit([commandEncoder.finish()]);
@@ -413,10 +414,9 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         // checkerboard subsets properly.
         for (let i = 0; i < sweepsPerFrame; i++) {
             for (let j = 0; j < 4; j++) {
-                commandEncoder.copyBufferToBuffer(subsetStagingBuffer, j * 4, paramsBuffer, 4, 4);
                 const pass = commandEncoder.beginComputePass();
                 pass.setPipeline(updatePipeline);
-                pass.setBindGroup(0, bindGroup);
+                pass.setBindGroup(0, bindGroups[j]); // j番目の専用BindGroupを使用
                 pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
                 pass.end();
 
@@ -431,7 +431,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         } else {
             vizPass.setPipeline(measurePlaquettePipeline);
         }
-        vizPass.setBindGroup(0, bindGroup);
+        vizPass.setBindGroup(0, bindGroups[0]);
         vizPass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
         vizPass.end();
 
@@ -482,8 +482,5 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
             cancelAnimationFrame(animationId);
             animationId = null;
         }
-        // Clean up GPU resources
-        subsetStagingBuffer.destroy();
-        // Other buffers are managed by the parent context that passed in the device.
     };
 }
