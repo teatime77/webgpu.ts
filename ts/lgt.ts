@@ -1,6 +1,12 @@
 import { fetchText, msg } from "@i18n";
 import { stopAnimation } from "./instance";
 
+const thermalizationSweeps = 1500; // Number of sweeps for equilibration
+
+let timeoutId: number;
+let isMeasuring = false;
+let updatePipelineCnt = 0;
+
 /**
  * This function sets up and runs a 2D U(1) Lattice Gauge Theory simulation.
  * It's a self-contained example to show the steps involved:
@@ -140,17 +146,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         return sum;
     }
 
-    // Debounce helper to avoid overwhelming the system with measurements
-    function debounce(func: (...args: any[]) => void, delay: number) {
-        let timeoutId: number;
-        return (...args: any[]) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                func(...args);
-            }, delay);
-        };
-    }
-
     const avgPlaquetteSpan = document.getElementById('avg-plaquette-value') as HTMLSpanElement;
     async function performMeasurement() {
         // This function now only reads the buffer and calculates the average.
@@ -274,8 +269,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
 
     // --- State, Constants, and New Simulation Logic ---
     let animationId: number | null = null;
-    let isThermalizing = false;
-    const thermalizationSweeps = 1500; // Number of sweeps for equilibration
     const sweepsPerFrame = 10; // Sweeps for live visualization
 
     // Create a staging buffer for subset indices. This is more efficient than
@@ -290,36 +283,8 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     subsetStagingBuffer.unmap();
 
     // This new function handles the entire thermalization and measurement process.
-    async function thermalizeAndMeasure() {
-        if (isThermalizing) return; // Don't start a new process if one is running
-        isThermalizing = true;
-
-        // 1. Update UI to show we're busy and stop the animation loop.
-        // The animation loop will just idle by checking `isThermalizing`.
+    async function MeasureAvgPlaquette() {
         betaSlider.disabled = true;
-        avgPlaquetteSpan.innerText = `Thermalizing for ${thermalizationSweeps} sweeps...`;
-
-        // 2. Run thermalization sweeps. We do this in chunks to avoid making the
-        //    GPU unresponsive, which could cause the OS to reset the driver (TDR).
-        const sweepsPerChunk = 100;
-        const numChunks = Math.ceil(thermalizationSweeps / sweepsPerChunk);
-
-        for (let chunk = 0; chunk < numChunks; chunk++) {
-            const commandEncoder = device.createCommandEncoder();
-            for (let i = 0; i < sweepsPerChunk; i++) {
-                // A full Monte Carlo sweep requires updating all 4 checkerboard subsets.
-                for (let j = 0; j < 4; j++) {
-                    commandEncoder.copyBufferToBuffer(subsetStagingBuffer, j * 4, paramsBuffer, 4, 4);
-                    const pass = commandEncoder.beginComputePass();
-                    pass.setPipeline(updatePipeline);
-                    pass.setBindGroup(0, bindGroup);
-                    pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
-                    pass.end();
-                }
-            }
-            device.queue.submit([commandEncoder.finish()]);
-            await device.queue.onSubmittedWorkDone(); // Wait for the chunk to complete.
-        }
 
         // 3. Now that the system is in equilibrium, perform a measurement.
         const commandEncoder = device.createCommandEncoder();
@@ -337,23 +302,16 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         // 4. Read the data and update the UI text.
         await performMeasurement();
 
-        // 5. Re-enable the UI. The animation loop will resume its work automatically.
-        isThermalizing = false;
         betaSlider.disabled = false;
     }
-
-    // --- New Event Listeners ---
-    const debouncedThermalizer = debounce(() => {
-        thermalizeAndMeasure();
-    }, 500);
 
     betaSlider.oninput = () => {
         const newBeta = parseFloat(betaSlider.value);
         betaValueSpan.innerText = newBeta.toFixed(1);
         // Update the beta value in the uniform buffer.
         device.queue.writeBuffer(paramsBuffer, 0, new Float32Array([newBeta]));
-        // Trigger a new thermalization and measurement cycle.
-        debouncedThermalizer();
+
+        updatePipelineCnt = 0;
     };
 
     // 4. Run Initialization
@@ -366,9 +324,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     device.queue.submit([commandEncoder.finish()]);
     await device.queue.onSubmittedWorkDone();
     msg("LGT: Lattice initialized.");
-
-    // Perform an initial thermalization and measurement on startup.
-    thermalizeAndMeasure();
 
     // --- Create Render Pipeline for Visualization ---
     const renderShaderCode = await fetchText('./wgsl/lgt_render.wgsl');
@@ -446,7 +401,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     // 5. Start a custom animation loop to run the update shader
     function frame() {
         // If thermalization is in progress, just idle and wait for the next frame.
-        if (isThermalizing) {
+        if (isMeasuring) {
             animationId = requestAnimationFrame(frame);
             return;
         }
@@ -464,6 +419,8 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
                 pass.setBindGroup(0, bindGroup);
                 pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
                 pass.end();
+
+                updatePipelineCnt++;
             }
         }
         
@@ -498,6 +455,23 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         device.queue.submit([commandEncoder.finish()]);
         
         animationId = requestAnimationFrame(frame);
+
+        if(timeoutId == undefined){
+            timeoutId = setInterval(async()=>{
+                if(isMeasuring){
+                    return;
+                }
+                if(updatePipelineCnt < thermalizationSweeps * 4){
+                    return;
+                }
+                isMeasuring = true;
+
+                await MeasureAvgPlaquette();
+
+                updatePipelineCnt = 0;
+                isMeasuring = false;
+            }, 1000);
+        }
     }
 
     frame(); // Start the animation loop.
