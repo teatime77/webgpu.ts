@@ -128,6 +128,18 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
         return sum;
     }
 
+    function besselI2(x: number, terms = 15): number {
+        let sum = 0.0;
+        // k=0 term: 1/(0! * 2!) * (x/2)^2 = (x*x)/8
+        let term = (x * x) / 8.0;
+        sum += term;
+        for (let k = 1; k <= terms; k++) {
+            term *= (x * x) / (4 * k * (k + 2));
+            sum += term;
+        }
+        return sum;
+    }
+
     // Debounce helper to avoid overwhelming the system with measurements
     function debounce(func: (...args: any[]) => void, delay: number) {
         let timeoutId: number;
@@ -160,8 +172,9 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
             const theoreticalAvg = besselI1(currentBeta) / besselI0(currentBeta);
             text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
             avgPlaquetteSpan.innerText = text;
-        } else { // SU(2) - theoretical value is harder to compute.
-            text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}`;
+        } else { // SU(2)
+            const theoreticalAvg = besselI2(currentBeta) / besselI1(currentBeta);
+            text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
             avgPlaquetteSpan.innerText = text;
         }
         console.log(`Beta = ${currentBeta.toFixed(1)} -> ${text}`);
