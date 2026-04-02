@@ -43,14 +43,18 @@ fn set_link(coord: vec2<u32>, dir: u32, val: vec2<f32>) {
     links[link_idx] = val;
 }
 
-// PCG random number generator
+// 正しい32-bit PCG random number generator
 fn pcg(state: ptr<function, u32>) -> f32 {
     let old_state = *state;
+    // LCG step
     *state = old_state * 747796405u + 2891336453u;
-    let xorshifted = ((old_state >> 18u) ^ old_state) >> 27u;
-    let rot = old_state >> 27u; // For a 32-bit state, the rotation amount is taken from the high bits of the state.
-    let result = (xorshifted >> rot) | (xorshifted << ((0u - rot) & 31u));
-    return f32(result) / f32(0xFFFFFFFFu);
+    
+    // PCG-RXS-M-XS (32-bit output)
+    var word = ((old_state >> ((old_state >> 28u) + 4u)) ^ old_state) * 277803737u;
+    word = (word >> 22u) ^ word;
+    
+    // 0.0 ~ 1.0 の範囲に正規化
+    return f32(word) / f32(0xFFFFFFFFu);
 }
 
 // Complex multiplication: (a+ib) * (c+id)
@@ -96,10 +100,23 @@ fn init_cold(@builtin(global_invocation_id) global_id: vec3<u32>) {
     rng_state[site_idx] = site_rng_state;
 }
 
-// --- 追加: 複素数の積 A * B の実部を計算するヘルパー ---
-fn re_dot(a: vec2<f32>, b: vec2<f32>) -> f32 {
-    // Re((a.x + i a.y)(b.x + i b.y)) = a.x*b.x - a.y*b.y
-    return a.x * b.x - a.y * b.y;
+// フォン・ミーゼス分布 P(x) ∝ exp(kappa * cos(x)) から角度をサンプリング
+fn sample_von_mises(kappa: f32, state: ptr<function, u32>) -> f32 {
+    if (kappa == 0.0) {
+        return (pcg(state) - 0.5) * TWO_PI;
+    }
+    
+    var x: f32 = 0.0;
+    // GPUの無限ループを防ぐため、安全策として上限付きのループにする
+    for (var i = 0u; i < 1000u; i++) {
+        x = (pcg(state) - 0.5) * TWO_PI;
+        let u = pcg(state);
+        // 確率 exp(kappa * (cos(x) - 1)) で受容
+        if (u <= exp(kappa * (cos(x) - 1.0))) {
+            break;
+        }
+    }
+    return x;
 }
 
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
@@ -119,56 +136,60 @@ fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var current_u0 = get_link(site_coord, 0u);
     var current_u1 = get_link(site_coord, 1u);
 
-    // ==========================================================
-    // Update U_0(n) link (x-direction)
+// ==========================================================
+    // Update U_0(n) link (Heat Bath)
     // ==========================================================
     let n_xp1 = vec2<u32>((x + 1u) % L, y);
     let n_yp1 = vec2<u32>(x, (y + 1u) % L);
     let n_ym1 = vec2<u32>(x, (y + L - 1u) % L);
     let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y + L - 1u) % L);
 
-    // Staple計算には `current_u1` を使用する
     let staple_up = complex_mul(complex_mul(get_link(n_xp1, 1u), complex_conj(get_link(n_yp1, 0u))), complex_conj(current_u1));
     let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_xp1_ym1, 1u)), complex_conj(get_link(n_ym1, 0u))), get_link(n_ym1, 1u));
     let staple_sum_1 = staple_up + staple_down;
-    
-    // --- 修正点2: re_dot を使用 ---
-    let old_action_1 = re_dot(staple_sum_1, current_u0);
 
-    // --- 修正後：完全にランダムな新しいリンクを提案 ---
-    let angle_1 = pcg(&site_rng_state) * TWO_PI;
-    let new_link_1 = vec2(cos(angle_1), sin(angle_1));
-    let new_action_1 = re_dot(staple_sum_1, new_link_1);
-
-    let dS_1 = new_action_1 - old_action_1;
-    if (dS_1 > 0.0 || exp(params.beta * dS_1) > pcg(&site_rng_state)) {
-        current_u0 = new_link_1;
-        set_link(site_coord, 0u, current_u0);
+    // --- Heat Bath ロジック ---
+    let norm_1 = length(staple_sum_1);
+    if (norm_1 > 0.0001) {
+        let kappa_1 = params.beta * norm_1;
+        let phi_1 = sample_von_mises(kappa_1, &site_rng_state);
+        
+        let rot_1 = vec2(cos(phi_1), sin(phi_1));
+        // 中心となる方向 (V*)
+        let v_star_1 = vec2(staple_sum_1.x, -staple_sum_1.y) / norm_1;
+        current_u0 = complex_mul(rot_1, v_star_1);
+    } else {
+        // ステープルが0の場合は完全にランダム
+        let angle = pcg(&site_rng_state) * TWO_PI;
+        current_u0 = vec2(cos(angle), sin(angle));
     }
+    set_link(site_coord, 0u, current_u0);
 
     // ==========================================================
-    // Update U_1(n) link (y-direction)
+    // Update U_1(n) link (Heat Bath)
     // ==========================================================
     let n_xm1 = vec2<u32>((x + L - 1u) % L, y);
     let n_xm1_yp1 = vec2<u32>((x + L - 1u) % L, (y + 1u) % L);
 
-    // Staple計算には、先ほど「更新されたかもしれない最新の current_u0」を使用する
     let staple_right = complex_mul(complex_mul(get_link(n_yp1, 0u), complex_conj(get_link(n_xp1, 1u))), complex_conj(current_u0));
     let staple_left = complex_mul(complex_mul(get_link(n_xm1, 0u), complex_conj(get_link(n_xm1, 1u))), complex_conj(get_link(n_xm1_yp1, 0u)));
     let staple_sum_2 = staple_right + staple_left;
-    
-    let old_action_2 = re_dot(staple_sum_2, current_u1);
 
-    // --- 修正後：完全にランダムな新しいリンクを提案 ---
-    let angle_2 = pcg(&site_rng_state) * TWO_PI;
-    let new_link_2 = vec2(cos(angle_2), sin(angle_2));
-    let new_action_2 = re_dot(staple_sum_2, new_link_2);
-
-    let dS_2 = new_action_2 - old_action_2;
-    if (dS_2 > 0.0 || exp(params.beta * dS_2) > pcg(&site_rng_state)) {
-        current_u1 = new_link_2;
-        set_link(site_coord, 1u, current_u1);
+    // --- Heat Bath ロジック ---
+    let norm_2 = length(staple_sum_2);
+    if (norm_2 > 0.0001) {
+        let kappa_2 = params.beta * norm_2;
+        let phi_2 = sample_von_mises(kappa_2, &site_rng_state);
+        
+        let rot_2 = vec2(cos(phi_2), sin(phi_2));
+        // 中心となる方向 (V*)
+        let v_star_2 = vec2(staple_sum_2.x, -staple_sum_2.y) / norm_2;
+        current_u1 = complex_mul(rot_2, v_star_2);
+    } else {
+        let angle = pcg(&site_rng_state) * TWO_PI;
+        current_u1 = vec2(cos(angle), sin(angle));
     }
+    set_link(site_coord, 1u, current_u1);
 
     rng_state[site_idx] = site_rng_state;
 }
