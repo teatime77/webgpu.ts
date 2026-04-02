@@ -26,20 +26,22 @@ fn su2_trace(a: SU2Mat) -> f32 {
     return 2.0 * a.x;
 }
 
-// --- Random Number Generation ---
-fn pcg_hash(input: u32) -> u32 {
-    let state = input * 747796405u + 2891336453u;
-    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
+// 状態更新とハッシュ出力を分離した正しいPCG
+fn random_u32(state: ptr<function, u32>) -> u32 {
+    let old_state = *state;
+    
+    // 1. 状態の更新（LCGステップ：これにより 2^32 の周期が完全に保証される）
+    *state = old_state * 747796405u + 2891336453u;
+
+    // 2. 出力の計算（古い状態を使ってハッシュ化する）
+    var word = ((old_state >> ((old_state >> 28u) + 4u)) ^ old_state) * 277803737u;
+    word = (word >> 22u) ^ word;
+
+    return word;
 }
 
-fn random_u32(seed: ptr<function, u32>) -> u32 {
-    *seed = pcg_hash(*seed);
-    return *seed;
-}
-
-fn random_f32(seed: ptr<function, u32>) -> f32 {
-    return f32(random_u32(seed)) / 4294967295.0; // 2^32 - 1
+fn random_f32(state: ptr<function, u32>) -> f32 {
+    return f32(random_u32(state)) / 4294967295.0; // 0.0 ~ 1.0
 }
 
 // Generate a random SU(2) matrix close to the identity.
@@ -108,9 +110,33 @@ fn init_hot(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 @compute @workgroup_size(8, 8, 1)
+fn init_cold(@builtin(global_invocation_id) id: vec3<u32>) {
+    let x = id.x;
+    let y = id.y;
+
+    // 境界チェック
+    if (x >= L || y >= L) { return; }
+
+    let site_idx = y * L + x;
+
+    // SU(2)の単位行列（Cold Start用の真空状態）
+    let identity_mat = SU2Mat(1.0, 0.0, 0.0, 0.0);
+
+    // x方向、y方向ともに単位行列で初期化
+    links[get_link_idx(x, y, 0u)] = identity_mat;
+    links[get_link_idx(x, y, 1u)] = identity_mat;
+
+    // 乱数シードの初期化（一回空回ししておく）
+    var rand_seed = rng_state[site_idx];
+    let dummy = random_u32(&rand_seed); 
+    rng_state[site_idx] = rand_seed;
+}
+
+@compute @workgroup_size(8, 8, 1)
 fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x;
     let y = id.y;
+    if (x >= L || y >= L) { return; } // 追加
 
     // Checkerboard update to avoid race conditions
     if ((x + y) % 2u != params.update_subset % 2u) {
@@ -130,11 +156,11 @@ fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     var staple: SU2Mat;
     if (dir_to_update == 0u) { // Updating an x-link at (x, y)
         let staple_up = su2_mult(links[get_link_idx(xp1, y, 1u)], su2_mult(su2_inv(links[get_link_idx(x, yp1, 0u)]), su2_inv(links[get_link_idx(x, y, 1u)])));
-        let staple_down = su2_mult(su2_inv(links[get_link_idx(xp1, ym1, 1u)]), su2_mult(links[get_link_idx(x, ym1, 0u)], links[get_link_idx(x, ym1, 1u)]));
+        let staple_down = su2_mult(su2_inv(links[get_link_idx(xp1, ym1, 1u)]), su2_mult(su2_inv(links[get_link_idx(x, ym1, 0u)]), links[get_link_idx(x, ym1, 1u)]));
         staple = staple_up + staple_down;
     } else { // Updating a y-link at (x, y)
         let staple_right = su2_mult(links[get_link_idx(x, yp1, 0u)], su2_mult(su2_inv(links[get_link_idx(xp1, y, 1u)]), su2_inv(links[get_link_idx(x, y, 0u)])));
-        let staple_left = su2_mult(su2_inv(links[get_link_idx(xm1, yp1, 0u)]), su2_mult(links[get_link_idx(xm1, y, 1u)], links[get_link_idx(xm1, y, 0u)]));
+        let staple_left = su2_mult(su2_inv(links[get_link_idx(xm1, yp1, 0u)]), su2_mult(su2_inv(links[get_link_idx(xm1, y, 1u)]), links[get_link_idx(xm1, y, 0u)]));
         staple = staple_right + staple_left;
     }
 
