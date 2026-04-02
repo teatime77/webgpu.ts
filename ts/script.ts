@@ -282,6 +282,10 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runLGT(g_device, "SU2");
     });
+    makeButton("2D SU(3)").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runLGT(g_device, "SU3");
+    });
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 
     if(params.has("debug")){

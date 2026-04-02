@@ -1,4 +1,4 @@
-import { fetchText, msg } from "@i18n";
+import { fetchText, msg, MyError } from "@i18n";
 import { stopAnimation } from "./instance";
 
 const thermalizationSweeps = 1500; // Number of sweeps for equilibration
@@ -17,7 +17,7 @@ let updatePipelineCnt = 0;
  * NOTE: This assumes a global `device: GPUDevice` object is available,
  * which is typical in WebGPU applications and seems to be the case in your framework.
  */
-export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Promise<() => void> {
+export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = 'U1'): Promise<() => void> {
     msg(`Starting 2D ${theory} Lattice Gauge Theory simulation.`);
     stopAnimation(); // Stop any previous animation
 
@@ -99,7 +99,8 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
     }
 
     // 1. Fetch shader code
-    const shaderCode = await fetchText(theory === 'U1' ? './wgsl/lgt_u1.wgsl' : './wgsl/lgt_su2.wgsl');
+    const shaderName = new Map<string, string>([["U1", "lgt_u1"], ["SU2", "lgt_su2"], ["SU3", "lgt_su3"]]).get(theory);
+    const shaderCode = await fetchText(`./wgsl/${shaderName}.wgsl`);
     const shaderModule = device.createShaderModule({ code: shaderCode });
 
 
@@ -159,18 +160,33 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' = 'U1'): Pr
             const theoreticalAvg = besselI1(currentBeta) / besselI0(currentBeta);
             text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
             avgPlaquetteSpan.innerText = text;
-        } else { // SU(2)
+        } 
+        else if (theory === 'SU2'){
             const theoreticalAvg = besselI2(currentBeta) / besselI1(currentBeta);
             text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
             avgPlaquetteSpan.innerText = text;
+        }
+        else if (theory === 'SU3'){
+            text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}`;
+            avgPlaquetteSpan.innerText = text;
+        }
+        else{
+            throw new MyError();
         }
         console.log(`Beta = ${currentBeta.toFixed(1)} -> ${text}`);
     }
 
     // Link variables: vec2<f32> per link
-    const link_vec_size = theory === 'U1' ? 2 : 4; // U(1) uses vec2, SU(2) uses vec4
+    let link_vec_size : number;
+
+    switch(theory){
+    case 'U1' : link_vec_size =  2; break;
+    case 'SU2': link_vec_size =  4; break;
+    case 'SU3': link_vec_size = 20; break;
+    }
+
     const linksBuffer = device.createBuffer({
-        // 2 directions * L*L sites * vecN<f32> (vec2 for U(1), vec4 for SU(2))
+        // 2 directions * L*L sites * vecN<f32> (vec2 for U(1), vec4 for SU(2), SU3Mat for SU(3))
         size: 2 * L_squared * link_vec_size * 4,
         usage: GPUBufferUsage.STORAGE,
     });
