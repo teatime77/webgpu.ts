@@ -1,4 +1,4 @@
-import { fetchText, msg, MyError } from "@i18n";
+import { $, fetchText, msg, MyError } from "@i18n";
 import { stopAnimation } from "./instance";
 
 let thermalizationSweeps : number; // Number of sweeps for equilibration
@@ -8,6 +8,9 @@ let isMeasuring = false;
 let updatePipelineCnt = 0;
 let autoBeta = false;
 let betaValue : number = 0;
+let Rstep = 1;
+let Tstep = 1;
+let W_1_1 = NaN;
 
 /**
  * This function sets up and runs a 2D U(1) Lattice Gauge Theory simulation.
@@ -19,11 +22,11 @@ let betaValue : number = 0;
  * NOTE: This assumes a global `device: GPUDevice` object is available,
  * which is typical in WebGPU applications and seems to be the case in your framework.
  */
-export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = 'U1'): Promise<() => void> {
+export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = 'U1', vizMode: 'plaquette' | 'vortex' | "wilson" = 'plaquette'): Promise<() => void> {
     thermalizationSweeps = (theory == "SU3" ? 1500 : 1000);
     msg(`Starting 2D ${theory} Lattice Gauge Theory simulation. sweeps:${thermalizationSweeps}`);
     autoBeta = true;
-    betaValue = 0;
+    betaValue = vizMode == "wilson" ? 10 : 0;
     stopAnimation(); // Stop any previous animation
 
     const L = 32; // Must match const in lgt_u1.wgsl
@@ -33,7 +36,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     // --- Create UI for controlling beta ---
     let betaSlider: HTMLInputElement;
     let betaValueSpan: HTMLSpanElement;
-    let vizMode: 'plaquette' | 'vortex' = theory === 'U1' ? 'vortex' : 'plaquette';
 
     const controlsContainerId = 'lgt-controls-container';
     let controlsContainer = document.getElementById(controlsContainerId);
@@ -51,7 +53,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         betaSlider.id = 'beta-slider';
         betaSlider.type = 'range';
         betaSlider.min = '0.1';
-        betaSlider.max = '10.0';
+        betaSlider.max = '30.0';
         betaSlider.step = '0.1';
         betaSlider.value = String(betaValue);
 
@@ -62,22 +64,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         controlsContainer.appendChild(betaLabel);
         controlsContainer.appendChild(betaSlider);
         controlsContainer.appendChild(betaValueSpan);
-
-        // --- Create UI for visualization mode ---
-        // Vortices are a U(1) concept.
-        if (theory === 'U1') {
-            const vizControlsContainer = document.createElement('div');
-            vizControlsContainer.id = 'lgt-viz-controls';
-            vizControlsContainer.style.margin = '10px';
-            vizControlsContainer.innerHTML = `
-                <span style="margin-right: 10px;">Visualization:</span>
-                <input type="radio" id="viz-vortex" name="viz-mode" value="vortex" checked>
-                <label for="viz-vortex" style="margin-right: 10px;">Vortices</label>
-                <input type="radio" id="viz-plaquette" name="viz-mode" value="plaquette">
-                <label for="viz-plaquette">Plaquette Energy</label>
-            `;
-            controlsContainer.appendChild(vizControlsContainer);
-        }
 
         const avgPlaquetteSpan = document.createElement('span');
         avgPlaquetteSpan.id = 'avg-plaquette-value';
@@ -92,10 +78,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         betaSlider = document.getElementById('beta-slider') as HTMLInputElement;
         betaValueSpan = document.getElementById('beta-value') as HTMLSpanElement;
         betaValue = parseFloat(betaSlider.value);
-        if (theory === 'U1') {
-            const vortexRadio = document.getElementById('viz-vortex') as HTMLInputElement;
-            vizMode = vortexRadio.checked ? 'vortex' : 'plaquette';
-        }
     }
 
     if (!device) {
@@ -108,13 +90,16 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     const shaderCode = await fetchText(`./wgsl/${shaderName}.wgsl`);
     const shaderModule = device.createShaderModule({ code: shaderCode });
 
-    function writeBeta(beta : number){
+    function writeBeta(beta : number, R : number, T : number){
         betaValue = beta;
+        Rstep     = R;
+        Tstep     = T;
 
         // 4つのUniformバッファ全てに新しいBetaを書き込む
         for (let i = 0; i < 4; i++) {
             const offset = 256 * i;
             device.queue.writeBuffer(paramsBuffer, offset, new Float32Array([betaValue]));
+            device.queue.writeBuffer(paramsBuffer, offset + 8, new Uint32Array([Rstep, Tstep]));
         }
 
         betaSlider.value = String(betaValue);
@@ -180,16 +165,25 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
             theoreticalAvg = besselI2(betaValue) / besselI1(betaValue);
         }
         else if (theory === 'SU3'){
-            if(betaValue <= 3){
-                // beta / (2 * N^2)
-                theoreticalAvg = betaValue / 18.0;
-            }
-            else if(8 <= betaValue){
-                // 1 - (N^2 - 1) / (2 * beta)
-                theoreticalAvg = 1.0 - 4.0 / betaValue;
+            theoreticalAvg = NaN;
+
+            if(vizMode == "wilson"){
+                if(Rstep == 1 && Tstep == 1){
+                    W_1_1 = simulatedAvg;
+                }
+                else{
+                    theoreticalAvg = Math.pow(W_1_1, Rstep * Tstep);
+                }
             }
             else{
-                theoreticalAvg = NaN;
+                if(betaValue <= 3){
+                    // beta / (2 * N^2)
+                    theoreticalAvg = betaValue / 18.0;
+                }
+                else if(8 <= betaValue){
+                    // 1 - (N^2 - 1) / (2 * beta)
+                    theoreticalAvg = 1.0 - 4.0 / betaValue;
+                }
             }
         }
         else{
@@ -198,7 +192,12 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         text = `Avg Plaquette: Sim = ${simulatedAvg.toFixed(4)}, Theory = ${theoreticalAvg.toFixed(4)}`;
         avgPlaquetteSpan.innerText = text;
 
-        console.log(`Beta = ${betaValue.toFixed(1)} -> ${text}`);
+        if(vizMode == "wilson"){
+            console.log(`Beta = ${betaValue.toFixed(1)} R = ${Rstep} T = ${Tstep} -> ${text}`);
+        }
+        else{
+            console.log(`Beta = ${betaValue.toFixed(1)} -> ${text}`);
+        }
     }
 
     // Link variables: vec2<f32> per link
@@ -288,10 +287,12 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         });
     }
 
+    const entryPoint = (vizMode == "plaquette" ? 'measure_plaquette' : "measure_wilson_loop");
     const measurePlaquettePipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
-        compute: { module: shaderModule, entryPoint: 'measure_plaquette' },
+        compute: { module: shaderModule, entryPoint },
     });
+    msg(`entry-Point:${entryPoint}`);
 
     // 1つの大きなバッファを作成（1024バイト）
     const paramsBuffer = device.createBuffer({
@@ -300,12 +301,15 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     });
 
     // バッファに初期データを書き込む（256バイト間隔で配置）
-    const simParams = new Float32Array(256 * 4 / 4); // /4 は float のサイズ
+    const simParams = new Float32Array(256 * 4 / 4); // ベースはFloat
+    const uintView  = new Uint32Array(simParams.buffer); // 同じメモリをUint32として見るビュー
+
     for (let i = 0; i < 4; i++) {
         const offset = (256 * i) / 4;
-        simParams[offset + 0] = betaValue;
-        // floatArrayの中にu32を書き込むトリック（WebGPUではビット幅が同じならこれでOK）
-        new Uint32Array(simParams.buffer)[offset + 1] = i; 
+        simParams[offset + 0] = betaValue;     // f32
+        uintView[offset + 1] = i;              // u32
+        uintView[offset + 2] = Rstep;          // u32 として書き込む！
+        uintView[offset + 3] = Tstep;          // u32 として書き込む！
     }
 
     device.queue.writeBuffer(paramsBuffer, 0, simParams);
@@ -351,10 +355,10 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     betaSlider.oninput = () => {
         const beta = parseFloat(betaSlider.value);
         
-        writeBeta(beta);
+        writeBeta(beta, 1, 1);
 
         updatePipelineCnt = 0;
-        autoBeta = false;
+        // autoBeta = false;
     };
 
     // 4. Run Initialization
@@ -404,17 +408,6 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(renderParamsBuffer, 0, renderParams);
-    
-    // Update vizMode and the render parameter when the radio button changes.
-    // This no longer triggers a measurement.
-    document.querySelectorAll<HTMLInputElement>('input[name="viz-mode"]').forEach(radio => {
-        radio.onchange = () => {
-            vizMode = radio.value as 'plaquette' | 'vortex';
-            const vizModeValue = vizMode === 'vortex' ? 1 : 0;
-            device.queue.writeBuffer(renderParamsBuffer, 0, new Uint32Array([vizModeValue]));
-        };
-    });
-
     const renderBindGroup = device.createBindGroup({
         layout: renderBindGroupLayout,
         entries: [
@@ -514,10 +507,26 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
                 await MeasureAvgPlaquette();
 
                 if(theory == "SU3" && betaValue < 30){
-                    writeBeta(betaValue + 1.0);
+                    if(vizMode == "plaquette"){
+                        writeBeta(betaValue + 1.0, Rstep, Tstep);
+                    }
+                    else if(vizMode == "wilson"){
+                        if(Rstep + Tstep == 6){
+
+                            writeBeta(betaValue + 2, 1, 1);
+                        }
+                        else{
+                            if(Math.random()< 0.5){
+                                writeBeta(betaValue, Rstep + 1, Tstep);
+                            }
+                            else{
+                                writeBeta(betaValue, Rstep, Tstep + 1);
+                            }
+                        }
+                    }
                 }
                 else if(theory != "SU3" && betaValue < 10){
-                    writeBeta(betaValue + 0.5);
+                    writeBeta(betaValue + 0.5, Rstep, Tstep);
                 }
                 else{
                     clearInterval(timeoutId);

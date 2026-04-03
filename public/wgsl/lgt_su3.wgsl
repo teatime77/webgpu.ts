@@ -229,8 +229,8 @@ fn cabibbo_marinari_step(U_in: SU3Mat, V: SU3Mat, beta: f32, seed: ptr<function,
 struct SimParams {
     beta: f32,
     update_subset: u32,
-    pad1: u32,
-    pad2: u32,
+    R: u32, // ウィルソンループの空間方向の長さ
+    T: u32, // ウィルソンループの時間方向の長さ
 };
 
 @group(0) @binding(0) var<uniform> params: SimParams;
@@ -321,4 +321,43 @@ fn measure_plaquette(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // Plaquette observable is normalized by N=3: 1/3 * Re(Tr(U_p))
     viz_results[site_idx] = (1.0 / 3.0) * su3_trace_real(plaquette_matrix);
+}
+
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
+fn measure_wilson_loop(@builtin(global_invocation_id) id: vec3<u32>) {
+    let x = id.x; let y = id.y;
+    if (x >= L || y >= L) { return; }
+
+    let site_idx = y * L + x;
+
+    var loop_mat = su3_identity();
+    var cx = x;
+    var cy = y;
+
+    // 1. 下辺 (Right方向へ R 歩)
+    for (var i = 0u; i < params.R; i++) {
+        loop_mat = su3_mult(loop_mat, links[get_link_idx(cx, cy, 0u)]);
+        cx = (cx + 1u) % L;
+    }
+
+    // 2. 右辺 (Up方向へ T 歩)
+    for (var i = 0u; i < params.T; i++) {
+        loop_mat = su3_mult(loop_mat, links[get_link_idx(cx, cy, 1u)]);
+        cy = (cy + 1u) % L;
+    }
+
+    // 3. 上辺 (Left方向へ R 歩) -> 逆向きに進むので逆行列(Dagger)を掛ける
+    for (var i = 0u; i < params.R; i++) {
+        cx = (cx + L - 1u) % L; // 先に左へ移動してから、そのマスの右向きリンクの逆をとる
+        loop_mat = su3_mult(loop_mat, su3_inv(links[get_link_idx(cx, cy, 0u)]));
+    }
+
+    // 4. 左辺 (Down方向へ T 歩) -> 逆向きに進むので逆行列(Dagger)を掛ける
+    for (var i = 0u; i < params.T; i++) {
+        cy = (cy + L - 1u) % L; // 先に下へ移動してから、そのマスの右上向きリンクの逆をとる
+        loop_mat = su3_mult(loop_mat, su3_inv(links[get_link_idx(cx, cy, 1u)]));
+    }
+
+    // SU(3)の正規化: 1/3 * Re(Tr(W))
+    viz_results[site_idx] = (1.0 / 3.0) * su3_trace_real(loop_mat);
 }

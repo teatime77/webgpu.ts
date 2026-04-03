@@ -278,13 +278,21 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runLGT(g_device, "U1");
     });
+    makeButton("2D U(1) vortex").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runLGT(g_device, "U1", "vortex");
+    });
     makeButton("2D SU(2)").addEventListener("click", async() => { 
         stopCurrentAnimation();
-        currentStopFunction = await runLGT(g_device, "SU2");
+        currentStopFunction = await runLGT(g_device, "SU2", "plaquette");
     });
     makeButton("2D SU(3)").addEventListener("click", async() => { 
         stopCurrentAnimation();
-        currentStopFunction = await runLGT(g_device, "SU3");
+        currentStopFunction = await runLGT(g_device, "SU3", "plaquette");
+    });
+    makeButton("2D SU(3) wilson").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runLGT(g_device, "SU3", "wilson");
     });
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 
