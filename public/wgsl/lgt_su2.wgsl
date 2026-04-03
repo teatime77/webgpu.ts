@@ -1,3 +1,5 @@
+const PI: f32 = 3.1415926535;
+
 // SU(2) matrix represented as a unit quaternion (a0, a1, a2, a3)
 // a = a0*I + i*a1*sigma1 + i*a2*sigma2 + i*a3*sigma3
 // where I is identity and sigma_k are Pauli matrices.
@@ -44,22 +46,58 @@ fn random_f32(state: ptr<function, u32>) -> f32 {
     return f32(random_u32(state)) / 4294967295.0; // 0.0 ~ 1.0
 }
 
-// Generate a random SU(2) matrix close to the identity.
-// `epsilon` controls how far from identity the new matrix is.
-fn random_su2_near_identity(epsilon: f32, seed: ptr<function, u32>) -> SU2Mat {
-    // Generate a random 3D vector
-    let r1 = (2.0 * random_f32(seed) - 1.0) * epsilon;
-    let r2 = (2.0 * random_f32(seed) - 1.0) * epsilon;
-    let r3 = (2.0 * random_f32(seed) - 1.0) * epsilon;
+// --- SU(2) Heat Bath Helpers ---
 
-    // Project to a quaternion close to identity (1, 0, 0, 0)
-    let norm_sq = r1 * r1 + r2 * r2 + r3 * r3;
-    if (norm_sq > 1.0) { // Should be rare with small epsilon
-        return SU2Mat(1.0, 0.0, 0.0, 0.0);
+// Kennedy-Pendletonアルゴリズムによる第0成分(x0)のサンプリング
+// 目標分布: P(x0) ∝ sqrt(1 - x0^2) * exp(alpha * x0)
+fn sample_su2_x0(alpha: f32, seed: ptr<function, u32>) -> f32 {
+    if (alpha < 0.0001) {
+        return 2.0 * random_f32(seed) - 1.0;
     }
-    let a0 = sqrt(1.0 - norm_sq);
 
-    return normalize(SU2Mat(a0, r1, r2, r3));
+    var x0: f32 = 0.0;
+    for (var i = 0u; i < 1000u; i++) {
+        // log(0) を防ぐために微小値を足す
+        let r1 = random_f32(seed) + 1e-7;
+        let r2 = random_f32(seed) + 1e-7;
+        let r3 = random_f32(seed);
+        let r4 = random_f32(seed);
+
+        let x = -log(r1) / alpha;
+        let y = -log(r2) / alpha;
+        let z = cos(2.0 * PI * r3);
+        let lambda = x + y * z * z;
+
+        x0 = 1.0 - lambda;
+
+        // 物理的にあり得ない範囲はリジェクト
+        if (x0 < -1.0) { continue; }
+
+        // 受容判定
+        if (r4 * r4 <= 0.5 * (1.0 + x0)) {
+            break;
+        }
+    }
+    return x0;
+}
+
+// 与えられたステープルの強さ(alpha)に基づくランダムなSU(2)行列の生成
+fn generate_su2_heatbath(alpha: f32, seed: ptr<function, u32>) -> SU2Mat {
+    let x0 = sample_su2_x0(alpha, seed);
+    let rho = sqrt(max(0.0, 1.0 - x0 * x0));
+
+    // 3次元球面上のランダムな方向を決定
+    let r5 = random_f32(seed);
+    let r6 = random_f32(seed);
+    let cos_theta = 2.0 * r5 - 1.0;
+    let sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+    let phi = 2.0 * PI * r6;
+
+    let x1 = rho * sin_theta * cos(phi);
+    let x2 = rho * sin_theta * sin(phi);
+    let x3 = rho * cos_theta;
+
+    return SU2Mat(x0, x1, x2, x3);
 }
 
 // --- Simulation Constants & Bindings ---
@@ -164,21 +202,31 @@ fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
         staple = staple_right + staple_left;
     }
 
-    // --- Metropolis Step ---
+    // --- Heat Bath Step ---
     let link_idx = get_link_idx(x, y, dir_to_update);
-    let old_link = links[link_idx];
+    
+    // ステープル(4次元ベクトル)の長さを計算
+    let k = length(staple);
+    var new_link: SU2Mat;
 
-    // Propose a new link by multiplying with a random matrix near identity
-    let new_link = normalize(su2_mult(random_su2_near_identity(0.5, &rand_seed), old_link));
-
-    // delta_S = -beta/2 * Tr((new_link - old_link) * staple)
-    let delta_S = -params.beta / 2.0 * (su2_trace(su2_mult(new_link, staple)) - su2_trace(su2_mult(old_link, staple)));
-
-    // Accept/Reject
-    if (exp(-delta_S) > random_f32(&rand_seed)) {
-        links[link_idx] = new_link;
+    if (k > 0.0001) {
+        // 正規化してSU(2)行列 W を作る
+        let W = staple / k;
+        let alpha = params.beta * k;
+        
+        // 目標の確率分布に従う行列 X を生成
+        let X = generate_su2_heatbath(alpha, &rand_seed);
+        
+        // U = X * W^\dagger (ステープルの方向に向ける)
+        new_link = su2_mult(X, su2_inv(W));
+    } else {
+        // ステープルが0の場合（初期など）は完全ランダム
+        new_link = generate_su2_heatbath(0.0, &rand_seed);
     }
 
+    // メトロポリス判定の式（exp(-delta_S)...）は完全に不要になります。
+    // 無条件で受容してメモリに書き込む。
+    links[link_idx] = new_link;
     rng_state[site_idx] = rand_seed;
 }
 

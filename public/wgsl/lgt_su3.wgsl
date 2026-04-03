@@ -121,32 +121,108 @@ fn random_f32(state: ptr<function, u32>) -> f32 {
     return f32(random_u32(state)) / 4294967295.0;
 }
 
-// Generate SU(2) sub-matrix and embed it into SU(3) at position idx (0, 1, or 2)
-fn random_embedded_su2(epsilon: f32, seed: ptr<function, u32>, idx: u32) -> SU3Mat {
-    let r1 = (2.0 * random_f32(seed) - 1.0) * epsilon;
-    let r2 = (2.0 * random_f32(seed) - 1.0) * epsilon;
-    let r3 = (2.0 * random_f32(seed) - 1.0) * epsilon;
-    let norm_sq = r1*r1 + r2*r2 + r3*r3;
-    
-    var a0 = 1.0;
-    var a1 = 0.0; var a2 = 0.0; var a3 = 0.0;
-    if (norm_sq <= 1.0) {
-        a0 = sqrt(1.0 - norm_sq);
-        a1 = r1; a2 = r2; a3 = r3;
+// --- SU(2) Kennedy-Pendleton Heat Bath Helpers ---
+
+fn sample_su2_x0(alpha: f32, seed: ptr<function, u32>) -> f32 {
+    if (alpha < 0.0001) { return 2.0 * random_f32(seed) - 1.0; }
+    var x0: f32 = 0.0;
+    for (var i = 0u; i < 1000u; i++) {
+        let r1 = random_f32(seed) + 1e-7;
+        let r2 = random_f32(seed) + 1e-7;
+        let r3 = random_f32(seed);
+        let r4 = random_f32(seed);
+        let x = -log(r1) / alpha;
+        let y = -log(r2) / alpha;
+        let z = cos(2.0 * PI * r3);
+        let lambda = x + y * z * z;
+        x0 = 1.0 - lambda;
+        if (x0 < -1.0) { continue; }
+        if (r4 * r4 <= 0.5 * (1.0 + x0)) { break; }
     }
+    return x0;
+}
 
+fn generate_su2_heatbath(alpha: f32, seed: ptr<function, u32>) -> vec4<f32> {
+    let x0 = sample_su2_x0(alpha, seed);
+    let rho = sqrt(max(0.0, 1.0 - x0 * x0));
+    let r5 = random_f32(seed);
+    let r6 = random_f32(seed);
+    let cos_theta = 2.0 * r5 - 1.0;
+    let sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+    let phi = 2.0 * PI * r6;
+    let x1 = rho * sin_theta * cos(phi);
+    let x2 = rho * sin_theta * sin(phi);
+    let x3 = rho * cos_theta;
+    return vec4(x0, x1, x2, x3);
+}
+
+fn su2_mult(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
+    return vec4(
+        a.x * b.x - a.y * b.y - a.z * b.z - a.w * b.w,
+        a.x * b.y + a.y * b.x + a.z * b.w - a.w * b.z,
+        a.x * b.z - a.y * b.w + a.z * b.x + a.w * b.y,
+        a.x * b.w + a.y * b.z - a.z * b.y + a.w * b.x
+    );
+}
+
+fn embed_su2(a: vec4<f32>, idx: u32) -> SU3Mat {
     var m = su3_identity();
-    let u00 = vec2(a0, a3);  let u01 = vec2(a2, a1);
-    let u10 = vec2(-a2, a1); let u11 = vec2(a0, -a3);
-
-    if (idx == 0u) { // Top-Left
+    let u00 = vec2(a.x, a.w);  let u01 = vec2(a.z, a.y);
+    let u10 = vec2(-a.z, a.y); let u11 = vec2(a.x, -a.w);
+    if (idx == 0u) {
         m.r0c0 = u00; m.r0c1 = u01; m.r1c0 = u10; m.r1c1 = u11;
-    } else if (idx == 1u) { // Bottom-Right
+    } else if (idx == 1u) {
         m.r1c1 = u00; m.r1c2 = u01; m.r2c1 = u10; m.r2c2 = u11;
-    } else { // Corners
+    } else {
         m.r0c0 = u00; m.r0c2 = u01; m.r2c0 = u10; m.r2c2 = u11;
     }
     return m;
+}
+
+// --- Cabibbo-Marinari Pseudo-Heat Bath ---
+fn cabibbo_marinari_step(U_in: SU3Mat, V: SU3Mat, beta: f32, seed: ptr<function, u32>) -> SU3Mat {
+    var U = U_in;
+    var W = su3_mult(U, V); // 現在の局所作用行列 W = U * V
+
+    for (var idx = 0u; idx < 3u; idx++) {
+        var a0: f32; var a1: f32; var a2: f32; var a3: f32;
+        
+        // W から 2x2 部分群の成分を抽出
+        if (idx == 0u) {
+            a0 = W.r0c0.x + W.r1c1.x;
+            a1 = -(W.r1c0.y + W.r0c1.y);
+            a2 = W.r1c0.x - W.r0c1.x;
+            a3 = -(W.r0c0.y - W.r1c1.y);
+        } else if (idx == 1u) {
+            a0 = W.r1c1.x + W.r2c2.x;
+            a1 = -(W.r2c1.y + W.r1c2.y);
+            a2 = W.r2c1.x - W.r1c2.x;
+            a3 = -(W.r1c1.y - W.r2c2.y);
+        } else {
+            a0 = W.r0c0.x + W.r2c2.x;
+            a1 = -(W.r2c0.y + W.r0c2.y);
+            a2 = W.r2c0.x - W.r0c2.x;
+            a3 = -(W.r0c0.y - W.r2c2.y);
+        }
+
+        let k = sqrt(a0*a0 + a1*a1 + a2*a2 + a3*a3);
+        var r_su2: vec4<f32>;
+
+        if (k > 1e-6) {
+            let a_hat = vec4(a0/k, a1/k, a2/k, a3/k);
+            let alpha = (beta * k) / 3.0; // SU(3)の作用に基づくスケーリング
+            let x_kp = generate_su2_heatbath(alpha, seed);
+            r_su2 = su2_mult(x_kp, a_hat);
+        } else {
+            r_su2 = generate_su2_heatbath(0.0, seed);
+        }
+
+        let R = embed_su2(r_su2, idx);
+        U = su3_mult(R, U);
+        W = su3_mult(R, W); // 次の部分群のために W も更新しておく
+    }
+
+    return U;
 }
 
 // --- Uniforms & Storage Buffers ---
@@ -218,31 +294,14 @@ fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     let link_idx = get_link_idx(x, y, dir_to_update);
     let old_link = links[link_idx];
 
-    // --- Propose New Link ---
-    // Generate a random SU(3) matrix near identity by multiplying 3 embedded SU(2) matrices
-    let step_size = 0.2; // Tuning parameter for acceptance rate
-    let R0 = random_embedded_su2(step_size, &rand_seed, 0u);
-    let R1 = random_embedded_su2(step_size, &rand_seed, 1u);
-    let R2 = random_embedded_su2(step_size, &rand_seed, 2u);
-    
-    let X = su3_mult(R0, su3_mult(R1, R2));
-    
-    // Multiply and STRICTLY Re-unitarize (Crucial for SU(3))
-    let new_link = su3_reunitarize(su3_mult(X, old_link));
+    // Cabibbo-Marinari ヒートバス更新
+    let new_link = cabibbo_marinari_step(old_link, staple, params.beta, &rand_seed);
 
-    // --- Metropolis Accept/Reject ---
-    // S = -(beta / 3) * Re(Tr(U * V))
-    let old_S = -(params.beta / 3.0) * su3_trace_real(su3_mult(old_link, staple));
-    let new_S = -(params.beta / 3.0) * su3_trace_real(su3_mult(new_link, staple));
-    
-    let dS = new_S - old_S;
-
-    if (dS < 0.0 || exp(-dS) > random_f32(&rand_seed)) {
-        links[link_idx] = new_link;
-    }
-
+    // 浮動小数点誤差の蓄積を防ぐため、厳密な再ユニタリ化を行ってから保存
+    links[link_idx] = su3_reunitarize(new_link);
     rng_state[site_idx] = rand_seed;
 }
+
 
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
 fn measure_plaquette(@builtin(global_invocation_id) id: vec3<u32>) {
