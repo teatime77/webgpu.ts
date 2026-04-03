@@ -222,7 +222,10 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
             { // @binding(0) var<uniform> params
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
-                buffer: { type: 'uniform' }
+                buffer: { 
+                    type: 'uniform',
+                    hasDynamicOffset: true
+                }
             },
             { // @binding(1) var<storage, read_write> links
                 binding: 1,
@@ -265,32 +268,32 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         compute: { module: shaderModule, entryPoint: 'measure_plaquette' },
     });
 
-    // 4つのサブセット用に独立したUniformバッファとBindGroupを作成
-    const paramsBuffers: GPUBuffer[] = [];
-    const bindGroups: GPUBindGroup[] = [];
+    // 1つの大きなバッファを作成（1024バイト）
+    const paramsBuffer = device.createBuffer({
+        size: 256 * 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
 
+    // バッファに初期データを書き込む（256バイト間隔で配置）
+    const simParams = new Float32Array(256 * 4 / 4); // /4 は float のサイズ
     for (let i = 0; i < 4; i++) {
-        // 16バイトアライメント: [beta, update_subset, pad, pad]
-        const pBuf = device.createBuffer({
-            size: 16,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        device.queue.writeBuffer(pBuf, 0, new Float32Array([initialBeta])); // offset 0: beta
-        device.queue.writeBuffer(pBuf, 4, new Uint32Array([i]));            // offset 4: subset
-        paramsBuffers.push(pBuf);
-
-        const bg = device.createBindGroup({
-            layout: bindGroupLayout,
-            entries: [
-                { binding: 0, resource: { buffer: pBuf } },
-                { binding: 1, resource: { buffer: linksBuffer } },
-                { binding: 2, resource: { buffer: rngBuffer } },
-                { binding: 3, resource: { buffer: vizResultBuffer } },
-            ],
-        });
-        bindGroups.push(bg);
+        const offset = (256 * i) / 4;
+        simParams[offset + 0] = initialBeta;
+        // floatArrayの中にu32を書き込むトリック（WebGPUではビット幅が同じならこれでOK）
+        new Uint32Array(simParams.buffer)[offset + 1] = i; 
     }
-    // --- 修正後（ここまで） ---
+
+    device.queue.writeBuffer(paramsBuffer, 0, simParams);
+
+    const bindGroup = device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: [
+            { binding: 0, resource: { buffer: paramsBuffer, size: 16 } }, // sizeはWGSLのstructのサイズ(16)を指定
+            { binding: 1, resource: { buffer: linksBuffer } },
+            { binding: 2, resource: { buffer: rngBuffer } },
+            { binding: 3, resource: { buffer: vizResultBuffer } },
+        ],
+    });
 
     // --- State, Constants, and New Simulation Logic ---
     let animationId: number | null = null;
@@ -305,7 +308,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         const commandEncoder = device.createCommandEncoder();
         const pass = commandEncoder.beginComputePass();
         pass.setPipeline(measurePlaquettePipeline);
-        pass.setBindGroup(0, bindGroups[0]);
+        pass.setBindGroup(0, bindGroup, [0]);
         pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
         pass.end();
 
@@ -326,7 +329,8 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         
         // 4つのUniformバッファ全てに新しいBetaを書き込む
         for (let i = 0; i < 4; i++) {
-            device.queue.writeBuffer(paramsBuffers[i], 0, new Float32Array([newBeta]));
+            const offset = 256 * i;
+            device.queue.writeBuffer(paramsBuffer, offset, new Float32Array([newBeta]));
         }
         updatePipelineCnt = 0;
     };
@@ -335,7 +339,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     let commandEncoder = device.createCommandEncoder();
     let passEncoder = commandEncoder.beginComputePass();
     passEncoder.setPipeline(initPipeline);
-    passEncoder.setBindGroup(0, bindGroups[0]);
+    passEncoder.setBindGroup(0, bindGroup, [0]);
     passEncoder.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
     passEncoder.end();
     device.queue.submit([commandEncoder.finish()]);
@@ -432,7 +436,10 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
             for (let j = 0; j < 4; j++) {
                 const pass = commandEncoder.beginComputePass();
                 pass.setPipeline(updatePipeline);
-                pass.setBindGroup(0, bindGroups[j]); // j番目の専用BindGroupを使用
+                
+                // BindGroupをセットする際、第3引数で 256 * j バイトずらす！
+                const dynamicOffset = 256 * j;
+                pass.setBindGroup(0, bindGroup, [dynamicOffset]); 
                 pass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
                 pass.end();
 
@@ -447,7 +454,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         } else {
             vizPass.setPipeline(measurePlaquettePipeline);
         }
-        vizPass.setBindGroup(0, bindGroups[0]);
+        vizPass.setBindGroup(0, bindGroup, [0]);
         vizPass.dispatchWorkgroups(L / WORKGROUP_SIZE, L / WORKGROUP_SIZE, 1);
         vizPass.end();
 
