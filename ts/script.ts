@@ -13,6 +13,7 @@ import { waitClick } from "./ui";
 import { showElectrons } from "./electrons";
 import { runHMC } from "./hmc";
 import { runLGT } from "./lgt";
+import { runFeynmanSimulation } from "./feynman";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -294,6 +295,12 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runLGT(g_device, "SU3", "wilson");
     });
+    makeButton("Beta Decay").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        await runFeynmanSimulation(g_device);
+    });
+
+
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 
     if(params.has("debug")){
