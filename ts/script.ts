@@ -305,9 +305,13 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runHiggs(g_device);
     });
-    makeButton("gauge higgs").addEventListener("click", async() => { 
+    makeButton("SU(2) gauge higgs").addEventListener("click", async() => { 
         stopCurrentAnimation();
-        currentStopFunction = await runGaugeHiggs(g_device);
+        currentStopFunction = await runGaugeHiggs(g_device, "SU2");
+    });
+    makeButton("U(1) gauge higgs").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runGaugeHiggs(g_device, "U1");
     });
 
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });

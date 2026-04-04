@@ -8,7 +8,7 @@ let kappaValue: number = 0.5;
  * フルスケール SU(2) Gauge-Higgs モデル
  * HTML側のUIを使用してパラメータを制御します。
  */
-export async function runGaugeHiggs(device: GPUDevice): Promise<() => void> {
+export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Promise<() => void> {
     msg("Starting Full Scale SU(2) Gauge-Higgs (Electroweak) simulation.");
     stopAnimation();
 
@@ -40,22 +40,32 @@ export async function runGaugeHiggs(device: GPUDevice): Promise<() => void> {
         return () => {};
     }
 
+    let computeName : string;
+    let renderName  : string;
+    let dataSize : number;
+    if(theory == "U1"){
+        [computeName, renderName, dataSize] = [ "lgt_u1_higgs", "u1_higgs_render", 4];
+    }
+    else{
+        [computeName, renderName, dataSize] = [ "lgt_gauge_higgs", "gauge_higgs_render2", 16];
+    }
+
     // --- 2. シェーダーの読み込み ---
-    const computeShaderCode = await fetchText(`./wgsl/lgt_gauge_higgs.wgsl`);
-    const renderShaderCode = await fetchText(`./wgsl/gauge_higgs_render2.wgsl`);
+    const computeShaderCode = await fetchText(`./wgsl/${computeName}.wgsl`);
+    const renderShaderCode = await fetchText(`./wgsl/${renderName}.wgsl`);
     const computeModule = device.createShaderModule({ code: computeShaderCode });
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
     // --- 3. バッファの作成 ---
     // ゲージ場 (リンク): 2方向 * L*Lサイト * 16バイト(vec4)
     const linksBuffer = device.createBuffer({
-        size: 2 * L_squared * 16,
+        size: 2 * L_squared * dataSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
     // ヒッグス場 (サイト): 1方向 * L*Lサイト * 16バイト(vec4)
     const higgsBuffer = device.createBuffer({
-        size: L_squared * 16,
+        size: L_squared * dataSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     });
 
