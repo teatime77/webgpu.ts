@@ -115,7 +115,24 @@ directionalColor
           ※Kappaを大きくすると「自発的対称性の破れ」が起こり、宇宙に色(質量)がつきます。
       </p>
   </div>
+
+
+  <div id="gauge-higgs-panel" style="display:none; position:absolute; top:10px; left:10px; background:rgba(20, 20, 25, 0.85); color:white; padding:15px; border-radius:8px; font-family:sans-serif; border: 1px solid #444; backdrop-filter: blur(4px);">
+      <div style="margin-bottom:10px;">
+          <label for="gh-beta-slider">Beta (β / ゲージ結合): </label>
+          <input type="range" id="gh-beta-slider" min="0.0" max="100.0" step="0.1" value="2.0">
+          <span id="gh-beta-value">2.0</span>
+      </div>
+      <div>
+          <label for="gh-kappa-slider">Kappa (κ / ヒッグス結合): </label>
+          <input type="range" id="gh-kappa-slider" min="0.0" max="2.0" step="0.05" value="0.5">
+          <span id="gh-kappa-value">0.50</span>
+      </div>
+      <p style="font-size:12px; color:#aaa; margin-top:10px; max-width: 350px;">
+          ※Kappaを上げると自発的対称性が破れ、ゲージ場(Wボソン)が質量を獲得します。
+      </p>
   </div>
+</div>
 
 <canvas id="plot-canvas" width="800px" height="400px"></canvas>
 </body>

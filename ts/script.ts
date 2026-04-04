@@ -15,6 +15,7 @@ import { runHMC } from "./hmc";
 import { runLGT } from "./lgt";
 import { runFeynmanSimulation } from "./feynman";
 import { runHiggs } from "./higgs";
+import { runGaugeHiggs } from "./gauge_higgs";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -304,7 +305,10 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runHiggs(g_device);
     });
-
+    makeButton("gauge higgs").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runGaugeHiggs(g_device);
+    });
 
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });
 
