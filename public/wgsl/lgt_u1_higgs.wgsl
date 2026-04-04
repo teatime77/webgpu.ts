@@ -100,7 +100,15 @@ fn update_higgs(@builtin(global_invocation_id) id: vec3<u32>) {
     let p_D = higgs[get_idx(x, ym1)]; let t_D = links[get_link_idx(x, ym1, 1u)];
 
     // メトロポリス提案 (ランダムに角度をずらす)
-    let new_phi = wrap(old_phi + (random_f32(&seed) * 2.0 - 1.0) * PI * 0.5);
+
+    // 【変更前】
+    // let new_phi = wrap(old_phi + (random_f32(&seed) * 2.0 - 1.0) * PI * 0.5);
+
+    // 【変更後】適応的ステップサイズ
+    let step_size = 2.0 / sqrt(params.kappa + 1.0);
+    let new_phi = wrap(old_phi + (random_f32(&seed) * 2.0 - 1.0) * step_size);
+
+
 
     // 局所作用の計算: S = -kappa * cos(phi(x) + theta_mu(x) - phi(x+mu))
     let S_old = -params.kappa * (
@@ -135,7 +143,13 @@ fn update_gauge(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let link_idx = get_link_idx(x, y, dir);
     let old_theta = links[link_idx];
-    let new_theta = wrap(old_theta + (random_f32(&seed) * 2.0 - 1.0) * PI * 0.5);
+
+    // 【変更前】
+    // let new_theta = wrap(old_theta + (random_f32(&seed) * 2.0 - 1.0) * PI * 0.5);
+
+    // 【変更後】適応的ステップサイズ
+    let step_size = 2.0 / sqrt(params.beta + params.kappa + 1.0);
+    let new_theta = wrap(old_theta + (random_f32(&seed) * 2.0 - 1.0) * step_size);
 
     let xp1 = (x + 1u) % L; let yp1 = (y + 1u) % L;
     let xm1 = (x + L - 1u) % L; let ym1 = (y + L - 1u) % L;
@@ -169,9 +183,9 @@ fn update_gauge(@builtin(global_invocation_id) id: vec3<u32>) {
         S_new_h = -params.kappa * cos(phi_x + new_theta - phi_yp1);
         
         let rt_plaq_old = old_theta - links[get_link_idx(xp1, y, 1u)] - links[get_link_idx(x, y, 0u)] + links[get_link_idx(x, yp1, 0u)];
-        let lf_plaq_old = old_theta + links[get_link_idx(xm1, y, 1u)] - links[get_link_idx(xm1, yp1, 0u)] - links[get_link_idx(xm1, y, 0u)];
+        let lf_plaq_old = old_theta + links[get_link_idx(xm1, y, 0u)] - links[get_link_idx(xm1, yp1, 0u)] - links[get_link_idx(xm1, y, 1u)];
         let rt_plaq_new = new_theta - links[get_link_idx(xp1, y, 1u)] - links[get_link_idx(x, y, 0u)] + links[get_link_idx(x, yp1, 0u)];
-        let lf_plaq_new = new_theta + links[get_link_idx(xm1, y, 1u)] - links[get_link_idx(xm1, yp1, 0u)] - links[get_link_idx(xm1, y, 0u)];
+        let lf_plaq_new = new_theta + links[get_link_idx(xm1, y, 0u)] - links[get_link_idx(xm1, yp1, 0u)] - links[get_link_idx(xm1, y, 1u)];
         
         let S_old_g = -params.beta * (cos(rt_plaq_old) + cos(lf_plaq_old));
         let S_new_g = -params.beta * (cos(rt_plaq_new) + cos(lf_plaq_new));
@@ -186,7 +200,7 @@ fn update_gauge(@builtin(global_invocation_id) id: vec3<u32>) {
 // 3. 物理量の測定
 // ============================================================================
 @compute @workgroup_size(8, 8, 1)
-fn measure_observables(@builtin(global_invocation_id) id: vec3<u32>) {
+fn measure_observables_E(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x; let y = id.y;
     if (x >= L || y >= L) { return; }
     let site_idx = get_idx(x, y);
@@ -201,4 +215,40 @@ fn measure_observables(@builtin(global_invocation_id) id: vec3<u32>) {
     // 画面の「色」には影響しませんが、TS側のエラーを防ぎ、
     // 将来的にエネルギー分布を可視化する際に使えます）
     viz_results[site_idx] = cos(phi_x + theta_x - phi_xp1);
+}
+
+// ============================================================================
+// 3. 物理量の測定 (DeGrand-Toussaint トポロジカル電荷)
+// ============================================================================
+@compute @workgroup_size(8, 8, 1)
+fn measure_observables_C(@builtin(global_invocation_id) id: vec3<u32>) {
+    let x = id.x; let y = id.y;
+    if (x >= L || y >= L) { return; }
+    let site_idx = get_idx(x, y);
+
+    let xp1 = (x + 1u) % L;
+    let yp1 = (y + 1u) % L;
+
+    // 1. 各リンクのゲージ不変な位相差 (Covariant Derivative)
+    let dx_bottom = wrap(higgs[get_idx(xp1, y)] - higgs[get_idx(x, y)] - links[get_link_idx(x, y, 0u)]);
+    let dy_right  = wrap(higgs[get_idx(xp1, yp1)] - higgs[get_idx(xp1, y)] - links[get_link_idx(xp1, y, 1u)]);
+    let dx_top    = wrap(higgs[get_idx(xp1, yp1)] - higgs[get_idx(x, yp1)] - links[get_link_idx(x, yp1, 0u)]);
+    let dy_left   = wrap(higgs[get_idx(x, yp1)] - higgs[get_idx(x, y)] - links[get_link_idx(x, y, 1u)]);
+
+    let curl = dx_bottom + dy_right - dx_top - dy_left;
+
+    // 2. プラケット (磁場)
+    let plaq = wrap(
+        links[get_link_idx(x, y, 0u)] + 
+        links[get_link_idx(xp1, y, 1u)] - 
+        links[get_link_idx(x, yp1, 0u)] - 
+        links[get_link_idx(x, y, 1u)]
+    );
+
+    // 3. トポロジカル電荷の計算
+    // curl と plaq を足すことで、熱ノイズが完全に相殺される！
+    // 浮動小数点の微小な誤差を消すために round() で確実に整数化します。
+    let Q = round((curl + plaq) / (2.0 * PI)); 
+
+    viz_results[site_idx] = Q; 
 }

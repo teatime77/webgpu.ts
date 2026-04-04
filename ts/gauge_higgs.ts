@@ -8,7 +8,7 @@ let kappaValue: number = 0.5;
  * フルスケール SU(2) Gauge-Higgs モデル
  * HTML側のUIを使用してパラメータを制御します。
  */
-export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Promise<() => void> {
+export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2', mode :"C" | "E"): Promise<() => void> {
     msg("Starting Full Scale SU(2) Gauge-Higgs (Electroweak) simulation.");
     stopAnimation();
 
@@ -44,10 +44,11 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Pr
     let renderName  : string;
     let dataSize : number;
     if(theory == "U1"){
-        [computeName, renderName, dataSize] = [ "lgt_u1_higgs", "u1_higgs_render", 4];
+        renderName = (mode == "E" ? "u1_higgs_render-E" : "u1_higgs_render-C");
+        [computeName, dataSize] = [ "lgt_u1_higgs", 4];
     }
     else{
-        [computeName, renderName, dataSize] = [ "lgt_gauge_higgs", "gauge_higgs_render2", 16];
+        [computeName, renderName, dataSize] = [ "lgt_gauge_higgs", "gauge_higgs_render", 16];
     }
 
     // --- 2. シェーダーの読み込み ---
@@ -152,9 +153,21 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Pr
         compute: { module: computeModule, entryPoint: 'update_gauge' }
     });
 
+    let measureEntryPoint : string;
+    if(theory == "SU2"){
+        measureEntryPoint = "measure_observables";
+    }
+    else{
+        if(mode == "E"){
+            measureEntryPoint = "measure_observables_E";
+        }
+        else{
+            measureEntryPoint = "measure_observables_C";
+        }
+    }
     const measurePipeline = await device.createComputePipelineAsync({
         layout: computePipelineLayout,
-        compute: { module: computeModule, entryPoint: 'measure_observables' }
+        compute: { module: computeModule, entryPoint: measureEntryPoint }
     });
 
     const computeBindGroup = device.createBindGroup({
@@ -187,11 +200,11 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Pr
     });
     device.queue.writeBuffer(renderParamsBuffer, 0, new Uint32Array([0]));
 
+    const renderBuffer = (theory === "U1" && mode == "C" ? vizResultBuffer : higgsBuffer);
     const renderBindGroup = device.createBindGroup({
         layout: renderBindGroupLayout,
         entries: [
-            // ↓ 変更！ vizResultBuffer ではなく、higgsBuffer を直接シェーダーに渡す！
-            { binding: 0, resource: { buffer: higgsBuffer } } 
+            { binding: 0, resource: { buffer: renderBuffer } }
         ]
     });
 
@@ -215,7 +228,7 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2'): Pr
 
     // --- 7. アニメーションループ ---
     let animationId: number | null = null;
-    const sweepsPerFrame = 5;
+    const sweepsPerFrame = 1;
 
     function frame() {
         const commandEncoder = device.createCommandEncoder();
