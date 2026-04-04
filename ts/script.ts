@@ -14,6 +14,7 @@ import { showElectrons } from "./electrons";
 import { runHMC } from "./hmc";
 import { runLGT } from "./lgt";
 import { runFeynmanSimulation } from "./feynman";
+import { runHiggs } from "./higgs";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -298,6 +299,10 @@ function makeButtons(params: Map<string, string>){
     makeButton("Beta Decay").addEventListener("click", async() => { 
         stopCurrentAnimation();
         await runFeynmanSimulation(g_device);
+    });
+    makeButton("higgs").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runHiggs(g_device);
     });
 
 

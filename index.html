@@ -99,10 +99,25 @@ directionalColor
 
 <div id="app-container">
   <canvas id="world" width="800" height="800" tabindex="0" style="touch-action: none; overscroll-behavior: none;"></canvas>
-</div>
+  
+  <div id="higgs-panel" style="display:none; position:absolute; top:10px; left:10px; background:rgba(20, 20, 25, 0.85); color:white; padding:15px; border-radius:8px; font-family:sans-serif; border: 1px solid #444; backdrop-filter: blur(4px);">
+      <div style="margin-bottom:10px;">
+          <label for="kappa-slider">Kappa (結合強度/温度): </label>
+          <input type="range" id="kappa-slider" min="0.0" max="1.2" step="0.01" value="0.3">
+          <span id="kappa-value">0.30</span>
+      </div>
+      <div>
+          <label for="lambda-slider">Lambda (ポテンシャル深さ): </label>
+          <input type="range" id="lambda-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+          <span id="lambda-value">1.00</span>
+      </div>
+      <p style="font-size:12px; color:#aaa; margin-top:10px; max-width: 350px;">
+          ※Kappaを大きくすると「自発的対称性の破れ」が起こり、宇宙に色(質量)がつきます。
+      </p>
+  </div>
+  </div>
 
 <canvas id="plot-canvas" width="800px" height="400px"></canvas>
-
 </body>
 
 </html>
