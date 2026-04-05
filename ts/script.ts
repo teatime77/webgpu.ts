@@ -18,6 +18,7 @@ import { runHiggs } from "./higgs";
 import { runGaugeHiggs } from "./gauge_higgs";
 import { runCGSolver } from "./cg";
 import { runDiracCGSolver } from "./cg_dirac";
+import { runHMCGaugeHiggs } from "./hmc_gauge_higgs";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -324,6 +325,14 @@ function makeButtons(params: Map<string, string>){
     });
     makeButton("DiracCG").addEventListener("click", async() => { 
         await runDiracCGSolver(g_device);
+    });
+    makeButton("HMC U(1) E gauge higgs").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runHMCGaugeHiggs(g_device, "E");
+    });
+    makeButton("HMC U(1) C gauge higgs").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runHMCGaugeHiggs(g_device, "C");
     });
 
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });

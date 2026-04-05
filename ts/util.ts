@@ -69,7 +69,12 @@ export async function asyncBodyOnLoad(){
         throw Error('Couldn\'t request WebGPU adapter.');
     }
 
-    g_device = await adapter!.requestDevice();
+    g_device = await adapter.requestDevice({
+        requiredLimits: {
+            maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage 
+            // または明示的に 16 などを指定してもOKです
+        }
+    });
     console.log("device is ready\n");
 
     g_presentationFormat = navigator.gpu.getPreferredCanvasFormat();
