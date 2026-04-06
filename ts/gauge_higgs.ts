@@ -12,14 +12,14 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2', mod
     msg("Starting Full Scale SU(2) Gauge-Higgs (Electroweak) simulation.");
     stopAnimation();
 
-    const L = 128; 
+    const L = 64; 
     const L_squared = L * L;
     const WORKGROUP_SIZE = 8; 
 
     // --- 1. UI要素の取得と表示 ---
     const ghPanel = document.getElementById('gauge-higgs-panel') as HTMLDivElement;
-    const betaSlider = document.getElementById('gh-beta-slider') as HTMLInputElement;
-    const kappaSlider = document.getElementById('gh-kappa-slider') as HTMLInputElement;
+    const betaSlider = document.getElementById('beta-inp') as HTMLInputElement;
+    const kappaSlider = document.getElementById('kappa-inp') as HTMLInputElement;
     const betaValueSpan = document.getElementById('gh-beta-value') as HTMLSpanElement;
     const kappaValueSpan = document.getElementById('gh-kappa-value') as HTMLSpanElement;
 

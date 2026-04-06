@@ -5,7 +5,7 @@ struct VertexOutput {
     @location(0) phi: f32,
 };
 
-const L: f32 = 128.0;
+const L: f32 = 64.0;
 
 @vertex
 fn vs_main(@builtin(vertex_index) v_idx: u32, @builtin(instance_index) i_idx: u32) -> VertexOutput {

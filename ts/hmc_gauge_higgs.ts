@@ -11,14 +11,14 @@ export async function runHMCGaugeHiggs(device: GPUDevice, mode: "C" | "E"): Prom
     msg("Starting U(1) Gauge-Higgs HMC simulation...");
     stopAnimation();
 
-    const L = 128;
+    const L = 64;
     const L_squared = L * L;
     const WORKGROUP_SIZE = 8; // WGSLのワークグループサイズに合わせて調整(8x8=64)
 
     // --- 1. UI要素の取得 ---
     const ghPanel = document.getElementById('gauge-higgs-panel') as HTMLDivElement;
-    const betaSlider = document.getElementById('gh-beta-slider') as HTMLInputElement;
-    const kappaSlider = document.getElementById('gh-kappa-slider') as HTMLInputElement;
+    const betaSlider = document.getElementById('beta-inp') as HTMLInputElement;
+    const kappaSlider = document.getElementById('kappa-inp') as HTMLInputElement;
     const betaValueSpan = document.getElementById('gh-beta-value') as HTMLSpanElement;
     const kappaValueSpan = document.getElementById('gh-kappa-value') as HTMLSpanElement;
 

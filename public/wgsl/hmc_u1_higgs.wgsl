@@ -2,7 +2,7 @@
 // WebGPU HMC for U(1) Gauge-Higgs Model (Pure Gauge & Higgs)
 // ============================================================================
 const PI: f32 = 3.1415926535;
-const L: u32 = 128u;
+const L: u32 = 64u;
 
 struct SimParams {
     beta: f32,

@@ -6,7 +6,7 @@ struct VertexOutput {
 };
 
 // typescript側の L に合わせる (128を推奨)
-const L: f32 = 128.0;
+const L: f32 = 64.0;
 
 @vertex
 fn vs_main(@builtin(vertex_index) v_idx: u32, @builtin(instance_index) i_idx: u32) -> VertexOutput {

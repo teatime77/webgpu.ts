@@ -287,7 +287,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
         });
     }
 
-    const entryPoint = (vizMode == "plaquette" ? 'measure_plaquette' : "measure_wilson_loop");
+    const entryPoint = (vizMode == "wilson" ? "measure_wilson_loop" : 'measure_plaquette');
     const measurePlaquettePipeline = await device.createComputePipelineAsync({
         layout: pipelineLayout,
         compute: { module: shaderModule, entryPoint },
