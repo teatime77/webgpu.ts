@@ -1,5 +1,5 @@
 import { fetchText, msg } from "@i18n";
-import { stopAnimation } from "./instance";
+import { stopAnimation } from "../instance";
 
 let betaValue: number = 2.0;
 let kappaValue: number = 0.5;

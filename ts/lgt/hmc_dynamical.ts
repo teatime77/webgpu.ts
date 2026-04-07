@@ -1,5 +1,5 @@
 import { $, $inp, fetchText, msg } from "@i18n";
-import { stopAnimation } from "./instance";
+import { stopAnimation } from "../instance";
 
 let betaValue: number = 4.0;
 let kappaValue: number = 1.0;

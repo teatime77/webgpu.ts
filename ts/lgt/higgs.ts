@@ -1,5 +1,5 @@
 import { fetchText, msg } from "@i18n"; // 環境に合わせてインポート元を調整してください
-import { stopAnimation } from "./instance";
+import { stopAnimation } from "../instance";
 
 let kappaValue: number = 0.3;
 let lambdaValue: number = 1.0;

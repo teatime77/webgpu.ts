@@ -1,5 +1,5 @@
 import { $, fetchText, msg, MyError } from "@i18n";
-import { stopAnimation } from "./instance";
+import { stopAnimation } from "../instance";
 
 let thermalizationSweeps : number; // Number of sweeps for equilibration
 
