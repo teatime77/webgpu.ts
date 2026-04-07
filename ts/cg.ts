@@ -33,7 +33,7 @@ export async function runCGSolver(device: GPUDevice) {
     device.queue.writeBuffer(scalarsBuffer, 0, initialScalars);
 
     // --- 2. シェーダーとパイプラインの準備 ---
-    const code = await fetchText('./wgsl/cg_solver.wgsl');
+    const code = await fetchText('./wgsl/lgt/cg_solver.wgsl');
     const module = device.createShaderModule({ code });
 
     const bindGroupLayout = device.createBindGroupLayout({

@@ -77,7 +77,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // ========================================================================
     // 2. レイアウトとパイプラインの構築
     // ========================================================================
-    const shaderCode = await fetchText('./wgsl/lgt_dynamical.wgsl');
+    const shaderCode = await fetchText('./wgsl/lgt/lgt_dynamical.wgsl');
     const module = device.createShaderModule({ code: shaderCode });
 
     const hmcGroupLayout = device.createBindGroupLayout({
@@ -165,7 +165,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // レンダーパイプラインの作成
     // ========================================================================
     const renderName = mode === "E" ? "u1_higgs_render-E" : "u1_higgs_render-C";
-    const renderShaderCode = "const L: f32 = 32.0;\n" + await fetchText(`./wgsl/${renderName}.wgsl`);
+    const renderShaderCode = "const L: f32 = 32.0;\n" + await fetchText(`./wgsl/lgt/${renderName}.wgsl`);
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
     const canvas = document.querySelector("#world") as HTMLCanvasElement;

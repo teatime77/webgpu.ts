@@ -87,7 +87,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
 
     // 1. Fetch shader code
     const shaderName = new Map<string, string>([["U1", "lgt_u1"], ["SU2", "lgt_su2"], ["SU3", "lgt_su3"]]).get(theory);
-    const shaderCode = await fetchText(`./wgsl/${shaderName}.wgsl`);
+    const shaderCode = await fetchText(`./wgsl/lgt/${shaderName}.wgsl`);
     const shaderModule = device.createShaderModule({ code: shaderCode });
 
     function writeBeta(beta : number, R : number, T : number){
@@ -373,7 +373,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
     msg("LGT: Lattice initialized.");
 
     // --- Create Render Pipeline for Visualization ---
-    const renderShaderCode = await fetchText('./wgsl/lgt_render.wgsl');
+    const renderShaderCode = await fetchText('./wgsl/lgt/lgt_render.wgsl');
     const renderShaderModule = device.createShaderModule({ code: renderShaderCode });
 
     // We need the canvas context to know the format of the texture we're rendering to.

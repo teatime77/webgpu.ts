@@ -15,7 +15,7 @@ export async function runFeynmanSimulation(device: GPUDevice) {
 
     // --- 2. シェーダーの読み込み ---
     // 先ほど作成した feynman_beta.wgsl を読み込みます
-    const response = await fetch('./wgsl/feynman_beta.wgsl');
+    const response = await fetch('./wgsl/lgt/feynman_beta.wgsl');
     const shaderCode = await response.text();
     const shaderModule = device.createShaderModule({ code: shaderCode });
 

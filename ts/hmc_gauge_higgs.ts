@@ -32,9 +32,9 @@ export async function runHMCGaugeHiggs(device: GPUDevice, mode: "C" | "E"): Prom
     kappaValue = parseFloat(kappaSlider.value);
 
     // --- 2. シェーダーの読み込み ---
-    const computeShaderCode = await fetchText('./wgsl/hmc_u1_higgs.wgsl');
+    const computeShaderCode = await fetchText('./wgsl/lgt/hmc_u1_higgs.wgsl');
     const renderName = mode === "E" ? "u1_higgs_render-E" : "u1_higgs_render-C";
-    const renderShaderCode = "const L: f32 = 64.0;\n" + await fetchText(`./wgsl/${renderName}.wgsl`);
+    const renderShaderCode = "const L: f32 = 64.0;\n" + await fetchText(`./wgsl/lgt/${renderName}.wgsl`);
 
     const computeModule = device.createShaderModule({ code: computeShaderCode });
     const renderModule = device.createShaderModule({ code: renderShaderCode });

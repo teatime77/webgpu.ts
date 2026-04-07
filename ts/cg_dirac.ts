@@ -38,7 +38,7 @@ export async function runDiracCGSolver(device: GPUDevice) {
     device.queue.writeBuffer(scalarsBuffer, 0, new Float32Array([initialRho, 0, 0, 0, 0]));
 
     // --- 3. パイプラインの構築 ---
-    const code = await fetchText('./wgsl/cg_dirac.wgsl');
+    const code = await fetchText('./wgsl/lgt/cg_dirac.wgsl');
     const module = device.createShaderModule({ code });
 
     const bindGroupLayout = device.createBindGroupLayout({
