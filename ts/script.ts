@@ -19,7 +19,7 @@ import { runGaugeHiggs } from "./lgt/gauge_higgs";
 import { runCGSolver } from "./lgt/cg_solver";
 import { runDiracCGSolver } from "./lgt/cg_dirac";
 import { runHMCGaugeHiggs } from "./lgt/hmc_gauge_higgs";
-import { runDynamicalFermions } from "./lgt/fermion_hmc_gauge_higgs";
+import { runDynamicalFermions } from "./lgt/fermion_hmc_u1_gauge_higgs";
 
 const common = "@common";
 const cpu    = "@cpu";
