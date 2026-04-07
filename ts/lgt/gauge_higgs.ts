@@ -47,12 +47,12 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2', mod
 
     if(theory == "U1"){
         renderName = (mode == "E" ? "u1_higgs_render-E" : "u1_higgs_render-C");
-        [computeName, dataSize] = [ "lgt_u1_higgs", 4];
+        [computeName, dataSize] = [ "u1_gauge_higgs", 4];
 
         renderShaderCode = "const L: f32 = 64.0;\n" + await fetchText(`./wgsl/lgt/${renderName}.wgsl`);
     }
     else{
-        [computeName, renderName, dataSize] = [ "lgt_gauge_higgs", "gauge_higgs_render", 16];
+        [computeName, renderName, dataSize] = [ "su2_gauge_higgs", "gauge_higgs_render", 16];
         renderShaderCode = await fetchText(`./wgsl/lgt/${renderName}.wgsl`);
     }
 

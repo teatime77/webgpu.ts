@@ -40,7 +40,7 @@ export async function runHiggs(device: GPUDevice): Promise<() => void> {
     }
 
     // --- 2. シェーダーの読み込み ---
-    const computeShaderCode = await fetchText(`./wgsl/lgt/higgs_field.wgsl`);
+    const computeShaderCode = await fetchText(`./wgsl/lgt/higgs.wgsl`);
     const renderShaderCode = await fetchText(`./wgsl/lgt/higgs_render.wgsl`);
     const computeModule = device.createShaderModule({ code: computeShaderCode });
     const renderModule = device.createShaderModule({ code: renderShaderCode });
