@@ -3,13 +3,15 @@ import { stopAnimation } from "./instance";
 
 let betaValue: number = 4.0;
 let kappaValue: number = 1.0;
-let massValue: number = 0.1; // クォークの軽さ (小さいほどCGが重くなる)
+
+// ↓ クォークを重くして方程式を解きやすくする
+let massValue: number = 1.0; // クォークの軽さ (小さいほどCGが重くなる)
 
 export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): Promise<() => void> {
     msg("Starting Dynamical Fermions (HMC + CG Solver) simulation...");
     stopAnimation();
 
-    const L = 64;
+    const L = 32;
     const N = L * L;
     const workgroups = Math.ceil(N / 64);
 
@@ -57,7 +59,20 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     const cgRBuffer = device.createBuffer({ size: spinorSize, usage: GPUBufferUsage.STORAGE });
     const cgQBuffer = device.createBuffer({ size: spinorSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
     const tmpYBuffer = device.createBuffer({ size: spinorSize, usage: GPUBufferUsage.STORAGE });
-    const cgScalarsBuffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE }); // [rho, p_q, alpha, beta, new_rho]
+    const cgScalarsBuffer = device.createBuffer({ size: 40, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }); // [rho, p_q, alpha, beta, new_rho]
+
+
+    // --- デバッグ・検証用の読み出し設定 ---
+    const debugBuffer = device.createBuffer({ size: 9 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });// scalars配列のサイズ (9個のf32)
+
+    let triggerDebug = false;
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'd' || e.key === 'D') {
+            const timerId = setInterval(()=>{
+                triggerDebug = true;
+            }, 10 * 1000);
+        }
+    });    
 
     // ========================================================================
     // 2. レイアウトとパイプラインの構築
@@ -124,6 +139,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
 
     // HMC Pipelines
     const initHotPipeline = await createCmp('init_hot');
+    const initColdPipeline = await createCmp('init_cold'); // ★この1行を追加！
     const initTrajPipeline = await createCmp('init_trajectory');
     const calcHPipeline = await createCmp('calc_local_H');
     const reduceHPipeline = await createCmp('reduce_H');
@@ -149,7 +165,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // レンダーパイプラインの作成
     // ========================================================================
     const renderName = mode === "E" ? "u1_higgs_render-E" : "u1_higgs_render-C";
-    const renderShaderCode = await fetchText(`./wgsl/${renderName}.wgsl`);
+    const renderShaderCode = "const L: f32 = 32.0;\n" + await fetchText(`./wgsl/${renderName}.wgsl`);
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
     const canvas = document.querySelector("#world") as HTMLCanvasElement;
@@ -180,9 +196,13 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // 3. アニメーションループ (The Great Orchestration)
     // ========================================================================
     let animationId: number | null = null;
-    const md_steps = 10;
-    const cg_iters = 30; // 質量が軽いほど多く必要
-    let eps = 0.05;
+
+    const md_steps = 20; // 軌道を保つために歩数を増やす
+
+    // ↓ CGソルバーが答えを見つけるまで、たっぷり回数を回してあげる。質量が軽いほど多く必要
+    const cg_iters = 100; 
+
+    let eps = 0.005;     // 歩幅を細かくしてカーブを正確に曲がる
 
     // パラメータ更新関数 (Dynamic Offset用)
     function writeParams() {
@@ -204,8 +224,12 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // Hot Start
     const initEnc = device.createCommandEncoder();
     const initPass = initEnc.beginComputePass();
-    initPass.setPipeline(initHotPipeline); initPass.setBindGroup(0, hmcBindGroup, [0]); initPass.setBindGroup(1, fermionBindGroup);
-    initPass.dispatchWorkgroups(workgroups); initPass.end();
+    // initPass.setPipeline(initHotPipeline); 
+    initPass.setPipeline(initColdPipeline); // ✅ Cold Start に変更！
+    initPass.setBindGroup(0, hmcBindGroup, [0]); 
+    initPass.setBindGroup(1, fermionBindGroup);
+    initPass.dispatchWorkgroups(workgroups); 
+    initPass.end();
     device.queue.submit([initEnc.finish()]);
 
 // ========================================================================
@@ -220,35 +244,57 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
 
     function frame() {
         const commandEncoder = device.createCommandEncoder();
-        
-        // --- 物理計算パス ---
-        const pass = commandEncoder.beginComputePass();
-        pass.setBindGroup(1, fermionBindGroup);
 
         if (hmc_state === 0) {
-            // 【State 0: 軌道初期化と熱浴】
+            const pass = commandEncoder.beginComputePass();
+            pass.setBindGroup(1, fermionBindGroup);
+
+            // 1. 軌道初期化と P のサンプリング
             pass.setBindGroup(0, hmcBindGroup, [0]);
             pass.setPipeline(initTrajPipeline); pass.dispatchWorkgroups(workgroups);
             
-            // 擬フェルミオン phi の生成 (xi -> tmp_Y -> cg_q)
+            // ↓↓↓ 修正①：フェルミオン生成には「質量(mass)」が必要なので offset [512] に切り替え！ ↓↓↓
+            pass.setBindGroup(0, hmcBindGroup, [512]); 
             pass.setPipeline(generateXiPipeline); pass.dispatchWorkgroups(workgroups);
             pass.setPipeline(applyDDagForCgPipeline); pass.dispatchWorkgroups(workgroups);
-            pass.end(); // 一旦パスを閉じてバッファコピー
+            pass.end(); 
 
-            // cg_q に入った結果を phi バッファにコピー (超重要！)
             commandEncoder.copyBufferToBuffer(cgQBuffer, 0, phiBuffer, 0, spinorSize);
 
+            // 3. 初期位置 Q_0 での CGソルバー (x_0 を求める)
+            const passCg = commandEncoder.beginComputePass();
+            passCg.setBindGroup(1, fermionBindGroup);
+            
+            // ↓↓↓ 修正②：最初のCGソルバーにも「質量(mass)」が必要なので offset [512] をセット！ ↓↓↓
+            passCg.setBindGroup(0, hmcBindGroup, [512]); 
+            
+            passCg.setPipeline(resetCgPipeline); passCg.dispatchWorkgroups(workgroups);
+            passCg.setPipeline(calcInitialRhoPipeline); passCg.dispatchWorkgroups(1);
+            for(let i = 0; i < cg_iters; i++) {
+                passCg.setPipeline(applyDForCgPipeline); passCg.dispatchWorkgroups(workgroups);
+                passCg.setPipeline(applyDDagForCgPipeline); passCg.dispatchWorkgroups(workgroups);
+                passCg.setPipeline(calcPQPipeline); passCg.dispatchWorkgroups(1);
+                passCg.setPipeline(updateXRPipeline); passCg.dispatchWorkgroups(workgroups);
+                passCg.setPipeline(calcNewRhoPipeline); passCg.dispatchWorkgroups(1);
+                passCg.setPipeline(updateCGPPipeline); passCg.dispatchWorkgroups(workgroups);
+            }
+            passCg.end();
+
+            // 4. H_old の計算 と 【最初の P 半歩】
             const pass2 = commandEncoder.beginComputePass();
             pass2.setBindGroup(1, fermionBindGroup);
-            pass2.setBindGroup(0, hmcBindGroup, [0]);
-
-            // H_old の計算
+            
+            // ↓↓↓ 修正③：H_old の計算には isNewH=0 のフラグが必要なので offset [0] に戻す ↓↓↓
+            pass2.setBindGroup(0, hmcBindGroup, [0]); 
             pass2.setPipeline(calcHPipeline); pass2.dispatchWorkgroups(workgroups);
             pass2.setPipeline(reduceHPipeline); pass2.dispatchWorkgroups(1);
 
-            // P を半歩進める
+            // 最初のP半歩には eps/2 と質量が必要なので offset [256]
             pass2.setBindGroup(0, hmcBindGroup, [256]); // eps/2
+            pass2.setPipeline(computeYPipeline); pass2.dispatchWorkgroups(workgroups);
+            pass2.setPipeline(calcFermionForcePipeline); pass2.dispatchWorkgroups(workgroups);
             pass2.setPipeline(updatePPipeline); pass2.dispatchWorkgroups(workgroups);
+            
             pass2.end();
 
             hmc_state = 1;
@@ -256,12 +302,17 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
 
         } 
         else if (hmc_state === 1) {
-            pass.setBindGroup(0, hmcBindGroup, [256]); 
+            const pass = commandEncoder.beginComputePass();
+            pass.setBindGroup(1, fermionBindGroup);
 
-            // 【State 1: リープフロッグ1歩分 ＋ CGソルバー】(毎フレーム1歩だけ進める)
+            // 1. Q を 1歩 進める
+            pass.setBindGroup(0, hmcBindGroup, [512]); // eps
+            pass.setPipeline(updateQPipeline); pass.dispatchWorkgroups(workgroups);
+            current_md_step++;
+
+            // 2. 新しい Q で CGソルバーを解く
             pass.setPipeline(resetCgPipeline); pass.dispatchWorkgroups(workgroups);
             pass.setPipeline(calcInitialRhoPipeline); pass.dispatchWorkgroups(1);
-            
             for(let i = 0; i < cg_iters; i++) {
                 pass.setPipeline(applyDForCgPipeline); pass.dispatchWorkgroups(workgroups);
                 pass.setPipeline(applyDDagForCgPipeline); pass.dispatchWorkgroups(workgroups);
@@ -271,41 +322,55 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
                 pass.setPipeline(updateCGPPipeline); pass.dispatchWorkgroups(workgroups);
             }
 
-            // フェルミオン力
-            pass.setBindGroup(0, hmcBindGroup, [512]); // eps
-            pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);
-            pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups);
-
-            // ゲージ・ヒッグス力
-            pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
-
-            if (current_md_step < md_steps - 1) {
-                // まだ軌道の途中なら q を1歩進める
-                pass.setPipeline(updateQPipeline); pass.dispatchWorkgroups(workgroups);
-                current_md_step++;
-            } else {
-                // 最後のステップ：qを1歩、Pを半歩
-                pass.setPipeline(updateQPipeline); pass.dispatchWorkgroups(workgroups);
-                pass.setBindGroup(0, hmcBindGroup, [256]); // eps/2
+            // 3. P を更新する
+            if (current_md_step < md_steps) {
+                // 途中なら P を 1歩進める (eps)
+                pass.setBindGroup(0, hmcBindGroup, [512]);
+                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);
+                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups);
                 pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
-                hmc_state = 2; // 次は判定へ
+            } else {
+                // ↓↓↓ 修正の核心: 最後の半歩(eps/2)でもフェルミオン力を確実に計算！ ↓↓↓
+                pass.setBindGroup(0, hmcBindGroup, [256]); // eps/2
+                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);
+                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups);
+                pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
+                hmc_state = 2;
+                // ↑↑↑
             }
             pass.end();
 
         } else if (hmc_state === 2) {
-            // 【State 2: 受容判定と観測】
-            pass.setBindGroup(0, hmcBindGroup, [768]); // H_new
+            const pass = commandEncoder.beginComputePass();
+            pass.setBindGroup(1, fermionBindGroup);
+
+            // 【State 2: H_new 計算と受容判定】
+            pass.setBindGroup(0, hmcBindGroup, [768]); // isNewH = 1
             pass.setPipeline(calcHPipeline); pass.dispatchWorkgroups(workgroups);
             pass.setPipeline(reduceHPipeline); pass.dispatchWorkgroups(1);
             
             pass.setBindGroup(0, hmcBindGroup, [0]);
             pass.setPipeline(acceptRejectPipeline); pass.dispatchWorkgroups(workgroups);
 
-            pass.setPipeline(measurePipeline); pass.dispatchWorkgroups(L/8, L/8, 1);
             pass.end();
-            
-            hmc_state = 0; // 次の新しい軌道へループ！
+
+            if (triggerDebug) {
+                triggerDebug = false;
+                commandEncoder.copyBufferToBuffer(cgScalarsBuffer, 0, debugBuffer, 0, 9 * 4);
+                (window as any).shouldReadDebug = true; 
+            }
+
+            hmc_state = 0; 
         }
+
+        // ↓↓↓ 追加：描画の直前に必ず Q を再計算してバッファを上書きする ↓↓↓
+        const vizPass = commandEncoder.beginComputePass();
+        vizPass.setPipeline(measurePipeline);
+        vizPass.setBindGroup(0, hmcBindGroup, [0]); 
+        vizPass.setBindGroup(1, fermionBindGroup); // レイアウトの都合上これも必須
+        vizPass.dispatchWorkgroups(L/8, L/8, 1);
+        vizPass.end();
+        // ↑↑↑
 
         // --- 描画パス (毎フレーム必ず実行して画面フリーズを防ぐ) ---
         const canvas = document.querySelector("#world") as HTMLCanvasElement;
@@ -323,6 +388,27 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
         renderPassEncoder.end();
 
         device.queue.submit([commandEncoder.finish()]);
+
+        // --- 修正: コピー命令が送信されたフレームの直後だけ読み出す ---
+        if ((window as any).shouldReadDebug) {
+            (window as any).shouldReadDebug = false; // フラグを戻す
+            
+            debugBuffer.mapAsync(GPUMapMode.READ).then(() => {
+                const data = new Float32Array(debugBuffer.getMappedRange());
+                const rho = data[0];       // CGソルバー最終ステップの残差 |r|^2
+                const H_old = data[5];     // 軌道開始時のエネルギー
+                const H_new = data[6];     // 軌道終了時のエネルギー
+                const accepted = data[7];  // 1なら受容、0なら棄却
+                const dH = H_new - H_old;  // エネルギー変動
+
+            msg(`--- Debug Readout Triggered ---
+[HMC] H_old: ${H_old.toFixed(2)}, H_new: ${H_new.toFixed(2)}, ΔH: ${dH.toFixed(4)} (Accepted: ${accepted})
+[CG]  Final Residual ρ: ${rho.toExponential(3)}`);
+
+                debugBuffer.unmap();
+            });
+        }
+        
         animationId = requestAnimationFrame(frame);
     }
 

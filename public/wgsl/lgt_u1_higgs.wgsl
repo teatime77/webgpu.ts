@@ -211,7 +211,7 @@ fn measure_observables_E(@builtin(global_invocation_id) id: vec3<u32>) {
     let theta_x = links[get_link_idx(x, y, 0u)];
     let phi_xp1 = higgs[get_idx((x + 1u) % L, y)];
 
-    // 結果を保存（今回は u1_higgs_render.wgsl が higgs を直接読むため
+    // 結果を保存（今回はレンダーが higgs を直接読むため
     // 画面の「色」には影響しませんが、TS側のエラーを防ぎ、
     // 将来的にエネルギー分布を可視化する際に使えます）
     viz_results[site_idx] = cos(phi_x + theta_x - phi_xp1);

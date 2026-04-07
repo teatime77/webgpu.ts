@@ -2,7 +2,7 @@
 // WebGPU Dynamical Fermions (HMC + CG Solver)
 // ============================================================================
 const PI: f32 = 3.1415926535;
-const L: u32 = 64u;
+const L: u32 = 32u;
 
 alias Spinor = vec4<f32>;
 
@@ -160,37 +160,71 @@ fn calc_fermion_force(@builtin(global_invocation_id) id: vec3<u32>) {
     let cx = idx % L; let cy = idx / L;
     let xp1 = (cx + 1u) % L; let yp1 = (cy + 1u) % L;
 
-    let Y_c = tmp_Y[idx]; // 前のカーネルで計算した Y = Dx
-    let x_c = x[idx];     // CGソルバーの答え
+    let Y_c = tmp_Y[idx]; // Y(n)
+    let x_c = x[idx];     // x(n)
     let eps = params.eps;
 
-    // --- x方向の力 ---
+    // ==========================================
+    // --- x方向の力 (Forward & Backward) ---
+    // ==========================================
     let l_x = get_link_idx(cx, cy, 0u);
     let u_x = links[l_x];
     let x_R = x[get_idx(xp1, cy)];
+    let Y_R = tmp_Y[get_idx(xp1, cy)];
 
-    // dD/dtheta = -0.5 * i * U * (1 - gamma)
-    // U に PI/2 (90度) 足すことで iU を実現
+    // Forward term (前方のサイトからの力)
     let dU_x = apply_U(u_x + PI / 2.0, x_R);
-    var dD_x = Spinor(0.0, 0.0, 0.0, 0.0);
-    dD_x.x = -0.5 * (dU_x.x - dU_x.z); dD_x.y = -0.5 * (dU_x.y - dU_x.w);
-    dD_x.z = -0.5 * (dU_x.z - dU_x.x); dD_x.w = -0.5 * (dU_x.w - dU_x.y);
+    let dD_x = Spinor(
+        -0.5 * (dU_x.x - dU_x.z),
+        -0.5 * (dU_x.y - dU_x.w),
+        -0.5 * (dU_x.z - dU_x.x),
+        -0.5 * (dU_x.w - dU_x.y)
+    );
+    let force_x_fwd = spinor_dot_real(Y_c, dD_x);
 
-    let force_x = 2.0 * spinor_dot_real(Y_c, dD_x);
-    p_links[l_x] -= eps * force_x; // ゲージ場の運動量をキック！
+    // Backward term (後方のサイトからの力)
+    let dU_x_rev = apply_U(PI / 2.0 - u_x, x_c);
+    let dD_x_rev = Spinor(
+        0.5 * (dU_x_rev.x + dU_x_rev.z),
+        0.5 * (dU_x_rev.y + dU_x_rev.w),
+        0.5 * (dU_x_rev.z + dU_x_rev.x),
+        0.5 * (dU_x_rev.w + dU_x_rev.y)
+    );
+    let force_x_rev = spinor_dot_real(Y_R, dD_x_rev);
 
-    // --- y方向の力 ---
+    let force_x = 2.0 * (force_x_fwd + force_x_rev);
+    p_links[l_x] += eps * force_x; 
+
+    // ==========================================
+    // --- y方向の力 (Forward & Backward) ---
+    // ==========================================
     let l_y = get_link_idx(cx, cy, 1u);
     let u_y = links[l_y];
     let x_U = x[get_idx(cx, yp1)];
+    let Y_U = tmp_Y[get_idx(cx, yp1)];
 
+    // Forward term (前方のサイトからの力)
     let dU_y = apply_U(u_y + PI / 2.0, x_U);
-    var dD_y = Spinor(0.0, 0.0, 0.0, 0.0);
-    dD_y.x = -0.5 * (dU_y.x + dU_y.w); dD_y.y = -0.5 * (dU_y.y - dU_y.z);
-    dD_y.z = -0.5 * (dU_y.z - dU_y.y); dD_y.w = -0.5 * (dU_y.w + dU_y.x);
+    let dD_y = Spinor(
+        -0.5 * (dU_y.x - dU_y.w),
+        -0.5 * (dU_y.y + dU_y.z),
+        -0.5 * (dU_y.z + dU_y.y),
+        -0.5 * (dU_y.w - dU_y.x)
+    );
+    let force_y_fwd = spinor_dot_real(Y_c, dD_y);
 
-    let force_y = 2.0 * spinor_dot_real(Y_c, dD_y);
-    p_links[l_y] -= eps * force_y; // ゲージ場の運動量をキック！
+    // Backward term (後方のサイトからの力)
+    let dU_y_rev = apply_U(PI / 2.0 - u_y, x_c);
+    let dD_y_rev = Spinor(
+        0.5 * (dU_y_rev.x + dU_y_rev.w),
+        0.5 * (dU_y_rev.y - dU_y_rev.z),
+        0.5 * (dU_y_rev.z - dU_y_rev.y),
+        0.5 * (dU_y_rev.w + dU_y_rev.x)
+    );
+    let force_y_rev = spinor_dot_real(Y_U, dD_y_rev);
+
+    let force_y = 2.0 * (force_y_fwd + force_y_rev);
+    p_links[l_y] += eps * force_y;
 }
 
 // ============================================================================
@@ -271,6 +305,27 @@ fn init_hot(@builtin(global_invocation_id) id: vec3<u32>) {
     higgs[idx] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
     links[idx * 2u + 0u] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
     links[idx * 2u + 1u] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
+    rng_state[idx] = seed;
+}
+
+// ============================================================================
+// コールドスタート (絶対零度・完全な真空での初期化)
+// ============================================================================
+@compute @workgroup_size(64)
+fn init_cold(@builtin(global_invocation_id) id: vec3<u32>) {
+    let idx = id.x;
+    if (idx >= L * L) { return; }
+    
+    var seed = rng_state[idx];
+    
+    // 位相をすべて 0.0 (完全な真空・絶対零度) に揃える
+    higgs[idx] = 0.0;
+    links[idx * 2u + 0u] = 0.0;
+    links[idx * 2u + 1u] = 0.0;
+    
+    // 乱数の状態を進めるための空回し
+    let dummy = rand_f32(&seed);
+    
     rng_state[idx] = seed;
 }
 

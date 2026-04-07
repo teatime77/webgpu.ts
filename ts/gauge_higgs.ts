@@ -43,17 +43,21 @@ export async function runGaugeHiggs(device: GPUDevice, theory: 'U1' | 'SU2', mod
     let computeName : string;
     let renderName  : string;
     let dataSize : number;
+    let renderShaderCode : string;
+
     if(theory == "U1"){
         renderName = (mode == "E" ? "u1_higgs_render-E" : "u1_higgs_render-C");
         [computeName, dataSize] = [ "lgt_u1_higgs", 4];
+
+        renderShaderCode = "const L: f32 = 64.0;\n" + await fetchText(`./wgsl/${renderName}.wgsl`);
     }
     else{
         [computeName, renderName, dataSize] = [ "lgt_gauge_higgs", "gauge_higgs_render", 16];
+        renderShaderCode = await fetchText(`./wgsl/${renderName}.wgsl`);
     }
 
     // --- 2. シェーダーの読み込み ---
     const computeShaderCode = await fetchText(`./wgsl/${computeName}.wgsl`);
-    const renderShaderCode = await fetchText(`./wgsl/${renderName}.wgsl`);
     const computeModule = device.createShaderModule({ code: computeShaderCode });
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
