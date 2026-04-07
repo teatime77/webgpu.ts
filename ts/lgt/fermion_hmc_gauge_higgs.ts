@@ -77,7 +77,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // ========================================================================
     // 2. レイアウトとパイプラインの構築
     // ========================================================================
-    const shaderCode = await fetchText('./wgsl/lgt/lgt_dynamical.wgsl');
+    const shaderCode = await fetchText('./wgsl/lgt/fermion_hmc_u1_gauge_higgs.wgsl');
     const module = device.createShaderModule({ code: shaderCode });
 
     const hmcGroupLayout = device.createBindGroupLayout({
