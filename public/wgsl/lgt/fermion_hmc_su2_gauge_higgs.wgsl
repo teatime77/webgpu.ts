@@ -61,10 +61,8 @@ fn su2_apply_spinor(U: SU2, psi: SU2Spinor) -> SU2Spinor {
     let beta_ = vec2<f32>(U.z, U.y);          // a2 + i a1
     let alpha_star = vec2<f32>(U.x, -U.w);    // a0 - i a3
     let minus_beta_star = vec2<f32>(-U.z, U.y); // -a2 + i a1
-
-    // u_new = alpha * u + beta * d  (← dがWボソンを放出してuに変わる項！)
+    // ベータ崩壊の混合項
     let u_new = c_mul_spinor(alpha, psi.u) + c_mul_spinor(beta_, psi.d);
-    // d_new = -beta^* * u + alpha^* * d
     let d_new = c_mul_spinor(minus_beta_star, psi.u) + c_mul_spinor(alpha_star, psi.d);
     
     return SU2Spinor(u_new, d_new);
@@ -109,7 +107,6 @@ fn su2_spinor_dot_real(a: SU2Spinor, b: SU2Spinor) -> f32 {
 @group(1) @binding(3) var<storage, read_write> cg_r: array<SU2Spinor>;
 @group(1) @binding(4) var<storage, read_write> cg_q: array<SU2Spinor>;
 @group(1) @binding(5) var<storage, read_write> tmp_Y: array<SU2Spinor>;
-// ※ binding 6 の scalars は Group 0 に統合したため削除されました。
 
 // --- ヘルパー関数 ---
 fn get_idx(cx: u32, cy: u32) -> u32 { return cy * L + cx; }
@@ -148,11 +145,12 @@ fn generate_xi(@builtin(global_invocation_id) id: vec3<u32>) {
     if (idx >= L * L) { return; }
     var seed = rng_state[idx];
     
+    let u_comp = vec4<f32>(rand_normal(&seed), rand_normal(&seed), rand_normal(&seed), rand_normal(&seed));
+    let d_comp = vec4<f32>(rand_normal(&seed), rand_normal(&seed), rand_normal(&seed), rand_normal(&seed));
+    
     // ガウシアンノイズ xi を生成し、一時バッファ tmp_Y に保存
-    tmp_Y[idx] = Spinor(rand_normal(&seed), rand_normal(&seed), rand_normal(&seed), rand_normal(&seed));
+    tmp_Y[idx] = SU2Spinor(u_comp, d_comp);
     rng_state[idx] = seed;
-
-    // ※この後、TS側で apply_D_dag を tmp_Y に掛けて phi に保存します
 }
 
 // ============================================================================
@@ -234,6 +232,30 @@ fn compute_Y_from_x(@builtin(global_invocation_id) id: vec3<u32>) {
     if (id.x < L * L) { tmp_Y[id.x] = compute_D(&x, id.x); }
 }
 
+// --- Fermion Force SU(2) Helpers ---
+fn mul_i(psi: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(-psi.y, psi.x, -psi.w, psi.z);
+}
+
+fn apply_i_sigma1(S: SU2Spinor) -> SU2Spinor {
+    return SU2Spinor(mul_i(S.d), mul_i(S.u));
+}
+
+fn apply_i_sigma2(S: SU2Spinor) -> SU2Spinor {
+    return SU2Spinor(S.d, vec4<f32>(-S.u.x, -S.u.y, -S.u.z, -S.u.w));
+}
+
+fn apply_i_sigma3(S: SU2Spinor) -> SU2Spinor {
+    return SU2Spinor(mul_i(S.u), vec4<f32>(S.d.y, -S.d.x, S.d.w, -S.d.z)); 
+}
+
+fn get_su2_force_components(Y: SU2Spinor, S_prime: SU2Spinor) -> vec3<f32> {
+    let f1 = su2_spinor_dot_real(Y, apply_i_sigma1(S_prime));
+    let f2 = su2_spinor_dot_real(Y, apply_i_sigma2(S_prime));
+    let f3 = su2_spinor_dot_real(Y, apply_i_sigma3(S_prime));
+    return vec3<f32>(f1, f2, f3);
+}
+
 @compute @workgroup_size(64)
 fn calc_fermion_force(@builtin(global_invocation_id) id: vec3<u32>) {
     let idx = id.x;
@@ -242,71 +264,65 @@ fn calc_fermion_force(@builtin(global_invocation_id) id: vec3<u32>) {
     let cx = idx % L; let cy = idx / L;
     let xp1 = (cx + 1u) % L; let yp1 = (cy + 1u) % L;
 
-    let Y_c = tmp_Y[idx]; // Y(n)
-    let x_c = x[idx];     // x(n)
+    let Y_c = tmp_Y[idx]; 
+    let x_c = x[idx];     
     let eps = params.eps;
 
     // ==========================================
     // --- x方向の力 (Forward & Backward) ---
     // ==========================================
     let l_x = get_link_idx(cx, cy, 0u);
-    let u_x = links[l_x];
+    let U_x = links[l_x];
     let x_R = x[get_idx(xp1, cy)];
     let Y_R = tmp_Y[get_idx(xp1, cy)];
 
-    // Forward term (前方のサイトからの力)
-    let dU_x = apply_U(u_x + PI / 2.0, x_R);
-    let dD_x = Spinor(
-        -0.5 * (dU_x.x - dU_x.z),
-        -0.5 * (dU_x.y - dU_x.w),
-        -0.5 * (dU_x.z - dU_x.x),
-        -0.5 * (dU_x.w - dU_x.y)
+    // Fwd
+    let S_fwd_x = su2_apply_spinor(U_x, x_R);
+    let g1_S_fwd = gamma1_mul_su2(S_fwd_x);
+    let S_prime_fwd_x = SU2Spinor(
+        -0.5 * (S_fwd_x.u - g1_S_fwd.u), 
+        -0.5 * (S_fwd_x.d - g1_S_fwd.d)
     );
-    let force_x_fwd = spinor_dot_real(Y_c, dD_x);
+    let force_x_fwd = get_su2_force_components(Y_c, S_prime_fwd_x);
 
-    // Backward term (後方のサイトからの力)
-    let dU_x_rev = apply_U(PI / 2.0 - u_x, x_c);
-    let dD_x_rev = Spinor(
-        0.5 * (dU_x_rev.x + dU_x_rev.z),
-        0.5 * (dU_x_rev.y + dU_x_rev.w),
-        0.5 * (dU_x_rev.z + dU_x_rev.x),
-        0.5 * (dU_x_rev.w + dU_x_rev.y)
+    // Bwd
+    let g1_Y_R = gamma1_mul_su2(Y_R);
+    let Y_R_plus = SU2Spinor(
+        0.5 * (Y_R.u + g1_Y_R.u), 
+        0.5 * (Y_R.d + g1_Y_R.d)
     );
-    let force_x_rev = spinor_dot_real(Y_R, dD_x_rev);
+    let S_prime_bwd_x = su2_apply_spinor(U_x, Y_R_plus);
+    let force_x_bwd = get_su2_force_components(S_prime_bwd_x, x_c);
 
-    let force_x = 2.0 * (force_x_fwd + force_x_rev);
-    p_links[l_x] += eps * force_x; 
+    let force_x = 2.0 * (force_x_fwd + force_x_bwd);
+    p_links[l_x] += SU2(0.0, eps * force_x.x, eps * force_x.y, eps * force_x.z);
 
-    // ==========================================
-    // --- y方向の力 (Forward & Backward) ---
-    // ==========================================
+    // --- Y方向の力 ---
     let l_y = get_link_idx(cx, cy, 1u);
-    let u_y = links[l_y];
+    let U_y = links[l_y];
     let x_U = x[get_idx(cx, yp1)];
     let Y_U = tmp_Y[get_idx(cx, yp1)];
 
-    // Forward term (前方のサイトからの力)
-    let dU_y = apply_U(u_y + PI / 2.0, x_U);
-    let dD_y = Spinor(
-        -0.5 * (dU_y.x - dU_y.w),
-        -0.5 * (dU_y.y + dU_y.z),
-        -0.5 * (dU_y.z + dU_y.y),
-        -0.5 * (dU_y.w - dU_y.x)
+    // Fwd
+    let S_fwd_y = su2_apply_spinor(U_y, x_U);
+    let g2_S_fwd = gamma2_mul_su2(S_fwd_y);
+    let S_prime_fwd_y = SU2Spinor(
+        -0.5 * (S_fwd_y.u - g2_S_fwd.u), 
+        -0.5 * (S_fwd_y.d - g2_S_fwd.d)
     );
-    let force_y_fwd = spinor_dot_real(Y_c, dD_y);
+    let force_y_fwd = get_su2_force_components(Y_c, S_prime_fwd_y);
 
-    // Backward term (後方のサイトからの力)
-    let dU_y_rev = apply_U(PI / 2.0 - u_y, x_c);
-    let dD_y_rev = Spinor(
-        0.5 * (dU_y_rev.x + dU_y_rev.w),
-        0.5 * (dU_y_rev.y - dU_y_rev.z),
-        0.5 * (dU_y_rev.z - dU_y_rev.y),
-        0.5 * (dU_y_rev.w + dU_y_rev.x)
+    // Bwd
+    let g2_Y_U = gamma2_mul_su2(Y_U);
+    let Y_U_plus = SU2Spinor(
+        0.5 * (Y_U.u + g2_Y_U.u), 
+        0.5 * (Y_U.d + g2_Y_U.d)
     );
-    let force_y_rev = spinor_dot_real(Y_U, dD_y_rev);
+    let S_prime_bwd_y = su2_apply_spinor(U_y, Y_U_plus);
+    let force_y_bwd = get_su2_force_components(S_prime_bwd_y, x_c);
 
-    let force_y = 2.0 * (force_y_fwd + force_y_rev);
-    p_links[l_y] += eps * force_y;
+    let force_y = 2.0 * (force_y_fwd + force_y_bwd);
+    p_links[l_y] += SU2(0.0, eps * force_y.x, eps * force_y.y, eps * force_y.z);
 }
 
 // ============================================================================

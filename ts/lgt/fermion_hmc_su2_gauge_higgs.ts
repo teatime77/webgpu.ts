@@ -291,8 +291,8 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
 
             // 最初のP半歩には eps/2 と質量が必要なので offset [256]
             pass2.setBindGroup(0, hmcBindGroup, [256]); // eps/2
-            // pass2.setPipeline(computeYPipeline); pass2.dispatchWorkgroups(workgroups);
-            // pass2.setPipeline(calcFermionForcePipeline); pass2.dispatchWorkgroups(workgroups);
+            pass2.setPipeline(computeYPipeline); pass2.dispatchWorkgroups(workgroups);
+            pass2.setPipeline(calcFermionForcePipeline); pass2.dispatchWorkgroups(workgroups);
             pass2.setPipeline(updatePPipeline); pass2.dispatchWorkgroups(workgroups);
             
             pass2.end();
@@ -326,14 +326,14 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
             if (current_md_step < md_steps) {
                 // 途中なら P を 1歩進める (eps)
                 pass.setBindGroup(0, hmcBindGroup, [512]);
-                // pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
-                // pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
+                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
+                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
                 pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
             } else {
                 // ↓↓↓ 修正の核心: 最後の半歩(eps/2)でもフェルミオン力を確実に計算！ ↓↓↓
                 pass.setBindGroup(0, hmcBindGroup, [256]); // eps/2
-                // pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
-                // pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
+                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
+                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
                 pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
                 hmc_state = 2;
                 // ↑↑↑
