@@ -20,6 +20,7 @@ import { runCGSolver } from "./lgt/cg_solver";
 import { runDiracCGSolver } from "./lgt/cg_dirac";
 import { runHMCGaugeHiggs } from "./lgt/hmc_gauge_higgs";
 import { runDynamicalFermions } from "./lgt/fermion_hmc_u1_gauge_higgs";
+import { runFermionSU2 } from "./lgt/fermion_hmc_su2_gauge_higgs";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -335,13 +336,17 @@ function makeButtons(params: Map<string, string>){
         stopCurrentAnimation();
         currentStopFunction = await runHMCGaugeHiggs(g_device, "C");
     });
-    makeButton("fermion C").addEventListener("click", async() => { 
+    makeButton("fermion U1 C").addEventListener("click", async() => { 
         stopCurrentAnimation();
         currentStopFunction = await runDynamicalFermions(g_device, "C");
     });
-    makeButton("fermion E").addEventListener("click", async() => { 
+    makeButton("fermion U1 E").addEventListener("click", async() => { 
         stopCurrentAnimation();
         currentStopFunction = await runDynamicalFermions(g_device, "E");
+    });
+    makeButton("fermion SU2 C").addEventListener("click", async() => { 
+        stopCurrentAnimation();
+        currentStopFunction = await runFermionSU2(g_device, "C");
     });
 
     makeButton("HMC").addEventListener("click", async() => { stopCurrentAnimation(); await runHMC() });

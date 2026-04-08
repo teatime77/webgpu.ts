@@ -7,7 +7,7 @@ let kappaValue: number = 1.0;
 // ↓ クォークを重くして方程式を解きやすくする
 let massValue: number = 1.0; // クォークの軽さ (小さいほどCGが重くなる)
 
-export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): Promise<() => void> {
+export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise<() => void> {
     msg("Starting Dynamical Fermions (HMC + CG Solver) simulation...");
     stopAnimation();
 
@@ -36,14 +36,15 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     // 1. バッファの作成 (Multi-BindGroup Architecture)
     // ========================================================================
     const floatSize = N * 4;
-    const spinorSize = N * 16;
+    const spinorSize = N * 16 * 2; // ★変更：vec4(16バイト) が u と d の 2つ分！
+    const su2Size = N * 16; // 追加: SU(2)行列は 4つのf32 = 16バイト
 
     // --- BindGroup 0: HMC Core ---
-    const linksBuffer = device.createBuffer({ size: floatSize * 2, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    const linksBuffer = device.createBuffer({ size: su2Size * 2, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
     const higgsBuffer = device.createBuffer({ size: floatSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    const pLinksBuffer = device.createBuffer({ size: floatSize * 2, usage: GPUBufferUsage.STORAGE });
+    const pLinksBuffer = device.createBuffer({ size: su2Size * 2, usage: GPUBufferUsage.STORAGE });
     const pHiggsBuffer = device.createBuffer({ size: floatSize, usage: GPUBufferUsage.STORAGE });
-    const oldLinksBuffer = device.createBuffer({ size: floatSize * 2, usage: GPUBufferUsage.STORAGE });
+    const oldLinksBuffer = device.createBuffer({ size: su2Size * 2, usage: GPUBufferUsage.STORAGE });
     const oldHiggsBuffer = device.createBuffer({ size: floatSize, usage: GPUBufferUsage.STORAGE });
     
     const rngState = new Uint32Array(N).map(() => Math.random() * 0xFFFFFFFF);
@@ -60,7 +61,6 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     const cgQBuffer = device.createBuffer({ size: spinorSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
     const tmpYBuffer = device.createBuffer({ size: spinorSize, usage: GPUBufferUsage.STORAGE });
     const cgScalarsBuffer = device.createBuffer({ size: 40, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }); // [rho, p_q, alpha, beta, new_rho]
-
 
     // --- デバッグ・検証用の読み出し設定 ---
     const debugBuffer = device.createBuffer({ size: 9 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });// scalars配列のサイズ (9個のf32)
@@ -291,8 +291,8 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
 
             // 最初のP半歩には eps/2 と質量が必要なので offset [256]
             pass2.setBindGroup(0, hmcBindGroup, [256]); // eps/2
-            pass2.setPipeline(computeYPipeline); pass2.dispatchWorkgroups(workgroups);
-            pass2.setPipeline(calcFermionForcePipeline); pass2.dispatchWorkgroups(workgroups);
+            // pass2.setPipeline(computeYPipeline); pass2.dispatchWorkgroups(workgroups);
+            // pass2.setPipeline(calcFermionForcePipeline); pass2.dispatchWorkgroups(workgroups);
             pass2.setPipeline(updatePPipeline); pass2.dispatchWorkgroups(workgroups);
             
             pass2.end();
@@ -326,14 +326,14 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
             if (current_md_step < md_steps) {
                 // 途中なら P を 1歩進める (eps)
                 pass.setBindGroup(0, hmcBindGroup, [512]);
-                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);
-                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups);
+                // pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
+                // pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
                 pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
             } else {
                 // ↓↓↓ 修正の核心: 最後の半歩(eps/2)でもフェルミオン力を確実に計算！ ↓↓↓
                 pass.setBindGroup(0, hmcBindGroup, [256]); // eps/2
-                pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);
-                pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups);
+                // pass.setPipeline(computeYPipeline); pass.dispatchWorkgroups(workgroups);         // ❌ クォークの力はオフ
+                // pass.setPipeline(calcFermionForcePipeline); pass.dispatchWorkgroups(workgroups); // ❌ クォークの力はオフ
                 pass.setPipeline(updatePPipeline); pass.dispatchWorkgroups(workgroups);
                 hmc_state = 2;
                 // ↑↑↑
