@@ -111,7 +111,6 @@ fn su2_spinor_dot_real(a: SU2Spinor, b: SU2Spinor) -> f32 {
 // --- ヘルパー関数 ---
 fn get_idx(cx: u32, cy: u32) -> u32 { return cy * L + cx; }
 fn get_link_idx(cx: u32, cy: u32, dir: u32) -> u32 { return (cy * L + cx) * 2u + dir; }
-fn wrap(a: f32) -> f32 { return atan2(sin(a), cos(a)); }
 
 // --- スピノル演算ヘルパー ---
 fn c_mult(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> { return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
@@ -279,25 +278,21 @@ fn calc_fermion_force(@builtin(global_invocation_id) id: vec3<u32>) {
     // Fwd
     let S_fwd_x = su2_apply_spinor(U_x, x_R);
     let g1_S_fwd = gamma1_mul_su2(S_fwd_x);
-    let S_prime_fwd_x = SU2Spinor(
-        -0.5 * (S_fwd_x.u - g1_S_fwd.u), 
-        -0.5 * (S_fwd_x.d - g1_S_fwd.d)
-    );
+    let S_prime_fwd_x = SU2Spinor(-0.5 * (S_fwd_x.u - g1_S_fwd.u), -0.5 * (S_fwd_x.d - g1_S_fwd.d));
     let force_x_fwd = get_su2_force_components(Y_c, S_prime_fwd_x);
 
-    // Bwd
+    // Bwd (★元の完璧なコードに復元★)
     let g1_Y_R = gamma1_mul_su2(Y_R);
-    let Y_R_plus = SU2Spinor(
-        0.5 * (Y_R.u + g1_Y_R.u), 
-        0.5 * (Y_R.d + g1_Y_R.d)
-    );
+    let Y_R_plus = SU2Spinor(0.5 * (Y_R.u + g1_Y_R.u), 0.5 * (Y_R.d + g1_Y_R.d));
     let S_prime_bwd_x = su2_apply_spinor(U_x, Y_R_plus);
     let force_x_bwd = get_su2_force_components(S_prime_bwd_x, x_c);
 
     let force_x = 2.0 * (force_x_fwd + force_x_bwd);
     p_links[l_x] += SU2(0.0, eps * force_x.x, eps * force_x.y, eps * force_x.z);
 
-    // --- Y方向の力 ---
+    // ==========================================
+    // --- y方向の力 (Forward & Backward) ---
+    // ==========================================
     let l_y = get_link_idx(cx, cy, 1u);
     let U_y = links[l_y];
     let x_U = x[get_idx(cx, yp1)];
@@ -306,18 +301,12 @@ fn calc_fermion_force(@builtin(global_invocation_id) id: vec3<u32>) {
     // Fwd
     let S_fwd_y = su2_apply_spinor(U_y, x_U);
     let g2_S_fwd = gamma2_mul_su2(S_fwd_y);
-    let S_prime_fwd_y = SU2Spinor(
-        -0.5 * (S_fwd_y.u - g2_S_fwd.u), 
-        -0.5 * (S_fwd_y.d - g2_S_fwd.d)
-    );
+    let S_prime_fwd_y = SU2Spinor(-0.5 * (S_fwd_y.u - g2_S_fwd.u), -0.5 * (S_fwd_y.d - g2_S_fwd.d));
     let force_y_fwd = get_su2_force_components(Y_c, S_prime_fwd_y);
 
-    // Bwd
+    // Bwd (★元の完璧なコードに復元★)
     let g2_Y_U = gamma2_mul_su2(Y_U);
-    let Y_U_plus = SU2Spinor(
-        0.5 * (Y_U.u + g2_Y_U.u), 
-        0.5 * (Y_U.d + g2_Y_U.d)
-    );
+    let Y_U_plus = SU2Spinor(0.5 * (Y_U.u + g2_Y_U.u), 0.5 * (Y_U.d + g2_Y_U.d));
     let S_prime_bwd_y = su2_apply_spinor(U_y, Y_U_plus);
     let force_y_bwd = get_su2_force_components(S_prime_bwd_y, x_c);
 
@@ -401,21 +390,15 @@ fn calc_initial_rho() {
 fn init_hot(@builtin(global_invocation_id) id: vec3<u32>) {
     let idx = id.x;
     if (idx >= L * L) { return; }
-    var seed = rng_state[idx];
-    higgs[idx] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
-    links[idx * 2u + 0u] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
-    links[idx * 2u + 1u] = (rand_f32(&seed) * 2.0 - 1.0) * PI;
-    rng_state[idx] = seed;
+    // とりあえずコールドスタートと同じ(単位行列)にしておく
+    links[idx * 2u + 0u] = SU2(1.0, 0.0, 0.0, 0.0);
+    links[idx * 2u + 1u] = SU2(1.0, 0.0, 0.0, 0.0);
 }
 
-// ============================================================================
-// コールドスタート (絶対零度・完全な真空での初期化)
-// ============================================================================
 @compute @workgroup_size(64)
 fn init_cold(@builtin(global_invocation_id) id: vec3<u32>) {
     let idx = id.x;
     if (idx >= L * L) { return; }
-    // 単位行列で初期化
     links[idx * 2u + 0u] = SU2(1.0, 0.0, 0.0, 0.0);
     links[idx * 2u + 1u] = SU2(1.0, 0.0, 0.0, 0.0);
 }
@@ -426,14 +409,17 @@ fn init_trajectory(@builtin(global_invocation_id) id: vec3<u32>) {
     if (idx >= L * L) { return; }
     var seed = rng_state[idx];
     
-    // 運動量はベクトル部分(yzw)のみ。x(スカラー部分)は0
+    // SU(2)の運動量はベクトル成分(y,z,w)のガウシアンノイズ
     p_links[idx * 2u + 0u] = SU2(0.0, rand_normal(&seed), rand_normal(&seed), rand_normal(&seed));
     p_links[idx * 2u + 1u] = SU2(0.0, rand_normal(&seed), rand_normal(&seed), rand_normal(&seed));
     
     old_links[idx * 2u + 0u] = links[idx * 2u + 0u];
     old_links[idx * 2u + 1u] = links[idx * 2u + 1u];
-    
-    if (idx == 0u) { scalars[7] = 0.0; scalars[8] = rand_f32(&seed); }
+
+    if (idx == 0u) {
+        scalars[7] = 0.0;
+        scalars[8] = rand_f32(&seed);
+    }
     rng_state[idx] = seed;
 }
 
@@ -444,7 +430,6 @@ fn calc_local_H(@builtin(global_invocation_id) id: vec3<u32>) {
     let cx = idx % L; let cy = idx / L;
     let xp1 = (cx + 1u) % L; let yp1 = (cy + 1u) % L;
 
-    // 運動エネルギー: 1/2 * (p1^2 + p2^2 + p3^2)
     let p_x = p_links[idx * 2u + 0u].yzw;
     let p_y = p_links[idx * 2u + 1u].yzw;
     var H = 0.5 * (dot(p_x, p_x) + dot(p_y, p_y));
@@ -459,8 +444,10 @@ fn calc_local_H(@builtin(global_invocation_id) id: vec3<u32>) {
     let U34_dag = su2_mul(su2_dagger(U_x_yp1), su2_dagger(U_y));
     let U_plaq = su2_mul(U12, U34_dag);
     
-    // SU(2)行列の トレースの半分 は 0番目の成分(U.x)
     H += params.beta * (1.0 - U_plaq.x);
+
+    // フェルミオンエネルギー S_F = phi^\dagger x
+    H += su2_spinor_dot_real(phi[idx], x[idx]);
 
     workspace[idx] = H;
 }
@@ -468,11 +455,17 @@ fn calc_local_H(@builtin(global_invocation_id) id: vec3<u32>) {
 @compute @workgroup_size(1)
 fn reduce_H() {
     var sum = 0.0;
-    for(var i = 0u; i < L * L; i++) { sum += workspace[i]; }
+    var c = 0.0; // 誤差をプールしておく補償変数
     
-    // TS側で uintView を使って書き込んでいるため、ビットキャストで正確な 0 か 1 を読み取る
-    let is_new = bitcast<u32>(params.mass_or_isNewH); 
-    scalars[5u + is_new] = sum; // 5 が H_old, 6 が H_new
+    for(var i = 0u; i < L * L; i++) {
+        let y = workspace[i] - c;
+        let t = sum + y;
+        c = (t - sum) - y; // 失われた下位の桁を計算して次回の足し算に回す
+        sum = t;
+    }
+    
+    let is_new = bitcast<u32>(params.mass_or_isNewH);
+    scalars[5u + is_new] = sum;
 }
 
 @compute @workgroup_size(64)
@@ -481,7 +474,6 @@ fn update_q(@builtin(global_invocation_id) id: vec3<u32>) {
     if (idx >= L * L) { return; }
     let eps = params.eps;
     
-    // U_new = exp(i * eps * P) * U_old
     let exp_px = su2_exp(eps * p_links[idx * 2u + 0u].yzw);
     links[idx * 2u + 0u] = su2_mul(exp_px, links[idx * 2u + 0u]);
 
@@ -500,24 +492,31 @@ fn update_P(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // --- X方向のステープル力 ---
     let Ux = links[get_link_idx(cx, cy, 0u)];
+    
+    // V_up = Uy(x+1,y) * Ux_dag(x,y+1) * Uy_dag(x,y)
     let V_up = su2_mul(su2_mul(links[get_link_idx(xp1, cy, 1u)], su2_dagger(links[get_link_idx(cx, yp1, 0u)])), su2_dagger(links[get_link_idx(cx, cy, 1u)]));
+    
+    // V_dn = Uy_dag(x+1,y-1) * Ux_dag(x,y-1) * Uy(x,y-1)
     let V_dn = su2_mul(su2_mul(su2_dagger(links[get_link_idx(xp1, ym1, 1u)]), su2_dagger(links[get_link_idx(cx, ym1, 0u)])), links[get_link_idx(cx, ym1, 1u)]);
     
-    let V_tot_x = V_up + V_dn; // SU(2)行列の足し算
-    let W_x = su2_mul(Ux, su2_dagger(V_tot_x));
-    
-    // 運動量の更新: dP = eps * beta * (力学部分)
-    // 力学部分は行列 W_x の反エルミート・トレースレス部分（ベクトル成分 yzw）
+    let V_tot_x = V_up + V_dn;
+    // 【修正1】余計な su2_dagger を除去し、正しい微分ベクトルを抽出
+    let W_x = su2_mul(Ux, V_tot_x);
     p_links[get_link_idx(cx, cy, 0u)] -= SU2(0.0, eps * params.beta * W_x.yzw);
 
     // --- Y方向のステープル力 ---
     let Uy = links[get_link_idx(cx, cy, 1u)];
-    let V_rt = su2_mul(su2_mul(su2_dagger(links[get_link_idx(xp1, cy, 1u)]), su2_dagger(links[get_link_idx(cx, yp1, 0u)])), links[get_link_idx(cx, cy, 0u)]);
-    let V_lf = su2_mul(su2_mul(links[get_link_idx(xm1, cy, 1u)], su2_dagger(links[get_link_idx(xm1, yp1, 0u)])), su2_dagger(links[get_link_idx(xm1, cy, 0u)]));
+    
+    // 【修正2】非可換(行列積)の正しい順序に修正
+    // V_rt = Ux(x,y+1) * Uy_dag(x+1,y) * Ux_dag(x,y)
+    let V_rt = su2_mul(su2_mul(links[get_link_idx(cx, yp1, 0u)], su2_dagger(links[get_link_idx(xp1, cy, 1u)])), su2_dagger(links[get_link_idx(cx, cy, 0u)]));
+    
+    // V_lf = Ux_dag(x-1,y+1) * Uy_dag(x-1,y) * Ux(x-1,y)
+    let V_lf = su2_mul(su2_mul(su2_dagger(links[get_link_idx(xm1, yp1, 0u)]), su2_dagger(links[get_link_idx(xm1, cy, 1u)])), links[get_link_idx(xm1, cy, 0u)]);
     
     let V_tot_y = V_rt + V_lf;
-    let W_y = su2_mul(Uy, su2_dagger(V_tot_y));
-    
+    // 【修正1】余計な su2_dagger を除去
+    let W_y = su2_mul(Uy, V_tot_y);
     p_links[get_link_idx(cx, cy, 1u)] -= SU2(0.0, eps * params.beta * W_y.yzw);
 }
 
@@ -526,14 +525,8 @@ fn accept_reject(@builtin(global_invocation_id) id: vec3<u32>) {
     let idx = id.x;
     if (idx >= L * L) { return; }
 
-    let H_old = scalars[5];
-    let H_new = scalars[6];
-    let rand_val = scalars[8];
-    
-    let dH = H_new - H_old;
-
-    if (dH > 0.0 && exp(-dH) <= rand_val) {
-        higgs[idx] = old_higgs[idx];
+    let dH = scalars[6] - scalars[5];
+    if (dH > 0.0 && exp(-dH) <= scalars[8]) {
         links[idx * 2u + 0u] = old_links[idx * 2u + 0u];
         links[idx * 2u + 1u] = old_links[idx * 2u + 1u];
     } else if (idx == 0u) {
@@ -542,45 +535,40 @@ fn accept_reject(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 // ============================================================================
-// Phase 7: 物理量の測定 (トポロジカル電荷とヒッグスエネルギー)
+// Phase 7: 物理量の測定 (SU(2)用)
 // ============================================================================
 
-@compute @workgroup_size(8, 8, 1)
-fn measure_observables_E(@builtin(global_invocation_id) id: vec3<u32>) {
-    let x = id.x; let y = id.y;
-    if (x >= L || y >= L) { return; }
-    let site_idx = get_idx(x, y);
-
-    let phi_x = higgs[site_idx];
-    let theta_x = links[get_link_idx(x, y, 0u)];
-    let phi_xp1 = higgs[get_idx((x + 1u) % L, y)];
-
-    workspace[site_idx] = cos(phi_x + theta_x - phi_xp1); // viz_results を workspace に変更
+// 角度を [-π, π] に収めるヘルパー関数
+fn wrap(a: f32) -> f32 {
+    return a - 2.0 * PI * round(a / (2.0 * PI));
 }
 
 @compute @workgroup_size(8, 8, 1)
 fn measure_observables_C(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x; let y = id.y;
     if (x >= L || y >= L) { return; }
-    let site_idx = get_idx(x, y);
+    let cx = x; let cy = y;
+    let xp1 = (cx + 1u) % L; let yp1 = (cy + 1u) % L;
 
-    let xp1 = (x + 1u) % L;
-    let yp1 = (y + 1u) % L;
+    let U_x = links[get_link_idx(cx, cy, 0u)];
+    let U_y_xp1 = links[get_link_idx(xp1, cy, 1u)];
+    let U_x_yp1 = links[get_link_idx(cx, yp1, 0u)];
+    let U_y = links[get_link_idx(cx, cy, 1u)];
 
-    let dx_bottom = wrap(higgs[get_idx(xp1, y)] - higgs[get_idx(x, y)] - links[get_link_idx(x, y, 0u)]);
-    let dy_right  = wrap(higgs[get_idx(xp1, yp1)] - higgs[get_idx(xp1, y)] - links[get_link_idx(xp1, y, 1u)]);
-    let dx_top    = wrap(higgs[get_idx(xp1, yp1)] - higgs[get_idx(x, yp1)] - links[get_link_idx(x, yp1, 0u)]);
-    let dy_left   = wrap(higgs[get_idx(x, yp1)] - higgs[get_idx(x, y)] - links[get_link_idx(x, y, 1u)]);
+    // プラケット (SU(2)行列の1周の掛け算)
+    let U12 = su2_mul(U_x, U_y_xp1);
+    let U34_dag = su2_mul(su2_dagger(U_x_yp1), su2_dagger(U_y));
+    let U_plaq = su2_mul(U12, U34_dag);
+    
+    // SU(2)行列(vec4)のうち、w成分（カラー磁場の第3成分）を抽出する
+    // この値は真空の量子ゆらぎによってプラスとマイナスに激しく振動します
+    let color_magnetic_field = U_plaq.w;
+    
+    // 描画シェーダーで赤と青がハッキリ見えるように、値を増幅させる
+    workspace[get_idx(x, y)] = color_magnetic_field * 10.0; 
+}
 
-    let curl = dx_bottom + dy_right - dx_top - dy_left;
-
-    let plaq = wrap(
-        links[get_link_idx(x, y, 0u)] + 
-        links[get_link_idx(xp1, y, 1u)] - 
-        links[get_link_idx(x, yp1, 0u)] - 
-        links[get_link_idx(x, y, 1u)]
-    );
-
-    let Q = round((curl + plaq) / (2.0 * PI)); 
-    workspace[site_idx] = Q; // viz_results を workspace に変更
+@compute @workgroup_size(8, 8, 1)
+fn measure_observables_E(@builtin(global_invocation_id) id: vec3<u32>) {
+    // ダミー
 }

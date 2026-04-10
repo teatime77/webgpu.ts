@@ -7,6 +7,11 @@ let kappaValue: number = 1.0;
 // ↓ クォークを重くして方程式を解きやすくする
 let massValue: number = 1.0; // クォークの軽さ (小さいほどCGが重くなる)
 
+
+betaValue  = 2.0;
+kappaValue = 0.5;
+massValue  = 0.1
+
 export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise<() => void> {
     msg("Starting Dynamical Fermions (HMC + CG Solver) simulation...");
     stopAnimation();
@@ -77,7 +82,7 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
     // ========================================================================
     // 2. レイアウトとパイプラインの構築
     // ========================================================================
-    const shaderCode = await fetchText('./wgsl/lgt/fermion_hmc_u1_gauge_higgs.wgsl');
+    const shaderCode = await fetchText('./wgsl/lgt/fermion_hmc_su2_gauge_higgs.wgsl');
     const module = device.createShaderModule({ code: shaderCode });
 
     const hmcGroupLayout = device.createBindGroupLayout({
@@ -139,7 +144,7 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
 
     // HMC Pipelines
     const initHotPipeline = await createCmp('init_hot');
-    const initColdPipeline = await createCmp('init_cold'); // ★この1行を追加！
+    // const initColdPipeline = await createCmp('init_cold'); // ★この1行を追加！
     const initTrajPipeline = await createCmp('init_trajectory');
     const calcHPipeline = await createCmp('calc_local_H');
     const reduceHPipeline = await createCmp('reduce_H');
@@ -197,12 +202,9 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
     // ========================================================================
     let animationId: number | null = null;
 
-    const md_steps = 20; // 軌道を保つために歩数を増やす
-
-    // ↓ CGソルバーが答えを見つけるまで、たっぷり回数を回してあげる。質量が軽いほど多く必要
+    const md_steps = 100; // 歩幅を半分にする分、歩数を倍にして軌道の長さを維持する
     const cg_iters = 100; 
-
-    let eps = 0.005;     // 歩幅を細かくしてカーブを正確に曲がる
+    let eps = 0.0002;     // ★歩幅を 0.001 からさらに半分の 0.0005 へ！
 
     // パラメータ更新関数 (Dynamic Offset用)
     function writeParams() {
@@ -225,7 +227,7 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
     const initEnc = device.createCommandEncoder();
     const initPass = initEnc.beginComputePass();
     // initPass.setPipeline(initHotPipeline); 
-    initPass.setPipeline(initColdPipeline); // ✅ Cold Start に変更！
+    initPass.setPipeline(initHotPipeline);
     initPass.setBindGroup(0, hmcBindGroup, [0]); 
     initPass.setBindGroup(1, fermionBindGroup);
     initPass.dispatchWorkgroups(workgroups); 
