@@ -301,16 +301,24 @@ fn measure_plaquette(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let site_idx = get_site_idx(global_id.xy);
     if (x >= L || y >= L) { return; }
 
-    // Plaquette operator U_p = U_1(n) U_2(n+x) U_1(n+y)* U_2(n)*
-    let n = vec2<u32>(x, y);
-    let n_xp1 = vec2<u32>((x + 1u) % L, y);
-    let n_yp1 = vec2<u32>(x, (y + 1u) % L);
+    // 次の座標（トーラス境界を考慮）
+    let x_next = (x + 1u) % L;
+    let y_next = (y + 1u) % L;
 
-    let p1 = get_link(n, 0u);
-    let p2 = get_link(n_xp1, 1u);
-    let p3 = complex_conj(get_link(n_yp1, 0u));
-    let p4 = complex_conj(get_link(n, 1u));
+    // (x,y) を起点に、反時計回りに1マスを巡回する
+    // 1歩目: (x, y) から右(+x)へ
+    let p1 = get_link_dir(x, y, 1, 0);
+    
+    // 2歩目: (x+1, y) から上(+y)へ
+    let p2 = get_link_dir(x_next, y, 0, 1);
+    
+    // 3歩目: (x+1, y+1) から左(-x)へ
+    let p3 = get_link_dir(x_next, y_next, -1, 0);
+    
+    // 4歩目: (x, y+1) から下(-y)へ
+    let p4 = get_link_dir(x, y_next, 0, -1);
 
+    // 全てのリンクを順番に掛け合わせる
     let plaquette_val = complex_mul(complex_mul(complex_mul(p1, p2), p3), p4);
-    viz_results[site_idx] = plaquette_val.x; // Store the real part (cosine of the angle)
+    viz_results[site_idx] = plaquette_val.x; // 実部（コサイン）を保存
 }
