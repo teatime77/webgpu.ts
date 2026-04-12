@@ -154,17 +154,28 @@ fn init_cold(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 // フォン・ミーゼス分布 P(x) ∝ exp(kappa * cos(x)) から角度をサンプリング
 fn sample_von_mises(kappa: f32, state: ptr<function, u32>) -> f32 {
+    // 【特例処理】kappaが0（温度が無限大）のときは、完全にランダムな一様分布になるため、
+    // 棄却法を使わずに一発で -PI から PI の角度を返して終了します。
     if (kappa == 0.0) {
         return (pcg(state) - 0.5) * TWO_PI;
     }
     
     var x: f32 = 0.0;
-    // GPUの無限ループを防ぐため、安全策として上限付きのループにする
+    
+    // 【安全ループ】通常は while(true) で当たりが出るまで繰り返しますが、
+    // GPUシェーダー（WGSL）で無限ループを書くとクラッシュ判定されるため、
+    // 念のため「最大1000回まで」という上限をつけています。
     for (var i = 0u; i < 1000u; i++) {
+        
+        // 1. 候補となる角度 x を -PI から PI の間でランダムに提案する
         x = (pcg(state) - 0.5) * TWO_PI;
+        
+        // 2. 判定用の高さ u を 0.0 から 1.0 の間でランダムに引く
         let u = pcg(state);
-        // 確率 exp(kappa * (cos(x) - 1)) で受容
+        
+        // 3. 候補 x のときの山の高さ（最大1.0に規格化済み）を計算し、u と比較する
         if (u <= exp(kappa * (cos(x) - 1.0))) {
+            // u が山より低ければ「当たり」！ループを抜けてこの x を採用する。
             break;
         }
     }
