@@ -46,6 +46,59 @@ fn random_f32(state: ptr<function, u32>) -> f32 {
     return f32(random_u32(state)) / 4294967295.0; // 0.0 ~ 1.0
 }
 
+// (x,y)からx方向(dx)またはy方向(dy)に進む際のリンクを取得する。
+// ※ dx, dy はマイナスをとるため i32
+fn get_link_dir(x: u32, y: u32, dx: i32, dy: i32) -> SU2Mat {
+    if (dx == 1) {
+        // 右に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 0u);
+    } else if (dx == -1) {
+        // 左に進む場合（逆走なので一つ左のリンクをエルミート共役/逆行列にする）
+        let prev_x = (x + L - 1u) % L;
+        return su2_inv(get_link(vec2<u32>(prev_x, y), 0u));
+    } else if (dy == 1) {
+        // 上に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 1u);
+    } else if (dy == -1) {
+        // 下に進む場合（逆走なので一つ下のリンクをエルミート共役/逆行列にする）
+        let prev_y = (y + L - 1u) % L;
+        return su2_inv(get_link(vec2<u32>(x, prev_y), 1u));
+    }
+    
+    // 原則ここには来ないが、念のためSU(2)の単位元(1, 0, 0, 0)を返す
+    return SU2Mat(1.0, 0.0, 0.0, 0.0);
+}
+
+// u32とi32の数をmod L で加算する。（変更なし）
+fn addModL(x : u32, dx : i32) -> u32 {
+    return u32(i32(x) + i32(L) + dx) % L;
+}
+
+// 3個のリンクのステープルを計算する。
+fn get_staple(start_x: u32, start_y: u32, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) -> SU2Mat {
+    // WGSLでは引数は書き換えられないので、内部変数を用意する
+    var cx = start_x;
+    var cy = start_y;
+
+    // 1番目のリンク
+    let l1 = get_link_dir(cx, cy, dx1, dy1);
+    // 座標を更新（マイナスになっても L を足して % L することで安全にラップアラウンド）
+    cx = addModL(cx, dx1);
+    cy = addModL(cy, dy1);
+
+    // 2番目のリンク
+    let l2 = get_link_dir(cx, cy, dx2, dy2);
+    cx = addModL(cx, dx2);
+    cy = addModL(cy, dy2);
+
+    // 3番目のリンク
+    let l3 = get_link_dir(cx, cy, dx3, dy3);
+
+    // 3個のリンクを乗算する。
+    // ※ SU(2)は非可換群なので、乗算の順序 (l1 * l2 * l3) が物理的に極めて重要です。
+    return su2_mult(su2_mult(l1, l2), l3);
+}
+
 // --- SU(2) Heat Bath Helpers ---
 
 // Kennedy-Pendletonアルゴリズムによる第0成分(x0)のサンプリング
@@ -118,7 +171,14 @@ const L = 32;
 
 // Helper to get link index
 fn get_link_idx(x: u32, y: u32, dir: u32) -> u32 {
-    return (y * L + x) * 2u + dir;
+    let mx = x % L;
+    let my = y % L;
+    return (my * L + mx) * 2u + dir;
+}
+
+// --- (必要であれば追加) get_link_dir が依存する補助関数 ---
+fn get_link(pos: vec2<u32>, dir: u32) -> SU2Mat {
+    return links[get_link_idx(pos.x, pos.y, dir)];
 }
 
 // --- Compute Kernels ---
@@ -170,11 +230,14 @@ fn init_cold(@builtin(global_invocation_id) id: vec3<u32>) {
     rng_state[site_idx] = rand_seed;
 }
 
+// ============================================================================
+// メトロポリス（ヒートバス）更新カーネル
+// ============================================================================
 @compute @workgroup_size(8, 8, 1)
 fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x;
     let y = id.y;
-    if (x >= L || y >= L) { return; } // 追加
+    if (x >= L || y >= L) { return; } 
 
     // Checkerboard update to avoid race conditions
     if ((x + y) % 2u != params.update_subset % 2u) {
@@ -186,67 +249,73 @@ fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     var rand_seed = rng_state[site_idx];
 
     // --- Calculate the staple V ---
-    let xp1 = (x + 1u) % L;
-    let yp1 = (y + 1u) % L;
-    let xm1 = (x + L - 1u) % L;
-    let ym1 = (y + L - 1u) % L;
-
     var staple: SU2Mat;
-    if (dir_to_update == 0u) { // Updating an x-link at (x, y)
-        let staple_up = su2_mult(links[get_link_idx(xp1, y, 1u)], su2_mult(su2_inv(links[get_link_idx(x, yp1, 0u)]), su2_inv(links[get_link_idx(x, y, 1u)])));
-        let staple_down = su2_mult(su2_inv(links[get_link_idx(xp1, ym1, 1u)]), su2_mult(su2_inv(links[get_link_idx(x, ym1, 0u)]), links[get_link_idx(x, ym1, 1u)]));
+    
+    if (dir_to_update == 0u) { 
+        // x方向リンクの更新
+        // 更新対象のリンクの終点 (x+1, y) から出発して、(x, y) に戻る3辺
+        
+        // 上側のコの字 (上 -> 左 -> 下)
+        let staple_up = get_staple(x + 1u, y, 0, 1, -1, 0, 0, -1);
+        // 下側のコの字 (下 -> 左 -> 上)
+        let staple_down = get_staple(x + 1u, y, 0, -1, -1, 0, 0, 1);
+        
         staple = staple_up + staple_down;
-    } else { // Updating a y-link at (x, y)
-        let staple_right = su2_mult(links[get_link_idx(x, yp1, 0u)], su2_mult(su2_inv(links[get_link_idx(xp1, y, 1u)]), su2_inv(links[get_link_idx(x, y, 0u)])));
-        let staple_left = su2_mult(su2_inv(links[get_link_idx(xm1, yp1, 0u)]), su2_mult(su2_inv(links[get_link_idx(xm1, y, 1u)]), links[get_link_idx(xm1, y, 0u)]));
+        
+    } else { 
+        // y方向リンクの更新
+        // 更新対象のリンクの終点 (x, y+1) から出発して、(x, y) に戻る3辺
+        
+        // 右側のコの字 (右 -> 下 -> 左)
+        let staple_right = get_staple(x, y + 1u, 1, 0, 0, -1, -1, 0);
+        // 左側のコの字 (左 -> 下 -> 右)
+        let staple_left = get_staple(x, y + 1u, -1, 0, 0, -1, 1, 0);
+        
         staple = staple_right + staple_left;
     }
 
     // --- Heat Bath Step ---
     let link_idx = get_link_idx(x, y, dir_to_update);
-    
-    // ステープル(4次元ベクトル)の長さを計算
     let k = length(staple);
     var new_link: SU2Mat;
 
     if (k > 0.0001) {
-        // 正規化してSU(2)行列 W を作る
         let W = staple / k;
         let alpha = params.beta * k;
-        
-        // 目標の確率分布に従う行列 X を生成
         let X = generate_su2_heatbath(alpha, &rand_seed);
-        
-        // U = X * W^\dagger (ステープルの方向に向ける)
         new_link = su2_mult(X, su2_inv(W));
     } else {
-        // ステープルが0の場合（初期など）は完全ランダム
         new_link = generate_su2_heatbath(0.0, &rand_seed);
     }
 
-    // メトロポリス判定の式（exp(-delta_S)...）は完全に不要になります。
-    // 無条件で受容してメモリに書き込む。
     links[link_idx] = new_link;
     rng_state[site_idx] = rand_seed;
 }
 
-
+// ============================================================================
+// プラケット測定カーネル
+// ============================================================================
 @compute @workgroup_size(8, 8, 1)
 fn measure_plaquette(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x;
     let y = id.y;
+    if (x >= L || y >= L) { return; } // 安全のための境界チェックを追加
     let site_idx = y * L + x;
 
-    let xp1 = (x + 1u) % L;
-    let yp1 = (y + 1u) % L;
+    // Plaquette = 正方形の閉路を一周する (右 -> 上 -> 左 -> 下)
+    // 逆方向のエルミート共役(逆行列)処理などは get_link_dir が自動で処理します。
+    
+    // 1. (x, y) から右へ
+    let U1 = get_link_dir(x, y, 1, 0);
+    // 2. (x+1, y) から上へ
+    let U2 = get_link_dir(x + 1u, y, 0, 1);
+    // 3. (x+1, y+1) から左へ
+    let U3 = get_link_dir(x + 1u, y + 1u, -1, 0);
+    // 4. (x, y+1) から下へ
+    let U4 = get_link_dir(x, y + 1u, 0, -1);
 
-    // Plaquette = U_1 U_2 U_3^dag U_4^dag
-    let U1 = links[get_link_idx(x, y, 0u)];
-    let U2 = links[get_link_idx(xp1, y, 1u)];
-    let U3_inv = su2_inv(links[get_link_idx(x, yp1, 0u)]);
-    let U4_inv = su2_inv(links[get_link_idx(x, y, 1u)]);
-
-    let plaquette_matrix = su2_mult(U1, su2_mult(U2, su2_mult(U3_inv, U4_inv)));
+    // 4つのリンクを順番に乗算
+    let plaquette_matrix = su2_mult(su2_mult(U1, U2), su2_mult(U3, U4));
 
     // Store 1/2 * Tr(U_p) for visualization and measurement
     viz_results[site_idx] = 0.5 * su2_trace(plaquette_matrix);
