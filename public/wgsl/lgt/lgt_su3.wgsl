@@ -121,6 +121,75 @@ fn random_f32(state: ptr<function, u32>) -> f32 {
     return f32(random_u32(state)) / 4294967295.0;
 }
 
+// Helper to get link index（変更なし）
+fn get_link_idx(x: u32, y: u32, dir: u32) -> u32 {
+    let mx = x % L;
+    let my = y % L;
+    return (my * L + mx) * 2u + dir;
+}
+
+// --- get_link_dir が依存する補助関数 ---
+// 変更: 戻り値を SU3Mat に変更
+fn get_link(pos: vec2<u32>, dir: u32) -> SU3Mat {
+    return links[get_link_idx(pos.x, pos.y, dir)];
+}
+
+// (x,y)からx方向(dx)またはy方向(dy)に進む際のリンクを取得する。
+// 変更: 戻り値を SU3Mat に変更
+fn get_link_dir(x: u32, y: u32, dx: i32, dy: i32) -> SU3Mat {
+    if (dx == 1) {
+        // 右に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 0u);
+    } else if (dx == -1) {
+        // 左に進む場合（逆走なので一つ左のリンクをエルミート共役/逆行列にする）
+        let prev_x = (x + L - 1u) % L;
+        return su3_inv(get_link(vec2<u32>(prev_x, y), 0u)); // 変更: su3_invを使用
+    } else if (dy == 1) {
+        // 上に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 1u);
+    } else if (dy == -1) {
+        // 下に進む場合（逆走なので一つ下のリンクをエルミート共役/逆行列にする）
+        let prev_y = (y + L - 1u) % L;
+        return su3_inv(get_link(vec2<u32>(x, prev_y), 1u)); // 変更: su3_invを使用
+    }
+    
+    // 原則ここには来ないが、念のためSU(3)の単位元を返す
+    // 変更: lgt_su3.wgsl に定義されている su3_identity() を呼び出す
+    return su3_identity();
+}
+
+// u32とi32の数をmod L で加算する。（変更なし）
+fn addModL(x : u32, dx : i32) -> u32 {
+    return u32(i32(x) + i32(L) + dx) % L;
+}
+
+// 3個のリンクのステープルを計算する。
+// 変更: 戻り値を SU3Mat に変更
+fn get_staple(start_x: u32, start_y: u32, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) -> SU3Mat {
+    // WGSLでは引数は書き換えられないので、内部変数を用意する
+    var cx = start_x;
+    var cy = start_y;
+
+    // 1番目のリンク
+    let l1 = get_link_dir(cx, cy, dx1, dy1);
+    // 座標を更新（マイナスになっても L を足して % L することで安全にラップアラウンド）
+    cx = addModL(cx, dx1);
+    cy = addModL(cy, dy1);
+
+    // 2番目のリンク
+    let l2 = get_link_dir(cx, cy, dx2, dy2);
+    cx = addModL(cx, dx2);
+    cy = addModL(cy, dy2);
+
+    // 3番目のリンク
+    let l3 = get_link_dir(cx, cy, dx3, dy3);
+
+    // 3個のリンクを乗算する。
+    // ※ SU(3)もSU(2)と同様に非可換群なので、乗算の順序 (l1 * l2 * l3) が物理的に極めて重要です。
+    // 変更: su3_mult を使用
+    return su3_mult(su3_mult(l1, l2), l3);
+}
+
 // --- SU(2) Kennedy-Pendleton Heat Bath Helpers ---
 
 fn sample_su2_x0(alpha: f32, seed: ptr<function, u32>) -> f32 {
@@ -238,10 +307,6 @@ struct SimParams {
 @group(0) @binding(2) var<storage, read_write> rng_state: array<u32>;
 @group(0) @binding(3) var<storage, read_write> viz_results: array<f32>;
 
-fn get_link_idx(x: u32, y: u32, dir: u32) -> u32 {
-    return (y * L + x) * 2u + dir;
-}
-
 // --- Kernels ---
 
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
@@ -260,35 +325,54 @@ fn init_cold(@builtin(global_invocation_id) id: vec3<u32>) {
     rng_state[site_idx] = rand_seed;
 }
 
+// --- 行列の加算（ステープルの合成に必要） ---
+fn su3_add(a: SU3Mat, b: SU3Mat) -> SU3Mat {
+    var m: SU3Mat;
+    m.r0c0 = a.r0c0 + b.r0c0; m.r0c1 = a.r0c1 + b.r0c1; m.r0c2 = a.r0c2 + b.r0c2;
+    m.r1c0 = a.r1c0 + b.r1c0; m.r1c1 = a.r1c1 + b.r1c1; m.r1c2 = a.r1c2 + b.r1c2;
+    m.r2c0 = a.r2c0 + b.r2c0; m.r2c1 = a.r2c1 + b.r2c1; m.r2c2 = a.r2c2 + b.r2c2;
+    m.pad = vec2(0.0, 0.0);
+    return m;
+}
+
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE, 1)
 fn metropolis_update(@builtin(global_invocation_id) id: vec3<u32>) {
     let x = id.x; let y = id.y;
     if (x >= L || y >= L) { return; }
 
+    // チェッカーボードアップデートのための判定
     if ((x + y) % 2u != params.update_subset % 2u) { return; }
     
     let dir_to_update = params.update_subset / 2u;
     let site_idx = y * L + x;
     var rand_seed = rng_state[site_idx];
 
-    let xp1 = (x + 1u) % L; let yp1 = (y + 1u) % L;
-    let xm1 = (x + L - 1u) % L; let ym1 = (y + L - 1u) % L;
-
     // --- Calculate Staple (V) ---
     var staple: SU3Mat;
-    if (dir_to_update == 0u) { // x-link
-        let staple_up = su3_mult(links[get_link_idx(xp1, y, 1u)], su3_mult(su3_inv(links[get_link_idx(x, yp1, 0u)]), su3_inv(links[get_link_idx(x, y, 1u)])));
-        let staple_down = su3_mult(su3_inv(links[get_link_idx(xp1, ym1, 1u)]), su3_mult(su3_inv(links[get_link_idx(x, ym1, 0u)]), links[get_link_idx(x, ym1, 1u)]));
-        // Add matrices
-        staple.r0c0 = staple_up.r0c0 + staple_down.r0c0; staple.r0c1 = staple_up.r0c1 + staple_down.r0c1; staple.r0c2 = staple_up.r0c2 + staple_down.r0c2;
-        staple.r1c0 = staple_up.r1c0 + staple_down.r1c0; staple.r1c1 = staple_up.r1c1 + staple_down.r1c1; staple.r1c2 = staple_up.r1c2 + staple_down.r1c2;
-        staple.r2c0 = staple_up.r2c0 + staple_down.r2c0; staple.r2c1 = staple_up.r2c1 + staple_down.r2c1; staple.r2c2 = staple_up.r2c2 + staple_down.r2c2;
-    } else { // y-link
-        let staple_right = su3_mult(links[get_link_idx(x, yp1, 0u)], su3_mult(su3_inv(links[get_link_idx(xp1, y, 1u)]), su3_inv(links[get_link_idx(x, y, 0u)])));
-        let staple_left = su3_mult(su3_inv(links[get_link_idx(xm1, yp1, 0u)]), su3_mult(su3_inv(links[get_link_idx(xm1, y, 1u)]), links[get_link_idx(xm1, y, 0u)]));
-        staple.r0c0 = staple_right.r0c0 + staple_left.r0c0; staple.r0c1 = staple_right.r0c1 + staple_left.r0c1; staple.r0c2 = staple_right.r0c2 + staple_left.r0c2;
-        staple.r1c0 = staple_right.r1c0 + staple_left.r1c0; staple.r1c1 = staple_right.r1c1 + staple_left.r1c1; staple.r1c2 = staple_right.r1c2 + staple_left.r1c2;
-        staple.r2c0 = staple_right.r2c0 + staple_left.r2c0; staple.r2c1 = staple_right.r2c1 + staple_left.r2c1; staple.r2c2 = staple_right.r2c2 + staple_left.r2c2;
+    if (dir_to_update == 0u) { 
+        // x-link (水平方向) の更新
+        // 対象リンクは (x,y) -> (x+1,y)。Staple は (x+1,y) から出発して (x,y) に戻る
+        let start_x = addModL(x, 1);
+        let start_y = y;
+        
+        // 上側のコの字: 上(0,1) -> 左(-1,0) -> 下(0,-1)
+        let staple_up = get_staple(start_x, start_y, 0, 1, -1, 0, 0, -1);
+        // 下側のコの字: 下(0,-1) -> 左(-1,0) -> 上(0,1)
+        let staple_down = get_staple(start_x, start_y, 0, -1, -1, 0, 0, 1);
+        
+        staple = su3_add(staple_up, staple_down);
+    } else { 
+        // y-link (垂直方向) の更新
+        // 対象リンクは (x,y) -> (x,y+1)。Staple は (x,y+1) から出発して (x,y) に戻る
+        let start_x = x;
+        let start_y = addModL(y, 1);
+        
+        // 右側のコの字: 右(1,0) -> 下(0,-1) -> 左(-1,0)
+        let staple_right = get_staple(start_x, start_y, 1, 0, 0, -1, -1, 0);
+        // 左側のコの字: 左(-1,0) -> 下(0,-1) -> 右(1,0)
+        let staple_left = get_staple(start_x, start_y, -1, 0, 0, -1, 1, 0);
+        
+        staple = su3_add(staple_right, staple_left);
     }
 
     let link_idx = get_link_idx(x, y, dir_to_update);
@@ -309,15 +393,25 @@ fn measure_plaquette(@builtin(global_invocation_id) id: vec3<u32>) {
     if (x >= L || y >= L) { return; }
 
     let site_idx = y * L + x;
-    let xp1 = (x + 1u) % L;
-    let yp1 = (y + 1u) % L;
 
-    let U1 = links[get_link_idx(x, y, 0u)];
-    let U2 = links[get_link_idx(xp1, y, 1u)];
-    let U3_inv = su3_inv(links[get_link_idx(x, yp1, 0u)]);
-    let U4_inv = su3_inv(links[get_link_idx(x, y, 1u)]);
+    // 現在地 (cx, cy) を更新しながら1周まわる
+    var cx = x;
+    var cy = y;
 
-    let plaquette_matrix = su3_mult(U1, su3_mult(U2, su3_mult(U3_inv, U4_inv)));
+    // (x,y) から反時計回りに1周する経路 (右 -> 上 -> 左 -> 下)
+    let l1 = get_link_dir(cx, cy, 1, 0);
+    cx = addModL(cx, 1);
+    
+    let l2 = get_link_dir(cx, cy, 0, 1);
+    cy = addModL(cy, 1);
+    
+    let l3 = get_link_dir(cx, cy, -1, 0);
+    cx = addModL(cx, -1);
+    
+    let l4 = get_link_dir(cx, cy, 0, -1);
+
+    // 4つのリンクを順番に乗算
+    let plaquette_matrix = su3_mult(su3_mult(su3_mult(l1, l2), l3), l4);
 
     // Plaquette observable is normalized by N=3: 1/3 * Re(Tr(U_p))
     viz_results[site_idx] = (1.0 / 3.0) * su3_trace_real(plaquette_matrix);
