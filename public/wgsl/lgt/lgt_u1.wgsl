@@ -43,6 +43,58 @@ fn set_link(coord: vec2<u32>, dir: u32, val: vec2<f32>) {
     links[link_idx] = val;
 }
 
+// (x,y)からx方向(dx)またはy方向(dy)に進む際のリンクを取得する。
+// ※ dx, dy はマイナスをとるため i32 に変更
+fn get_link_dir(x: u32, y: u32, dx: i32, dy: i32) -> vec2<f32> {
+    if (dx == 1) {
+        // 右に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 0u);
+    } else if (dx == -1) {
+        // 左に進む場合（逆走なので一つ左のリンクを複素共役）
+        let prev_x = (x + L - 1u) % L;
+        return complex_conj(get_link(vec2<u32>(prev_x, y), 0u));
+    } else if (dy == 1) {
+        // 上に進む場合（正方向）
+        return get_link(vec2<u32>(x, y), 1u);
+    } else if (dy == -1) {
+        // 下に進む場合（逆走なので一つ下のリンクを複素共役）
+        let prev_y = (y + L - 1u) % L;
+        return complex_conj(get_link(vec2<u32>(x, prev_y), 1u));
+    }
+    
+    // 原則ここには来ないが、念のため単位元を返す
+    return vec2<f32>(1.0, 0.0);
+}
+
+// u32とi32の数をmod L で加算する。
+fn addModL(x : u32, dx : i32) -> u32 {
+    return u32(i32(x) + i32(L) + dx) % L;
+}
+
+// 3個のリンクのステープルを計算する。
+fn get_staple(start_x: u32, start_y: u32, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) -> vec2<f32> {
+    // WGSLでは引数は書き換えられないので、内部変数を用意する
+    var cx = start_x;
+    var cy = start_y;
+
+    // 1番目のリンク
+    let l1 = get_link_dir(cx, cy, dx1, dy1);
+    // 座標を更新（マイナスになっても L を足して % L することで安全にラップアラウンド）
+    cx = addModL(cx, dx1);
+    cy = addModL(cy, dy1);
+
+    // 2番目のリンク
+    let l2 = get_link_dir(cx, cy, dx2, dy2);
+    cx = addModL(cx, dx2);
+    cy = addModL(cy, dy2);
+
+    // 3番目のリンク（typo修正: l3に）
+    let l3 = get_link_dir(cx, cy, dx3, dy3);
+
+    // 3個のリンクを乗算する。
+    return complex_mul(complex_mul(l1, l2), l3);
+}
+
 // 正しい32-bit PCG random number generator
 fn pcg(state: ptr<function, u32>) -> f32 {
     let old_state = *state;
@@ -144,8 +196,8 @@ fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let n_ym1 = vec2<u32>(x, (y + L - 1u) % L);
     let n_xp1_ym1 = vec2<u32>((x + 1u) % L, (y + L - 1u) % L);
 
-    let staple_up = complex_mul(complex_mul(get_link(n_xp1, 1u), complex_conj(get_link(n_yp1, 0u))), complex_conj(current_u1));
-    let staple_down = complex_mul(complex_mul(complex_conj(get_link(n_xp1_ym1, 1u)), complex_conj(get_link(n_ym1, 0u))), get_link(n_ym1, 1u));
+    let staple_up   = get_staple((x + 1u) % L, y,  0, 1, -1, 0,  0, -1);
+    let staple_down = get_staple((x + 1u) % L, y,  0,-1, -1, 0,  0, 1);
     let staple_sum_1 = staple_up + staple_down;
 
     // --- Heat Bath ロジック ---
@@ -171,8 +223,8 @@ fn metropolis_update(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let n_xm1 = vec2<u32>((x + L - 1u) % L, y);
     let n_xm1_yp1 = vec2<u32>((x + L - 1u) % L, (y + 1u) % L);
 
-    let staple_right = complex_mul(complex_mul(get_link(n_yp1, 0u), complex_conj(get_link(n_xp1, 1u))), complex_conj(current_u0));
-    let staple_left = complex_mul(complex_mul(get_link(n_xm1, 0u), complex_conj(get_link(n_xm1, 1u))), complex_conj(get_link(n_xm1_yp1, 0u)));
+    let staple_right = get_staple(x, (y + 1u) % L,  1, 0,  0,-1, -1, 0);
+    let staple_left  = get_staple(x, (y + 1u) % L, -1, 0,  0,-1,  1, 0);
     let staple_sum_2 = staple_right + staple_left;
 
     // --- Heat Bath ロジック ---
