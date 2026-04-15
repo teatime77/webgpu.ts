@@ -3,7 +3,6 @@ package.json
 package-lock.json
 .vscode/settings.json
 tmp
-node_modules/.package-lock.json
 public/lib/algebra
 public/lib/i18n
 public/lib/parser

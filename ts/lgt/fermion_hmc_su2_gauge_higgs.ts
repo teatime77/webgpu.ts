@@ -174,7 +174,7 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
     const canvas = document.querySelector("#world") as HTMLCanvasElement;
-    const context = canvas.getContext("webgpu")!;
+    const context = canvas.getContext("webgpu") as GPUCanvasContext;
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format: presentationFormat, alphaMode: "premultiplied" });
 
@@ -376,7 +376,7 @@ export async function runFermionSU2(device: GPUDevice, mode: "C" | "E"): Promise
 
         // --- 描画パス (毎フレーム必ず実行して画面フリーズを防ぐ) ---
         const canvas = document.querySelector("#world") as HTMLCanvasElement;
-        const context = canvas.getContext("webgpu")!;
+        const context = canvas.getContext("webgpu") as GPUCanvasContext;
         const renderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{ 
                 view: context.getCurrentTexture().createView(), 

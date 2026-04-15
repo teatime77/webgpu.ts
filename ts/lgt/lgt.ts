@@ -378,7 +378,7 @@ export async function runLGT(device: GPUDevice, theory: 'U1' | 'SU2' | 'SU3' = '
 
     // We need the canvas context to know the format of the texture we're rendering to.
     const canvas = document.querySelector("canvas")!;
-    const context = canvas.getContext("webgpu")!;
+    const context = canvas.getContext("webgpu") as GPUCanvasContext;
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({
         device: device,
