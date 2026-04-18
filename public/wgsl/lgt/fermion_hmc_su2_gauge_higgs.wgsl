@@ -113,15 +113,8 @@ fn get_idx(cx: u32, cy: u32) -> u32 { return cy * L + cx; }
 fn get_link_idx(cx: u32, cy: u32, dir: u32) -> u32 { return (cy * L + cx) * 2u + dir; }
 
 // --- スピノル演算ヘルパー ---
-fn c_mult(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> { return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
-fn apply_U(theta: f32, psi: Spinor) -> Spinor {
-    let u = vec2(cos(theta), sin(theta));
-    let s1 = c_mult(u, vec2(psi.x, psi.y)); let s2 = c_mult(u, vec2(psi.z, psi.w));
-    return Spinor(s1.x, s1.y, s2.x, s2.y);
-}
 fn gamma1_mul(psi: Spinor) -> Spinor { return Spinor(psi.z, psi.w, psi.x, psi.y); }
 fn gamma2_mul(psi: Spinor) -> Spinor { return Spinor(psi.w, -psi.z, -psi.y, psi.x); }
-fn spinor_dot_real(a: Spinor, b: Spinor) -> f32 { return dot(a, b); }
 
 // --- 乱数 ---
 fn pcg_hash(state: ptr<function, u32>) -> u32 {
