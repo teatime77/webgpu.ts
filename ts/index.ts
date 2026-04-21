@@ -237,7 +237,7 @@ export async function asyncBodyOnLoadTestAll(){
     }
 }
 
-window.addEventListener('load', async() => {
+export async function initWebGPU(){
     const [ origin, pathname, params, url_base] = parseURL();
     
     console.log('画像も含めてすべてのロードが完了しました');
@@ -249,6 +249,10 @@ window.addEventListener('load', async() => {
 
     makeButtons(params);
     console.log('初期化完了');
+}
+
+window.addEventListener('load', async() => {
+    await initWebGPU();
 });
 
 let divButtons = $div("span-buttons");
