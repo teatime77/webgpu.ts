@@ -251,10 +251,6 @@ export async function initWebGPU(){
     console.log('初期化完了');
 }
 
-window.addEventListener('load', async() => {
-    await initWebGPU();
-});
-
 let divButtons = $div("span-buttons");
 function makeButton( text : string) : HTMLButtonElement {
     const button = document.createElement("button");
