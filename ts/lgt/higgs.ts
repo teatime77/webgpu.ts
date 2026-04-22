@@ -129,7 +129,7 @@ export async function runHiggs(device: GPUDevice): Promise<() => void> {
     });
 
     // --- 5. レンダーパイプラインの作成 ---
-    const canvas = document.querySelector("#world") as HTMLCanvasElement;
+    const canvas = document.querySelector("#world-webgpu") as HTMLCanvasElement;
     const context = canvas.getContext("webgpu") as GPUCanvasContext;
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device: device, format: presentationFormat, alphaMode: "premultiplied" });

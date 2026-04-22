@@ -155,7 +155,7 @@ export async function runHMCGaugeHiggs(device: GPUDevice, mode: "C" | "E"): Prom
     });
 
     // --- 5. レンダーパイプライン ---
-    const canvas = document.querySelector("#world") as HTMLCanvasElement;
+    const canvas = document.querySelector("#world-webgpu") as HTMLCanvasElement;
     const context = canvas.getContext("webgpu") as GPUCanvasContext;
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format: presentationFormat, alphaMode: "premultiplied" });

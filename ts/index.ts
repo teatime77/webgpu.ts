@@ -358,3 +358,7 @@ function makeButtons(params: Map<string, string>){
         $("next-button").style.display = "inline-block";
     }
 }
+
+export async function playWebGPUPackage(name: string) {
+    await startTestPackage(name);
+}

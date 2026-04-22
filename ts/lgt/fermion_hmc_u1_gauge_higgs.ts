@@ -168,7 +168,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
     const renderShaderCode = "const L: f32 = 32.0;\n" + await fetchText(`./wgsl/lgt/${renderName}.wgsl`);
     const renderModule = device.createShaderModule({ code: renderShaderCode });
 
-    const canvas = document.querySelector("#world") as HTMLCanvasElement;
+    const canvas = document.querySelector("#world-webgpu") as HTMLCanvasElement;
     const context = canvas.getContext("webgpu") as GPUCanvasContext;
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format: presentationFormat, alphaMode: "premultiplied" });
@@ -373,7 +373,7 @@ export async function runDynamicalFermions(device: GPUDevice, mode: "C" | "E"): 
         // ↑↑↑
 
         // --- 描画パス (毎フレーム必ず実行して画面フリーズを防ぐ) ---
-        const canvas = document.querySelector("#world") as HTMLCanvasElement;
+        const canvas = document.querySelector("#world-webgpu") as HTMLCanvasElement;
         const context = canvas.getContext("webgpu") as GPUCanvasContext;
         const renderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{ 

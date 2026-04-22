@@ -27,7 +27,7 @@ class Run {
         this.meshes = meshes.splice(0);
         this.comps = inst.splice(0);
 
-        const canvas = document.getElementById('world') as HTMLCanvasElement;
+        const canvas = document.getElementById('world-webgpu') as HTMLCanvasElement;
             
         this.context = initContext(canvas, 'opaque');
 
