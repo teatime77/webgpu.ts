@@ -190,7 +190,7 @@ export class Script {
 }
 
 
-export async function parseAll(){
+export async function parseAll(basePath: string = "."){
     const shader_names = [
         "three-body-com",
         "tube-instance-vert",
@@ -216,7 +216,7 @@ export async function parseAll(){
 
     for(const shader_name of shader_names){
         msg(`\n------------------------------ ${shader_name}`);
-        const text = await fetchText(`./wgsl/${shader_name}.wgsl`);
+        const text = await fetchText(`${basePath}/wgsl/${shader_name}.wgsl`);
         const module = new Module(text);
         const shaderModule = makeShaderModule(module.text);
         // mod.dump();
@@ -242,9 +242,14 @@ export async function initWebGPU(){
     
     console.log('画像も含めてすべてのロードが完了しました');
     await asyncBodyOnLoad();
-    await parseAll();
+    
+    // diagramから呼ばれた場合はパスを../webgpu/に調整する
+    const isDiagram = pathname.includes("diagram");
+    const basePath = isDiagram ? "../webgpu" : ".";
 
-    const test_text = await fetchText(`./package/test.json`);
+    await parseAll(basePath);
+
+    const test_text = await fetchText(`${basePath}/package/test.json`);
     testPackages = JSON.parse(test_text) as Package[];
 
     makeButtons(params);
