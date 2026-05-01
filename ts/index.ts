@@ -21,6 +21,7 @@ import { runDiracCGSolver } from "./lgt/cg_dirac";
 import { runHMCGaugeHiggs } from "./lgt/hmc_gauge_higgs";
 import { runDynamicalFermions } from "./lgt/fermion_hmc_u1_gauge_higgs";
 import { runFermionSU2 } from "./lgt/fermion_hmc_su2_gauge_higgs";
+import { initControl } from "./main";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -239,6 +240,11 @@ export async function asyncBodyOnLoadTestAll(){
 
 export async function initWebGPU(){
     const [ origin, pathname, params, url_base] = parseURL();
+
+    if(params.has("new")){
+        await initControl();
+        return;
+    }
     
     console.log('画像も含めてすべてのロードが完了しました');
     await asyncBodyOnLoad();

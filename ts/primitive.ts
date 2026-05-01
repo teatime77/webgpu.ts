@@ -815,57 +815,63 @@ export function makeArrow(compute  : ComputePipeline, shape : ShapeInfo) : Compu
     return [ disc1, tube, disc2, cone ];
 }
 
+export function makeGeodesicPolyhedron(shape : ShapeInfo) : Float32Array {
+    // Use the subdivision level from shape.divideCount, with a fallback to 2.
+    const divide_cnt = shape.divideCount ?? 2;
+    const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
+    const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
+
+    const vertexCount = triangles2.length * 3;
+    const vertexArray = new Float32Array(vertexCount * (3 + 3) );
+
+    let idx = 0;
+    for(let i = 0; i < triangles2.length; i++){
+        const tri = triangles2[i];
+        for(let j = 0; j < 3; j++){
+            const vert = tri.Vertexes[j];
+
+            vertexArray[idx    ] = vert.x;
+            vertexArray[idx + 1] = vert.y;
+            vertexArray[idx + 2] = vert.z;
+
+            const len = vert.len();
+
+            vertexArray[idx + 3] = vert.x / len;
+            vertexArray[idx + 4] = vert.y / len;
+            vertexArray[idx + 5] = vert.z / len;
+
+            idx += 3 + 3;
+        }
+    }
+
+    if(shape.scale != undefined){
+        const [sx, sy, sz] = shape.scale;
+        for(let i = 0; i < vertexArray.length; i +=6 ){
+            vertexArray[i    ] *= sx;
+            vertexArray[i + 1] *= sy;
+            vertexArray[i + 2] *= sz;
+        }
+    }
+
+    if(shape.position != undefined){
+        const [dx, dy, dz] = shape.position;
+        for(let i = 0; i < vertexArray.length; i +=6 ){
+            vertexArray[i    ] += dx;
+            vertexArray[i + 1] += dy;
+            vertexArray[i + 2] += dz;
+        }
+    }
+
+    return vertexArray;
+}
+
 export class GeodesicPolyhedron extends ComputeRenderPipeline {
     constructor(compute  : ComputePipeline, shape : ShapeInfo){
         super(compute, shape);
 
         this.topology = 'triangle-list';
-
-        // Use the subdivision level from shape.divideCount, with a fallback to 2.
-        const divide_cnt = shape.divideCount ?? 2;
-        const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
-        const [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divide_cnt);
-    
-        this.vertexCount = triangles2.length * 3;
-        this.vertexArray = new Float32Array(this.vertexCount * (3 + 3) );
-    
-        let idx = 0;
-        for(let i = 0; i < triangles2.length; i++){
-            const tri = triangles2[i];
-            for(let j = 0; j < 3; j++){
-                const vert = tri.Vertexes[j];
-    
-                this.vertexArray[idx    ] = vert.x;
-                this.vertexArray[idx + 1] = vert.y;
-                this.vertexArray[idx + 2] = vert.z;
-    
-                const len = vert.len();
-    
-                this.vertexArray[idx + 3] = vert.x / len;
-                this.vertexArray[idx + 4] = vert.y / len;
-                this.vertexArray[idx + 5] = vert.z / len;
-    
-                idx += 3 + 3;
-            }
-        }
-
-        if(shape.scale != undefined){
-            const [sx, sy, sz] = shape.scale;
-            for(let i = 0; i < this.vertexArray.length; i +=6 ){
-                this.vertexArray[i    ] *= sx;
-                this.vertexArray[i + 1] *= sy;
-                this.vertexArray[i + 2] *= sz;
-            }
-        }
-
-        if(shape.position != undefined){
-            const [dx, dy, dz] = shape.position;
-            for(let i = 0; i < this.vertexArray.length; i +=6 ){
-                this.vertexArray[i    ] += dx;
-                this.vertexArray[i + 1] += dy;
-                this.vertexArray[i + 2] += dz;
-            }
-        }
+        this.vertexArray = makeGeodesicPolyhedron(shape);
+        this.vertexCount = this.vertexArray.length / (3 + 3);
     }
 }
 

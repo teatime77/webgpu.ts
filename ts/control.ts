@@ -2,19 +2,19 @@
 // 1. 型定義 (Types & Interfaces)
 // ============================================================================
 
-export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>';
+export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>';
 
 export interface MetaData {
     [key: string]: number | string | boolean | number[]; 
 }
 
 export interface ResourceDef {
-    type: 'storage' | 'uniform' | 'indirect';
-    access?: 'read' | 'read_write'; // デフォルトは 'read'
+    type: 'storage' | 'uniform' | 'indirect' | 'texture' | 'sampler';
+    access?: 'read' | 'read_write';
     format?: WgslFormat;
-    count?: string | number;        // 変数展開 ("$metadata.maxParticles") を許容
-    pingPong?: boolean;             // A/Bバッファを生成するか
-    fields?: Record<string, string>; // Uniformバッファの場合の構造体フィールド
+    count?: string | number;
+    pingPong?: boolean;
+    fields?: Record<string, string>;
 }
 
 export interface BindingDefinition {
@@ -22,6 +22,8 @@ export interface BindingDefinition {
     binding: number;
     resource: string;               // 参照するリソースID
     state?: 'current' | 'previous'; // Ping-Pongバッファの場合の指定
+    varName?: string;               // 🌟 追加: WGSL上で使用する明示的な変数名
+    access?: 'read' | 'read_write';
 }
 
 export interface BaseNodeDef {
@@ -71,6 +73,87 @@ export interface SimulationSchema {
     };
 }
 
+export const sphereSchema: SimulationSchema = {
+    name: "Sphere GPU Physics",
+    version: "2.0",
+    
+    metadata: {
+        "particleCount": 1024, // 🌟 変更: コンピュートシェーダ(64スレッド)で割り切れるように1024に変更
+        "viewProjection": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+        "view":           [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+        "baseSphereFloatCount": 23040, 
+        "baseSphereVertexCount": 3840
+    },
+
+    resources: {
+        "CameraParams": { type: "uniform", fields: { "viewProjection": "mat4x4<f32>", "view": "mat4x4<f32>" } },
+        "BaseSphere": { type: "storage", format: "f32", count: "$metadata.baseSphereFloatCount" }, 
+        
+        // 🌟 変更: 位置と速度を Ping-Pong バッファにする
+        "ParticlePos": { type: "storage", access:"read_write", format: "vec4<f32>", count: "$metadata.particleCount", pingPong: true },
+        "ParticleVel": { type: "storage", access:"read_write", format: "vec4<f32>", count: "$metadata.particleCount", pingPong: true },
+        
+        "MatCapTex": { type: "texture" },
+        "MatCapSampler": { type: "sampler" }
+    },
+
+    nodes: {
+        // 🌟 追加: GPUでランダムな初期位置と初速を設定する
+        "InitParticles": {
+            type: "compute",
+            shader: "init_particles",
+            dispatch: { type: "direct", workgroups: ["$metadata.particleCount / 64", 1, 1] },
+            bindings: [
+                { group: 0, binding: 0, resource: "ParticlePos", state: "current", varName: "posOut" },
+                { group: 0, binding: 1, resource: "ParticleVel", state: "current", varName: "velOut" }
+            ]
+        },
+        // 🌟 追加: GPUで毎フレーム重力とバウンドを計算する
+        "UpdateParticles": {
+            type: "compute",
+            shader: "update_particles",
+            dispatch: { type: "direct", workgroups: ["$metadata.particleCount / 64", 1, 1] },
+            bindings: [
+                { group: 0, binding: 0, resource: "ParticlePos", state: "previous", varName: "posIn" },
+                { group: 0, binding: 1, resource: "ParticlePos", state: "current",  varName: "posOut" },
+                { group: 0, binding: 2, resource: "ParticleVel", state: "previous", varName: "velIn" },
+                { group: 0, binding: 3, resource: "ParticleVel", state: "current",  varName: "velOut" }
+            ]
+        },
+        "RenderParticles": {
+            type: "render",
+            shader: "matcap_spheres",
+            topology: "triangle-list",
+            depthTest: true,
+            bindings: [
+                { group: 0, binding: 0, resource: "CameraParams", varName: "camera" },
+                { group: 0, binding: 1, resource: "BaseSphere", varName: "baseSphere" },
+                // 🌟 変更: 描画は最新(current)の位置を読む
+                { group: 0, binding: 2, resource: "ParticlePos", state: "current", varName: "particlePos", access:"read" },
+                { group: 0, binding: 3, resource: "MatCapTex", varName: "matcapTex" },
+                { group: 0, binding: 4, resource: "MatCapSampler", varName: "matcapSampler" }
+            ],
+            draw: { type: "direct", vertexCount: "$metadata.baseSphereVertexCount", instanceCount: "$metadata.particleCount" }
+        }
+    },
+
+    // 🌟 変更: ライフゲームと同じように、初期化 -> 更新ループ を回し、スワップする
+    stateMachine: {
+        initialState: "State_Initialize",
+        states: {
+            "State_Initialize": {
+                execute: ["InitParticles", "RenderParticles"],
+                onExit: [{ action: "swapPingPong", resources: ["ParticlePos", "ParticleVel"] }],
+                transitions: [{ condition: "true", target: "State_Simulate" }]
+            },
+            "State_Simulate": {
+                execute: ["UpdateParticles", "RenderParticles"],
+                onExit: [{ action: "swapPingPong", resources: ["ParticlePos", "ParticleVel"] }],
+                transitions: [{ condition: "true", target: "State_Simulate" }]
+            }
+        }
+    }
+};
 
 // 型定義の追加
 interface UniformLayoutInfo {
@@ -165,25 +248,28 @@ export class WgslHeaderGenerator {
             const bindingNum = bind.binding;
             
             // Ping-Pongの過去バッファを参照する場合は変数名に _prev を付ける
-            let varName = this.toSnakeCase(bind.resource);
-            if (resource.pingPong && bind.state === 'previous') {
-                varName += '_prev';
-            }
+            let varName = bind.varName || bind.resource;
 
             if (resource.type === 'uniform') {
                 code += `@group(${group}) @binding(${bindingNum}) var<uniform> ${varName}: ${bind.resource};\n`;
             } 
             else if (resource.type === 'storage') {
                 // stateが'previous'の場合は強制的にread-onlyにする安全対策
-                const access = (resource.access === 'read_write' && bind.state !== 'previous') ? 'read_write' : 'read';
+                let access = bind.access;
+                if (!access) {
+                    // デフォルトのフォールバック (previousは安全のため強制read)
+                    access = (resource.access === 'read_write' && bind.state !== 'previous') ? 'read_write' : 'read';
+                }
                 code += `@group(${group}) @binding(${bindingNum}) var<storage, ${access}> ${varName}: array<${resource.format}>;\n`;
+            }
+            else if (resource.type === 'texture') {
+                code += `@group(${group}) @binding(${bindingNum}) var ${varName}: texture_2d<f32>;\n`;
+            }
+            else if (resource.type === 'sampler') {
+                code += `@group(${group}) @binding(${bindingNum}) var ${varName}: sampler;\n`;
             }
         }
         return code;
-    }
-
-    private static toSnakeCase(str: string): string {
-        return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`).replace(/^_/, '');
     }
 }
 
@@ -224,9 +310,14 @@ export class GraphManager {
         reject: (reason?: any) => void;
     }> = [];
 
+    private externalResources: Map<string, GPUBindingResource> = new Map();
 
     constructor(device: GPUDevice) {
         this.device = device;
+    }
+
+    public setExternalResource(id: string, resource: GPUBindingResource) {
+        this.externalResources.set(id, resource);
     }
 
     /** JSONスキーマをロードし、GPUリソースを確保する */
@@ -296,6 +387,7 @@ export class GraphManager {
             case 'vec2<f32>': return 8;
             case 'vec3<f32>': return 16; 
             case 'vec4<f32>': return 16;
+            case 'mat4x4<f32>': return 64; // 追加: 4x4行列は64バイト
             default: return 4;
         }
     }
@@ -512,15 +604,20 @@ export class GraphManager {
         let cacheKey = `${nodeId}_`;
         
         const entries: GPUBindGroupEntry[] = nodeDef.bindings.map(bind => {
-            const wrapper = this.resources.get(bind.resource)!;
-            const buffer = bind.state === 'previous' ? wrapper.getPreviousBuffer() : wrapper.getCurrentBuffer();
-            
-            cacheKey += `${buffer.label}|`;
+            let gpuResource: GPUBindingResource;
+            if (this.externalResources.has(bind.resource)) {
+                gpuResource = this.externalResources.get(bind.resource)!;
+            } else {
+                const wrapper = this.resources.get(bind.resource)!;
+                
+                // 🌟 追加: Ping-Pongの「今どっちの面か(0 or 1)」をキャッシュキーに足す！
+                // (anyキャストを使ってprivateプロパティを強引に読みます)
+                cacheKey += `${wrapper.isPingPong ? (wrapper as any).currentIndex : 0}_`;
+                
+                gpuResource = { buffer: bind.state === 'previous' ? wrapper.getPreviousBuffer() : wrapper.getCurrentBuffer() };
+            }
 
-            return {
-                binding: bind.binding,
-                resource: { buffer: buffer }
-            };
+            return { binding: bind.binding, resource: gpuResource };
         });
 
         if (this.bindGroupCache.has(cacheKey)) {
@@ -579,6 +676,7 @@ export class GraphManager {
                     let size = 4;
                     if (format === 'vec2<f32>') { alignment = 8; size = 8; }
                     if (format === 'vec3<f32>' || format === 'vec4<f32>') { alignment = 16; size = 16; }
+                    else if (format === 'mat4x4<f32>') { alignment = 16; size = 64; }
 
                     // 現在のオフセットをアライメントの倍数に切り上げる (パディングの挿入)
                     currentOffset = Math.ceil(currentOffset / alignment) * alignment;
@@ -628,8 +726,8 @@ export class GraphManager {
                 else if (info.format === 'i32' && typeof value === 'number') {
                     dataView.setInt32(info.byteOffset, value, true);
                 }
-                else if (info.format.startsWith('vec') && Array.isArray(value)) {
-                    // vec2, vec3, vec4 の書き込み
+                else if ((info.format.startsWith('vec') || info.format.startsWith('mat')) && Array.isArray(value)) {
+                    // vec2, vec3, vec4, mat4x4 などの配列書き込み
                     for (let i = 0; i < value.length; i++) {
                         dataView.setFloat32(info.byteOffset + i * 4, value[i], true);
                     }
