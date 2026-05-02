@@ -2,7 +2,7 @@
 // 1. 型定義 (Types & Interfaces)
 // ============================================================================
 
-export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>';
+export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
 
 export interface MetaData {
     [key: string]: number | string | boolean | number[]; 
@@ -174,7 +174,13 @@ export class WgslHeaderGenerator {
             else if (resource.type === 'storage') {
                 // stateが'previous'の場合は強制的にread-onlyにする安全対策
                 let access = bind.access;
-                if (!access) {
+
+                const isAtomic = resource.format && resource.format.includes('atomic');
+
+                if (isAtomic) {
+                    // WGSLの仕様上、atomicを含むバッファは必ず read_write
+                    access = 'read_write';
+                } else if (!access) {
                     // デフォルトのフォールバック (previousは安全のため強制read)
                     access = (resource.access === 'read_write' && bind.state !== 'previous') ? 'read_write' : 'read';
                 }
@@ -301,11 +307,13 @@ export class GraphManager {
 
     private getFormatByteSize(format: WgslFormat): number {
         switch (format) {
-            case 'f32': case 'u32': case 'i32': return 4;
+            case 'f32': case 'u32': case 'i32': 
+            case 'atomic<u32>': case 'atomic<i32>':
+                return 4;
             case 'vec2<f32>': return 8;
             case 'vec3<f32>': return 16; 
             case 'vec4<f32>': return 16;
-            case 'mat4x4<f32>': return 64; // 追加: 4x4行列は64バイト
+            case 'mat4x4<f32>': return 64;
             default: return 4;
         }
     }

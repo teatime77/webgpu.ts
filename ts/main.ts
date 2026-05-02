@@ -20,7 +20,7 @@ async function loadShaders(url: string): Promise<Record<string, string>> {
     for (let i = 1; i < parts.length; i += 2) {
         const name = parts[i].trim();
         const code = parts[i + 1].trim();
-        shaders[name] = code;
+        shaders[name] = parts[0] + code;
     }
 
     return shaders;
