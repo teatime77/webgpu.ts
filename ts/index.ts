@@ -241,8 +241,9 @@ export async function asyncBodyOnLoadTestAll(){
 export async function initWebGPU(){
     const [ origin, pathname, params, url_base] = parseURL();
 
-    if(params.has("new")){
-        await initControl();
+    if(params.has("schema")){
+        const schemaName = params.get("schema")!;
+        await initControl(schemaName);
         return;
     }
     

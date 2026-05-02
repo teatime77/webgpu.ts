@@ -1,0 +1,76 @@
+{
+    "name": "Sphere GPU Physics",
+    "version": "2.0",
+    
+    "metadata": {
+        "particleCount": 1024,
+        "viewProjection": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+        "view":           [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+        "baseSphereFloatCount": 23040, 
+        "baseSphereVertexCount": 3840
+    },
+
+    "resources": {
+        "CameraParams": { "type": "uniform", "fields": { "viewProjection": "mat4x4<f32>", "view": "mat4x4<f32>" } },
+        "BaseSphere": { "type": "storage", "format": "f32", "count": "$metadata.baseSphereFloatCount" }, 
+        
+        "ParticlePos": { "type": "storage", "access":"read_write", "format": "vec4<f32>", "count": "$metadata.particleCount", "pingPong": true },
+        "ParticleVel": { "type": "storage", "access":"read_write", "format": "vec4<f32>", "count": "$metadata.particleCount", "pingPong": true },
+        
+        "MatCapTex": { "type": "texture" },
+        "MatCapSampler": { "type": "sampler" }
+    },
+
+    "nodes": {
+        "InitParticles": {
+            "type": "compute",
+            "shader": "init_particles",
+            "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "current", "varName": "posOut" },
+                { "group": 0, "binding": 1, "resource": "ParticleVel", "state": "current", "varName": "velOut" }
+            ]
+        },
+        "UpdateParticles": {
+            "type": "compute",
+            "shader": "update_particles",
+            "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "previous", "varName": "posIn" },
+                { "group": 0, "binding": 1, "resource": "ParticlePos", "state": "current",  "varName": "posOut" },
+                { "group": 0, "binding": 2, "resource": "ParticleVel", "state": "previous", "varName": "velIn" },
+                { "group": 0, "binding": 3, "resource": "ParticleVel", "state": "current",  "varName": "velOut" }
+            ]
+        },
+        "RenderParticles": {
+            "type": "render",
+            "shader": "matcap_spheres",
+            "topology": "triangle-list",
+            "depthTest": true,
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "CameraParams", "varName": "camera" },
+                { "group": 0, "binding": 1, "resource": "BaseSphere", "varName": "baseSphere" },
+                { "group": 0, "binding": 2, "resource": "ParticlePos", "state": "current", "varName": "particlePos", "access":"read" },
+                { "group": 0, "binding": 3, "resource": "MatCapTex", "varName": "matcapTex" },
+                { "group": 0, "binding": 4, "resource": "MatCapSampler", "varName": "matcapSampler" }
+            ],
+            "draw": { "type": "direct", "vertexCount": "$metadata.baseSphereVertexCount", "instanceCount": "$metadata.particleCount" }
+        }
+    },
+
+    "stateMachine": {
+        "initialState": "State_Initialize",
+        "states": {
+            "State_Initialize": {
+                "execute": ["InitParticles", "RenderParticles"],
+                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
+                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
+            },
+            "State_Simulate": {
+                "execute": ["UpdateParticles", "RenderParticles"],
+                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
+                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
+            }
+        }
+    }
+}

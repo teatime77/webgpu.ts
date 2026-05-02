@@ -1,6 +1,6 @@
-import { fetchText } from '@i18n';
+import { fetchJson, fetchText } from '@i18n';
 import { OrbitCamera } from './camera';
-import { SimulationSchema, sphereSchema } from './control';
+import { SimulationSchema } from './control';
 
 /**
  * 外部のWGSLファイルを読み込み、Record<string, string> に分割して返すパーサー
@@ -26,99 +26,6 @@ async function loadShaders(url: string): Promise<Record<string, string>> {
     return shaders;
 }
 
-
-export const gameOfLifeSchema: SimulationSchema = {
-    name: "Conway's Game of Life",
-    version: "1.0",
-    
-    // 1. メタデータ (シミュレーションの解像度など)
-    metadata: {
-        gridWidth: 256,
-        gridHeight: 256
-    },
-
-    // 2. リソース定義
-    resources: {
-        "GlobalUniforms": {
-            type: "uniform",
-            fields: {
-                "gridWidth": "f32",
-                "gridHeight": "f32"
-            }
-        },
-        // Ping-Pongバッファとして宣言！システムが裏で2つ作ります。
-        "CellBuffer": {
-            type: "storage",
-            access: "read_write",
-            format: "u32",
-            count: "$metadata.gridWidth * $metadata.gridHeight",
-            pingPong: true 
-        }
-    },
-
-    // 3. ノード定義
-    nodes: {
-        // [A] 初期化ノード (ランダムに生と死を配置)
-        "InitCells": {
-            type: "compute",
-            shader: "init_cells",
-            dispatch: {
-                type: "direct",
-                workgroups: ["$metadata.gridWidth / 8", "$metadata.gridHeight / 8", 1]
-            },
-            bindings: [
-                { group: 0, binding: 0, resource: "GlobalUniforms" },
-                { group: 0, binding: 1, resource: "CellBuffer", state: "current" }
-            ]
-        },
-        // [B] 更新ノード (ライフゲームのルール適用)
-        "UpdateCells": {
-            type: "compute",
-            shader: "update_cells",
-            dispatch: {
-                type: "direct",
-                workgroups: ["$metadata.gridWidth / 8", "$metadata.gridHeight / 8", 1]
-            },
-            bindings: [
-                { group: 0, binding: 0, resource: "GlobalUniforms" },
-                { group: 0, binding: 1, resource: "CellBuffer", state: "previous" }, // 前のフレームを読んで
-                { group: 0, binding: 2, resource: "CellBuffer", state: "current" }   // 新しいフレームに書く
-            ]
-        },
-        // [C] 描画ノード (フルスクリーンクアッドでグリッドを描画)
-        "RenderCells": {
-            type: "render",
-            shader: "render_cells",
-            topology: "triangle-list",
-            draw: { type: "direct", vertexCount: 6 }, // 2つの三角形(6頂点)を描画
-            bindings: [
-                { group: 0, binding: 0, resource: "GlobalUniforms" },
-                { group: 0, binding: 1, resource: "CellBuffer", state: "current" }
-            ]
-        }
-    },
-
-    // 4. ステートマシン (実行制御)
-    stateMachine: {
-        initialState: "State_Initialize",
-        states: {
-            "State_Initialize": {
-                execute: ["InitCells", "RenderCells"],
-                // 🌟 追加: 初期化が終わったら、必ずバッファを裏返す！
-                onExit: [{ action: "swapPingPong", resources: ["CellBuffer"] }],
-                transitions: [{ condition: "true", "target": "State_Simulate" }]
-            },
-            "State_Simulate": {
-                execute: ["UpdateCells", "RenderCells"],
-                onExit: [{ action: "swapPingPong", resources: ["CellBuffer"] }],
-                transitions: [{ condition: "true", "target": "State_Simulate" }]
-            }
-        }
-    }
-};
-
-
-
 import { GraphManager } from './control';
 import { ShapeInfo } from './package';
 import { makeGeodesicPolyhedron } from './primitive';
@@ -128,7 +35,7 @@ let animationId: number | null = null;
 
 // ※ 上部に sphereSchema と wgslCodes が定義されている前提です。
 
-export async function initControl() {
+export async function initControl(schemaName : string) {
     // --- (HMR二重起動防止処理などそのまま) ---
     if ((window as any).isSimulationRunning) {
         if ((window as any).currentAnimationId) {
@@ -183,22 +90,26 @@ export async function initControl() {
     // ⑤ GeodesicPolyhedron の頂点データを BaseSphere バッファに書き込む
     const sphereVertices = makeGeodesicPolyhedron({divideCount : 3} as ShapeInfo);
     
+    const sphereSchema = await fetchJson(`./wgsl/${schemaName}/${schemaName}.json`) as SimulationSchema;
+
     sphereSchema.metadata.baseSphereFloatCount = sphereVertices.length;
     sphereSchema.metadata.baseSphereVertexCount = sphereVertices.length / 6; // x,y,z,nx,ny,nz
 
     // ④ スキーマのロード（ここでバッファが確保される）
     engine.loadSchema(sphereSchema); // 🚨 gameOfLifeSchema から変更！
 
-    device.queue.writeBuffer(
-        engine.resources.get('BaseSphere')!.getCurrentBuffer(), 
-        0, 
-        sphereVertices
-    );
+    if(engine.resources.has('BaseSphere')){
+        device.queue.writeBuffer(
+            engine.resources.get('BaseSphere')!.getCurrentBuffer(), 
+            0, 
+            sphereVertices
+        );
+    }
 
     // ========================================================
     // パイプラインコンパイルと変数更新
     // ========================================================
-    const codes = await loadShaders("./wgsl/ball/ball.wgsl");
+    const codes = await loadShaders(`./wgsl/${schemaName}/${schemaName}.wgsl`);
     await engine.compilePipelines(codes);
 
     // カメラ行列や粒子数の初期設定

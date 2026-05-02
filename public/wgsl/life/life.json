@@ -1,0 +1,74 @@
+{
+    "name": "Conway's Game of Life",
+    "version": "1.0",
+    
+    "metadata": {
+        "gridWidth": 256,
+        "gridHeight": 256
+    },
+
+    "resources": {
+        "GlobalUniforms": {
+            "type": "uniform",
+            "fields": {
+                "gridWidth": "f32",
+                "gridHeight": "f32"
+            }
+        },
+        "CellBuffer": {
+            "type": "storage",
+            "access": "read_write",
+            "format": "u32",
+            "count": "$metadata.gridWidth * $metadata.gridHeight",
+            "pingPong": true 
+        }
+    },
+
+    "nodes": {
+        "InitCells": {
+            "type": "compute",
+            "shader": "init_cells",
+            "dispatch": { "type": "direct", "workgroups": ["$metadata.gridWidth / 8", "$metadata.gridHeight / 8", 1] },
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "GlobalUniforms", "varName": "globalUniforms" },
+                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current", "varName": "cellBuffer" }
+            ]
+        },
+        "UpdateCells": {
+            "type": "compute",
+            "shader": "update_cells",
+            "dispatch": { "type": "direct", "workgroups": ["$metadata.gridWidth / 8", "$metadata.gridHeight / 8", 1] },
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "GlobalUniforms", "varName": "globalUniforms" },
+                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "previous", "varName": "cellBufferIn" },
+                { "group": 0, "binding": 2, "resource": "CellBuffer", "state": "current", "varName": "cellBufferOut" }
+            ]
+        },
+        "RenderCells": {
+            "type": "render",
+            "shader": "render_cells",
+            "topology": "triangle-list",
+            "draw": { "type": "direct", "vertexCount": 6 },
+            "bindings": [
+                { "group": 0, "binding": 0, "resource": "GlobalUniforms", "varName": "globalUniforms" },
+                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current", "varName": "cellBuffer", "access": "read" }
+            ]
+        }
+    }
+    ,
+    "stateMachine": {
+        "initialState": "State_Initialize",
+        "states": {
+            "State_Initialize": {
+                "execute": ["InitCells", "RenderCells"],
+                "onExit": [{ "action": "swapPingPong", "resources": ["CellBuffer"] }],
+                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
+            },
+            "State_Simulate": {
+                "execute": ["UpdateCells", "RenderCells"],
+                "onExit": [{ "action": "swapPingPong", "resources": ["CellBuffer"] }],
+                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
+            }
+        }
+    }
+}
