@@ -1,3 +1,4 @@
+import { OrbitCamera } from './camera';
 import { SimulationSchema, sphereSchema } from './control';
 
 // wgsl_life.ts 等に分離して保存することをおすすめします
@@ -336,6 +337,7 @@ export async function initControl() {
     const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({ device, format, alphaMode: 'premultiplied' });
 
+    const camera = new OrbitCamera(canvas);
     // ========================================================
     // 🌟 ステップ 3: テクスチャのロードとリソースの注入
     // ========================================================
@@ -412,8 +414,19 @@ export async function initControl() {
     // メインループ
     // ========================================================
     function frame() {
-        // ※ ここで毎フレームカメラを動かす場合は updateVariables を呼ぶ
+        // 1. 画面のアスペクト比(縦横比)を計算
+        const aspect = canvas.width / canvas.height;
         
+        // 2. マウス入力から最新の行列を計算して取得
+        const matrices = camera.getMatrices(aspect);
+
+        // 3. エンジンのメタデータ(GPUのUniformバッファ)を更新
+        engine.updateVariables({
+            viewProjection: matrices.viewProjection as number[],
+            view: matrices.view
+        });
+        
+        // 4. シミュレーションと描画を1ステップ進める
         engine.step();
         
         animationId = requestAnimationFrame(frame);
