@@ -1,221 +1,30 @@
+import { fetchText } from '@i18n';
 import { OrbitCamera } from './camera';
 import { SimulationSchema, sphereSchema } from './control';
 
-// wgsl_life.ts 等に分離して保存することをおすすめします
-export const lifeWgslCodes: Record<string, string> = {
+/**
+ * 外部のWGSLファイルを読み込み、Record<string, string> に分割して返すパーサー
+ */
+async function loadShaders(url: string): Promise<Record<string, string>> {
+    const response = await fetch(url);
+    const text = await response.text();
 
-    "init_cells": `
-@compute @workgroup_size(8, 8, 1)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let w = u32(GlobalUniforms.gridWidth);
-    let h = u32(GlobalUniforms.gridHeight);
-    if (id.x >= w || id.y >= h) { return; }
-
-    let idx = id.y * w + id.x;
+    const shaders: Record<string, string> = {};
     
-    // シンプルな擬似乱数ハッシュで20%の確率でセルを「生(1)」にする
-    let hash = (id.x * 374761393u + id.y * 668265263u) ^ 1013904223u;
-    if (hash % 100u < 20u) {
-        CellBuffer[idx] = 1u;
-    } else {
-        CellBuffer[idx] = 0u;
-    }
-}
-`,
+    // 正規表現で行頭にある "// @shader: [名前]" を見つけて分割する
+    // (\s* はスペースの揺らぎを許容、(.+)$ は行末までの名前を取得)
+    const parts = text.split(/^\/\/\s*@shader:\s*(.+)$/gm);
 
-    "update_cells": `
-fn get_cell(x: i32, y: i32, w: i32, h: i32) -> u32 {
-    // トーラス状に世界を繋ぐ (Wrap around)
-    let nx = (x + w) % w;
-    let ny = (y + h) % h;
-    return CellBufferPrev[u32(ny * w + nx)];
-}
-
-@compute @workgroup_size(8, 8, 1)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let w = i32(GlobalUniforms.gridWidth);
-    let h = i32(GlobalUniforms.gridHeight);
-    let x = i32(id.x);
-    let y = i32(id.y);
-    
-    if (x >= w || y >= h) { return; }
-
-    // 周囲8マスの生存セルをカウント
-    var alive_neighbors = 0u;
-    alive_neighbors += get_cell(x - 1, y - 1, w, h);
-    alive_neighbors += get_cell(x,     y - 1, w, h);
-    alive_neighbors += get_cell(x + 1, y - 1, w, h);
-    alive_neighbors += get_cell(x - 1, y,     w, h);
-    alive_neighbors += get_cell(x + 1, y,     w, h);
-    alive_neighbors += get_cell(x - 1, y + 1, w, h);
-    alive_neighbors += get_cell(x,     y + 1, w, h);
-    alive_neighbors += get_cell(x + 1, y + 1, w, h);
-
-    let idx = u32(y * w + x);
-    let current_state = CellBufferPrev[idx];
-
-    // ライフゲームのルール適用
-    if (current_state == 1u) {
-        if (alive_neighbors == 2u || alive_neighbors == 3u) {
-            CellBuffer[idx] = 1u;
-        } else {
-            CellBuffer[idx] = 0u;
-        }
-    } else {
-        if (alive_neighbors == 3u) {
-            CellBuffer[idx] = 1u;
-        } else {
-            CellBuffer[idx] = 0u;
-        }
-    }
-}
-`,
-
-    "render_cells": `
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertex_idx: u32) -> VertexOutput {
-    var pos = array<vec2<f32>, 6>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>( 1.0, -1.0), vec2<f32>(-1.0,  1.0),
-        vec2<f32>(-1.0,  1.0), vec2<f32>( 1.0, -1.0), vec2<f32>( 1.0,  1.0)
-    );
-    var out: VertexOutput;
-    out.position = vec4<f32>(pos[vertex_idx], 0.0, 1.0);
-    out.uv = pos[vertex_idx] * 0.5 + 0.5;
-    out.uv.y = 1.0 - out.uv.y; 
-    return out;
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let w = GlobalUniforms.gridWidth;
-    let h = GlobalUniforms.gridHeight;
-    
-    let max_x = u32(w) - 1u;
-    let max_y = u32(h) - 1u;
-    let x = min(u32(in.uv.x * w), max_x);
-    let y = min(u32(in.uv.y * h), max_y);
-    
-    let idx = y * u32(w) + x;
-    let cell_state = CellBuffer[idx];
-
-    if (cell_state == 1u) {
-        return vec4<f32>(0.0, 0.8, 0.2, 1.0); 
-    }
-    return vec4<f32>(0.05, 0.05, 0.05, 1.0);
-}
-`
-};
-
-// wgsl_spheres.ts 等に分離して保存することをおすすめします
-export const sphereWgslCodes: Record<string, string> = {
-    // 🌟 追加: 初期化 (簡易乱数で空中にばらまく)
-    "init_particles": `
-fn hash(n: u32) -> f32 {
-    var x = n;
-    x ^= x >> 16u; x *= 0x7feb352du; x ^= x >> 15u; x *= 0x846ca68bu; x ^= x >> 16u;
-    return f32(x) / 4294967295.0;
-}
-
-@compute @workgroup_size(64, 1, 1)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let idx = id.x;
-    
-    // -10.0 ~ 10.0 の範囲の空中にランダム配置
-    let px = (hash(idx * 3u + 0u) - 0.5) * 20.0;
-    let py = (hash(idx * 3u + 1u) - 0.5) * 20.0 + 10.0; // 上の方に配置
-    let pz = (hash(idx * 3u + 2u) - 0.5) * 20.0;
-    
-    // ランダムな初速
-    let vx = (hash(idx * 3u + 10u) - 0.5) * 0.2;
-    let vy = (hash(idx * 3u + 11u) - 0.5) * 0.2;
-    let vz = (hash(idx * 3u + 12u) - 0.5) * 0.2;
-
-    posOut[idx] = vec4<f32>(px, py, pz, 1.0);
-    velOut[idx] = vec4<f32>(vx, vy, vz, 0.0);
-}
-`,
-
-    // 🌟 追加: 毎フレームの物理計算 (重力 + 床でのバウンド)
-    "update_particles": `
-@compute @workgroup_size(64, 1, 1)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let idx = id.x;
-
-    var p = posIn[idx].xyz;
-    var v = velIn[idx].xyz;
-
-    // 1. 重力を適用
-    v.y -= 0.005;
-    
-    // 2. 中心へ少し集まる力を加えて、画面外に飛び散るのを防ぐ
-    v -= p * 0.0001;
-
-    // 3. 速度を位置に加算
-    p += v;
-
-    // 4. 床 (Y = -10.0) でのバウンド処理
-    if (p.y < -10.0) {
-        p.y = -10.0;
-        v.y = -v.y * 0.8; // 反発係数 0.8 で跳ね返る
+    // parts[0] は最初の @shader より前にある文字列（グローバルなコメントなど）なので無視
+    // parts は [ "ゴミ", "init_particles", "WGSLコード...", "update_particles", "WGSLコード..." ] のように並ぶ
+    for (let i = 1; i < parts.length; i += 2) {
+        const name = parts[i].trim();
+        const code = parts[i + 1].trim();
+        shaders[name] = code;
     }
 
-    posOut[idx] = vec4<f32>(p, 1.0);
-    velOut[idx] = vec4<f32>(v, 0.0);
+    return shaders;
 }
-`,
-    "matcap_spheres": `
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) view_normal: vec3<f32>,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) v_idx: u32, @builtin(instance_index) i_idx: u32) -> VertexOutput {
-    let offset = v_idx * 6u;
-    
-    let local_pos = vec3<f32>(
-        baseSphere[offset],
-        baseSphere[offset + 1u],
-        baseSphere[offset + 2u]
-    );
-    
-    let local_normal = vec3<f32>(
-        baseSphere[offset + 3u],
-        baseSphere[offset + 4u],
-        baseSphere[offset + 5u]
-    );
-    
-    let center = particlePos[i_idx].xyz;
-    let radius = 0.5; 
-    
-    let world_pos = (local_pos * radius) + center;
-
-    var out: VertexOutput;
-    out.position = camera.viewProjection * vec4<f32>(world_pos, 1.0);
-    
-    let view_n = camera.view * vec4<f32>(local_normal, 0.0);
-    out.view_normal = normalize(view_n.xyz);
-    
-    return out;
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let n = normalize(in.view_normal);
-    
-    let matcap_uv = n.xy * 0.48 + 0.5;
-    let final_uv = vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y);
-    
-    return textureSample(matcapTex, matcapSampler, final_uv);
-}
-`
-};
-
 
 
 export const gameOfLifeSchema: SimulationSchema = {
@@ -389,7 +198,8 @@ export async function initControl() {
     // ========================================================
     // パイプラインコンパイルと変数更新
     // ========================================================
-    await engine.compilePipelines(sphereWgslCodes);
+    const codes = await loadShaders("./wgsl/ball/ball.wgsl");
+    await engine.compilePipelines(codes);
 
     // カメラ行列や粒子数の初期設定
     // ※ glMatrixなどのライブラリを使って、実際の4x4行列(16要素の配列)を計算して渡します
