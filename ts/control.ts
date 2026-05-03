@@ -17,10 +17,18 @@ export interface MetaData {
 export interface ResourceDef {
     type: 'storage' | 'uniform' | 'indirect' | 'texture' | 'sampler';
     access?: 'read' | 'read_write';
-    format?: WgslFormat;
+    /** Storage 等では WGSL 要素型。`type: 'texture'` のときは GPUTextureFormat 相当の文字列（省略時は `rgba8unorm`）。 */
+    format?: WgslFormat | string;
     count?: string | number;
     bufferCount?: number;
     fields?: Record<string, string>;
+    /** `type: 'texture'` のときのみ。省略時は `2d`。 */
+    dimension?: '1d' | '2d' | '3d';
+    /**
+     * テクスチャの各次元サイズ。例: 1D は `[W]`、2D は `[W,H]`、3D は `[W,H,D]`。
+     * 未指定または空のときはキャンバス幅・高さをフォールバック（3D の奥行きは `1`）。
+     */
+    size?: number[];
 }
 
 export interface BindingDefinition {
@@ -99,13 +107,21 @@ function getNodeById(nodes: NodeDef[], id : string) : NodeDef {
 export class ResourceWrapper {
     public id: string;
     public buffers: GPUBuffer[];
+    /** `type: 'texture'` でエンジンが確保したテクスチャ（N 面は bufferCount と同じ長さ）。 */
+    public textures: GPUTexture[] | null;
     public readonly bufferCount: number;
     currentIndex: number = 0;
 
-    constructor(id: string, buffers: GPUBuffer[], bufferCount: number) {
+    constructor(
+        id: string,
+        buffers: GPUBuffer[],
+        bufferCount: number,
+        textures: GPUTexture[] | null = null,
+    ) {
         this.id = id;
         this.buffers = buffers;
         this.bufferCount = bufferCount;
+        this.textures = textures;
     }
 
 
@@ -116,7 +132,21 @@ export class ResourceWrapper {
     public getBuffer(historyLevel: number = 0): GPUBuffer {
         const n = this.bufferCount;
         const idx = (this.currentIndex + n - historyLevel) % n;
-        return this.buffers[idx];
+        const buf = this.buffers[idx];
+        if (!buf) {
+            throw new Error(`Resource "${this.id}" has no GPU buffer at index ${idx} (texture-only or misconfigured).`);
+        }
+        return buf;
+    }
+
+    /** テクスチャリング（historyLevel はバッファと同じインデックス規則）。 */
+    public getTexture(historyLevel: number = 0): GPUTexture {
+        if (!this.textures || this.textures.length === 0) {
+            throw new Error(`Resource "${this.id}" is not a GPU texture resource.`);
+        }
+        const n = this.bufferCount;
+        const idx = (this.currentIndex + n - historyLevel) % n;
+        return this.textures[idx]!;
     }
 
     /** フレーム/ステップ終了時にリングの現在位置を 1 つ進める */
@@ -231,6 +261,9 @@ export class GraphManager {
     private canvasContext: GPUCanvasContext | null = null;
     private presentationFormat: GPUTextureFormat = 'bgra8unorm'; // 初期値
     private depthTextureView: GPUTextureView | null = null;
+    /** テクスチャ `size` 未指定時のフォールバック（`setContext` で更新） */
+    private canvasWidth = 1;
+    private canvasHeight = 1;
     
     private renderPipelines: Map<string, GPURenderPipeline> = new Map();
 
@@ -327,9 +360,18 @@ export class GraphManager {
         this.allocateResources(schema.resources);
     }
 
-    /** リソース定義からGPUBufferを動的に確保する */
+    /** リソース定義から GPUBuffer / GPUTexture を動的に確保する */
     private allocateResources(resourceDefs: Record<string, ResourceDef>) {
         for (const [id, def] of Object.entries(resourceDefs)) {
+            if (def.type === 'texture' && this.externalResources.has(id)) {
+                // 例: main から `setExternalResource` 済みのサンプル用テクスチャは二重確保しない
+                continue;
+            }
+            if (def.type === 'texture') {
+                this.allocateTextureResource(id, def);
+                continue;
+            }
+
             const byteSize = this.calculateByteSize(id, def);
             const usage = this.resolveBufferUsage(def);
 
@@ -344,9 +386,67 @@ export class GraphManager {
                 }));
             }
 
-            this.resources.set(id, new ResourceWrapper(id, buffers, bufferCount));
+            this.resources.set(id, new ResourceWrapper(id, buffers, bufferCount, null));
             console.log(`Allocated resource [${id}]: ${byteSize} bytes (bufferCount=${bufferCount})`);
         }
+    }
+
+    private allocateTextureResource(id: string, def: ResourceDef) {
+        assert(def.type === 'texture');
+        const bufferCount = def.bufferCount ?? 1;
+        const dimension = def.dimension ?? '2d';
+        const format: GPUTextureFormat =
+            def.format !== undefined ? (def.format as GPUTextureFormat) : 'rgba8unorm';
+        const size = this.resolveTextureSize(def, dimension);
+
+        let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        const access = def.access ?? 'read';
+        if (access === 'read_write') {
+            usage |= GPUTextureUsage.STORAGE_BINDING;
+        }
+
+        const gpuDimension: GPUTextureDimension =
+            dimension === '1d' ? '1d' : dimension === '3d' ? '3d' : '2d';
+
+        const textures: GPUTexture[] = [];
+        for (let i = 0; i < bufferCount; i++) {
+            textures.push(
+                this.device.createTexture({
+                    label: `${id}_texture_${i}`,
+                    dimension: gpuDimension,
+                    size,
+                    format,
+                    usage,
+                }),
+            );
+        }
+
+        this.resources.set(id, new ResourceWrapper(id, [], bufferCount, textures));
+        console.log(
+            `Allocated texture [${id}]: dimension=${dimension}, format=${format}, size=${JSON.stringify(size)}, bufferCount=${bufferCount}`,
+        );
+    }
+
+    /** スキーマの `size` またはキャンバスサイズから GPUTexture の extent を決定する */
+    private resolveTextureSize(def: ResourceDef, dimension: '1d' | '2d' | '3d'): GPUExtent3D {
+        const cw = this.canvasWidth;
+        const ch = this.canvasHeight;
+        const hasCustom =
+            def.type === 'texture' && Array.isArray(def.size) && def.size.length > 0;
+
+        if (dimension === '1d') {
+            const w = hasCustom ? def.size![0]! : cw;
+            return [Math.max(1, w), 1, 1];
+        }
+        if (dimension === '2d') {
+            const w = hasCustom ? def.size![0]! : cw;
+            const h = hasCustom && def.size!.length >= 2 ? def.size![1]! : ch;
+            return [Math.max(1, w), Math.max(1, h), 1];
+        }
+        const w = hasCustom ? def.size![0]! : cw;
+        const h = hasCustom && def.size!.length >= 2 ? def.size![1]! : ch;
+        const d = hasCustom && def.size!.length >= 3 ? def.size![2]! : 1;
+        return [Math.max(1, w), Math.max(1, h), Math.max(1, d)];
     }
 
     // --- 計算式・変数展開ヘルパー ---
@@ -629,10 +729,27 @@ export class GraphManager {
             if (this.externalResources.has(bind.resource)) {
                 gpuResource = this.externalResources.get(bind.resource)!;
             } else {
-                const wrapper = this.resources.get(bind.resource)!;
+                const wrapper = this.resources.get(bind.resource);
+                if (!wrapper) {
+                    throw new Error(`Resource "${bind.resource}" not found for node ${nodeId}.`);
+                }
                 const hl = bind.historyLevel ?? 0;
                 cacheKey += `${wrapper.currentIndex}_${hl}_`;
-                gpuResource = { buffer: wrapper.getBuffer(hl) };
+
+                const resDef = this.schema.resources[bind.resource];
+                if (wrapper.textures && resDef?.type === 'texture') {
+                    const tex = wrapper.getTexture(hl);
+                    const dim = resDef.dimension ?? '2d';
+                    if (dim === '1d') {
+                        gpuResource = tex.createView({ dimension: '1d' });
+                    } else if (dim === '3d') {
+                        gpuResource = tex.createView({ dimension: '3d' });
+                    } else {
+                        gpuResource = tex.createView();
+                    }
+                } else {
+                    gpuResource = { buffer: wrapper.getBuffer(hl) };
+                }
             }
 
             return { binding: bind.binding, resource: gpuResource };
@@ -749,6 +866,8 @@ export class GraphManager {
     public setContext(context: GPUCanvasContext, format: GPUTextureFormat, width: number, height: number) {
         this.canvasContext = context;
         this.presentationFormat = format;
+        this.canvasWidth = Math.max(1, width);
+        this.canvasHeight = Math.max(1, height);
         this.resizeDepthBuffer(width, height);
     }
 
