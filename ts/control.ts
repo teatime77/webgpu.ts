@@ -142,6 +142,8 @@ export class WgslHeaderGenerator {
         header += this.generateBindings(schema, node.bindings);
 
         header += `\n// --- YOUR COMPUTE LOGIC BELOW ---\n\n`;
+        msg(`header:\n${header}`);
+        
         return header;
     }
 

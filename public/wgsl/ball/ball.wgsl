@@ -64,18 +64,18 @@ fn vs_main(@builtin(vertex_index) v_idx: u32, @builtin(instance_index) i_idx: u3
     let offset = v_idx * 6u;
     
     let local_pos = vec3<f32>(
-        baseSphere[offset],
-        baseSphere[offset + 1u],
-        baseSphere[offset + 2u]
+        BaseSphere[offset],
+        BaseSphere[offset + 1u],
+        BaseSphere[offset + 2u]
     );
     
     let local_normal = vec3<f32>(
-        baseSphere[offset + 3u],
-        baseSphere[offset + 4u],
-        baseSphere[offset + 5u]
+        BaseSphere[offset + 3u],
+        BaseSphere[offset + 4u],
+        BaseSphere[offset + 5u]
     );
     
-    let center = particlePos[i_idx].xyz;
+    let center = ParticlePos[i_idx].xyz;
     let radius = 0.5; 
     
     let world_pos = (local_pos * radius) + center;
@@ -96,5 +96,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let matcap_uv = n.xy * 0.48 + 0.5;
     let final_uv = vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y);
     
-    return textureSample(matcapTex, matcapSampler, final_uv);
+    return textureSample(MatCapTex, MatCapSampler, final_uv);
 }

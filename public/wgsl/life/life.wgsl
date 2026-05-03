@@ -11,9 +11,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     
     let hash = (id.x * 374761393u + id.y * 668265263u) ^ 1013904223u;
     if (hash % 100u < 20u) {
-        cellBuffer[idx] = 1u;
+        CellBuffer[idx] = 1u;
     } else {
-        cellBuffer[idx] = 0u;
+        CellBuffer[idx] = 0u;
     }
 }
 
@@ -95,7 +95,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let y = min(u32(in.uv.y * h), max_y);
     
     let idx = y * u32(w) + x;
-    let cell_state = cellBuffer[idx];
+    let cell_state = CellBuffer[idx];
 
     if (cell_state == 1u) {
         return vec4<f32>(0.0, 0.8, 0.2, 1.0); 

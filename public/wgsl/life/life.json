@@ -32,7 +32,7 @@
             "dispatch": { "type": "direct", "workgroups": ["$metadata.gridWidth / 8", "$metadata.gridHeight / 8", 1] },
             "bindings": [
                 { "group": 0, "binding": 0, "resource": "GlobalUniforms", "varName": "globalUniforms" },
-                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current", "varName": "cellBuffer" }
+                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current" }
             ]
         }
         ,
@@ -56,7 +56,7 @@
             "draw": { "type": "direct", "vertexCount": 6 },
             "bindings": [
                 { "group": 0, "binding": 0, "resource": "GlobalUniforms", "varName": "globalUniforms" },
-                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current", "varName": "cellBuffer", "access": "read" }
+                { "group": 0, "binding": 1, "resource": "CellBuffer", "state": "current", "access": "read" }
             ]
         }
     ]

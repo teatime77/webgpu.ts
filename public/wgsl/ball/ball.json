@@ -54,10 +54,10 @@
             "depthTest": true,
             "bindings": [
                 { "group": 0, "binding": 0, "resource": "CameraParams", "varName": "camera" },
-                { "group": 0, "binding": 1, "resource": "BaseSphere", "varName": "baseSphere" },
-                { "group": 0, "binding": 2, "resource": "ParticlePos", "state": "current", "varName": "particlePos", "access":"read" },
-                { "group": 0, "binding": 3, "resource": "MatCapTex", "varName": "matcapTex" },
-                { "group": 0, "binding": 4, "resource": "MatCapSampler", "varName": "matcapSampler" }
+                { "group": 0, "binding": 1, "resource": "BaseSphere" },
+                { "group": 0, "binding": 2, "resource": "ParticlePos", "state": "current", "access":"read" },
+                { "group": 0, "binding": 3, "resource": "MatCapTex" },
+                { "group": 0, "binding": 4, "resource": "MatCapSampler" }
             ],
             "draw": { "type": "direct", "vertexCount": "$metadata.baseSphereVertexCount", "instanceCount": "$metadata.particleCount" }
         }

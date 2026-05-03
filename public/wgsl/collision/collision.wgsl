@@ -82,7 +82,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (index >= NUM_CELLS) { return; }
     
     // カウントをゼロクリア
-    atomicStore(&gridCounts[index], 0u);
+    atomicStore(&GridCounts[index], 0u);
 }
 
 
@@ -92,15 +92,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let p_index = id.x;
     if (p_index >= NUM_PARTICLES) { return; }
 
-    let pos = posBuffer[p_index].xyz;
+    let pos = ParticlePos[p_index].xyz;
     let cell_index = get_cell_index(pos);
 
     // アトミックにカウントを加算して格納先インデックスを取得
-    let count = atomicAdd(&gridCounts[cell_index], 1u);
+    let count = atomicAdd(&GridCounts[cell_index], 1u);
 
     if (count < MAX_PARTICLES_PER_CELL) {
         let storage_index = cell_index * MAX_PARTICLES_PER_CELL + count;
-        gridCells[storage_index] = p_index;
+        GridCells[storage_index] = p_index;
     }
 }
 
@@ -111,8 +111,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let p_index = id.x;
     if (p_index >= NUM_PARTICLES) { return; }
 
-    var p_pos = posBuffer[p_index].xyz;
-    var p_vel = velBuffer[p_index].xyz;
+    var p_pos = ParticlePos[p_index].xyz;
+    var p_vel = ParticleVel[p_index].xyz;
 
     let shifted_pos = p_pos + vec3<f32>(16.0, 16.0, 16.0);
     let cell_coord = vec3<i32>(
@@ -137,15 +137,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                 }
 
                 let neighbor_cell_index = u32(neighbor_coord.z) * (GRID_RES.x * GRID_RES.y) + u32(neighbor_coord.y) * GRID_RES.x + u32(neighbor_coord.x);
-                let count = min(atomicLoad(&gridCounts[neighbor_cell_index]), MAX_PARTICLES_PER_CELL);
+                let count = min(atomicLoad(&GridCounts[neighbor_cell_index]), MAX_PARTICLES_PER_CELL);
 
                 for (var i = 0u; i < count; i++) {
-                    let other_p_index = gridCells[neighbor_cell_index * MAX_PARTICLES_PER_CELL + i];
+                    let other_p_index = GridCells[neighbor_cell_index * MAX_PARTICLES_PER_CELL + i];
                     
                     if (p_index == other_p_index) { continue; }
 
-                    let other_pos = posBuffer[other_p_index].xyz;
-                    let other_vel = velBuffer[other_p_index].xyz;
+                    let other_pos = ParticlePos[other_p_index].xyz;
+                    let other_vel = ParticleVel[other_p_index].xyz;
 
                     let diff = p_pos - other_pos;
                     let dist = length(diff);
@@ -174,8 +174,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     // 更新 (インプレース)
-    posBuffer[p_index] = vec4<f32>(p_pos + pos_correction, 1.0);
-    velBuffer[p_index] = vec4<f32>(p_vel + vel_correction, 0.0);
+    ParticlePos[p_index] = vec4<f32>(p_pos + pos_correction, 1.0);
+    ParticleVel[p_index] = vec4<f32>(p_vel + vel_correction, 0.0);
 }
 
 
@@ -190,18 +190,18 @@ fn vs_main(@builtin(vertex_index) v_idx: u32, @builtin(instance_index) i_idx: u3
     let offset = v_idx * 6u;
     
     let local_pos = vec3<f32>(
-        baseSphere[offset],
-        baseSphere[offset + 1u],
-        baseSphere[offset + 2u]
+        BaseSphere[offset],
+        BaseSphere[offset + 1u],
+        BaseSphere[offset + 2u]
     );
     
     let local_normal = vec3<f32>(
-        baseSphere[offset + 3u],
-        baseSphere[offset + 4u],
-        baseSphere[offset + 5u]
+        BaseSphere[offset + 3u],
+        BaseSphere[offset + 4u],
+        BaseSphere[offset + 5u]
     );
     
-    let center = particlePos[i_idx].xyz;
+    let center = ParticlePos[i_idx].xyz;
     let radius = PARTICLE_RADIUS; 
     
     let world_pos = (local_pos * radius) + center;
@@ -222,5 +222,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let matcap_uv = n.xy * 0.48 + 0.5;
     let final_uv = vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y);
     
-    return textureSample(matcapTex, matcapSampler, final_uv);
+    return textureSample(MatCapTex, MatCapSampler, final_uv);
 }
