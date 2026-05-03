@@ -94,7 +94,7 @@ export async function initControl(schemaName : string) {
 
     if(engine.resources.has('BaseSphere')){
         device.queue.writeBuffer(
-            engine.resources.get('BaseSphere')!.getCurrentBuffer(), 
+            engine.resources.get('BaseSphere')!.getBuffer(0), 
             0, 
             sphereVertices
         );

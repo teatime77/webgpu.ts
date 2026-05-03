@@ -19,7 +19,7 @@ export interface ResourceDef {
     access?: 'read' | 'read_write';
     format?: WgslFormat;
     count?: string | number;
-    pingPong?: boolean;
+    bufferCount?: number;
     fields?: Record<string, string>;
 }
 
@@ -27,7 +27,7 @@ export interface BindingDefinition {
     group?: number;                 // デフォルトは 0
     binding: number;
     resource: string;               // 参照するリソースID
-    state?: 'current' | 'previous'; // Ping-Pongバッファの場合の指定
+    historyLevel?: number;
     varName?: string;               // 🌟 追加: WGSL上で使用する明示的な変数名
     access?: 'read' | 'read_write';
 }
@@ -95,31 +95,29 @@ function getNodeById(nodes: NodeDef[], id : string) : NodeDef {
 export class ResourceWrapper {
     public id: string;
     public buffers: GPUBuffer[];
-    public isPingPong: boolean;
-    private currentIndex: number = 0;
+    public readonly bufferCount: number;
+    currentIndex: number = 0;
 
-    constructor(id: string, buffers: GPUBuffer[], isPingPong: boolean) {
+    constructor(id: string, buffers: GPUBuffer[], bufferCount: number) {
         this.id = id;
         this.buffers = buffers;
-        this.isPingPong = isPingPong;
+        this.bufferCount = bufferCount;
     }
 
-    /** 最新状態(書き込み先または最新の読み取り元)のバッファを取得 */
-    public getCurrentBuffer(): GPUBuffer {
-        return this.buffers[this.currentIndex];
+
+    /**
+     * historyLevel だけ過去にさかのぼったスロットのバッファを取得（0=現在書き込み面に相当する先頭）。
+     * buffers[(currentIndex - historyLevel + bufferCount) % bufferCount]
+     */
+    public getBuffer(historyLevel: number = 0): GPUBuffer {
+        const n = this.bufferCount;
+        const idx = (this.currentIndex + n - historyLevel) % n;
+        return this.buffers[idx];
     }
 
-    /** 1つ前の状態(読み取り専用)のバッファを取得 */
-    public getPreviousBuffer(): GPUBuffer {
-        if (!this.isPingPong) return this.buffers[0];
-        return this.buffers[1 - this.currentIndex];
-    }
-
-    /** フレーム/ステップ終了時にA/Bを反転させる */
+    /** フレーム/ステップ終了時にリングの現在位置を 1 つ進める */
     public swap(): void {
-        if (this.isPingPong) {
-            this.currentIndex = 1 - this.currentIndex;
-        }
+        this.currentIndex = (this.currentIndex + 1) % this.bufferCount;
     }
 }
 
@@ -175,14 +173,12 @@ export class WgslHeaderGenerator {
             const group = bind.group || 0;
             const bindingNum = bind.binding;
             
-            // Ping-Pongの過去バッファを参照する場合は変数名に _prev を付ける
             let varName = bind.varName || bind.resource;
 
             if (resource.type === 'uniform') {
                 code += `@group(${group}) @binding(${bindingNum}) var<uniform> ${varName}: ${bind.resource};\n`;
             } 
             else if (resource.type === 'storage') {
-                // stateが'previous'の場合は強制的にread-onlyにする安全対策
                 let access = bind.access;
 
                 const isAtomic = resource.format && resource.format.includes('atomic');
@@ -190,9 +186,8 @@ export class WgslHeaderGenerator {
                 if (isAtomic) {
                     // WGSLの仕様上、atomicを含むバッファは必ず read_write
                     access = 'read_write';
-                } else if (!access) {
-                    // デフォルトのフォールバック (previousは安全のため強制read)
-                    access = (resource.access === 'read_write' && bind.state !== 'previous') ? 'read_write' : 'read';
+                } else if (access == undefined) {
+                    access = (resource.access != undefined ? resource.access : 'read');
                 }
                 code += `@group(${group}) @binding(${bindingNum}) var<storage, ${access}> ${varName}: array<${resource.format}>;\n`;
             }
@@ -224,8 +219,8 @@ export class GraphManager {
     
     // --- パフォーマンス最適化のためのキャッシュ ---
     private computePipelines: Map<string, GPUComputePipeline> = new Map();
-    // バインドグループはPing-Pongの状態によって変わるため、毎フレーム動的生成するか、
-    // 「NodeID + 現在のPingPongインデックス」をキーにしてキャッシュします。
+    // バインドグループはリングの現在インデックスと historyLevel ごとの参照先が変わるため、
+    // 「NodeID + 各ラップの currentIndex / historyLevel」をキーにしてキャッシュします。
     private bindGroupCache: Map<string, GPUBindGroup> = new Map();
 
     // --- レンダリング用プロパティ ---
@@ -335,7 +330,7 @@ export class GraphManager {
             const usage = this.resolveBufferUsage(def);
 
             const buffers: GPUBuffer[] = [];
-            const bufferCount = def.pingPong ? 2 : 1;
+            const bufferCount = def.bufferCount ?? 1;
 
             for (let i = 0; i < bufferCount; i++) {
                 buffers.push(this.device.createBuffer({
@@ -345,8 +340,8 @@ export class GraphManager {
                 }));
             }
 
-            this.resources.set(id, new ResourceWrapper(id, buffers, !!def.pingPong));
-            console.log(`Allocated resource [${id}]: ${byteSize} bytes ${def.pingPong ? '(Ping-Pong)' : ''}`);
+            this.resources.set(id, new ResourceWrapper(id, buffers, bufferCount));
+            console.log(`Allocated resource [${id}]: ${byteSize} bytes (bufferCount=${bufferCount})`);
         }
     }
 
@@ -406,7 +401,7 @@ export class GraphManager {
     public swapPingPongResources(resourceIds: string[]) {
         for (const id of resourceIds) {
             const res = this.resources.get(id);
-            if (res && res.isPingPong) {
+            if (res) {
                 res.swap();
             }
         }
@@ -626,12 +621,9 @@ export class GraphManager {
                 gpuResource = this.externalResources.get(bind.resource)!;
             } else {
                 const wrapper = this.resources.get(bind.resource)!;
-                
-                // 🌟 追加: Ping-Pongの「今どっちの面か(0 or 1)」をキャッシュキーに足す！
-                // (anyキャストを使ってprivateプロパティを強引に読みます)
-                cacheKey += `${wrapper.isPingPong ? (wrapper as any).currentIndex : 0}_`;
-                
-                gpuResource = { buffer: bind.state === 'previous' ? wrapper.getPreviousBuffer() : wrapper.getCurrentBuffer() };
+                const hl = bind.historyLevel ?? 0;
+                cacheKey += `${wrapper.currentIndex}_${hl}_`;
+                gpuResource = { buffer: wrapper.getBuffer(hl) };
             }
 
             return { binding: bind.binding, resource: gpuResource };
@@ -732,7 +724,7 @@ export class GraphManager {
 
             // WebGPUのキューに書き込み命令を積む (エンコーダーを介さず直接送信できるので超高速)
             this.device.queue.writeBuffer(
-                resource.getCurrentBuffer(), 
+                resource.getBuffer(0), 
                 0, 
                 arrayBuffer
             );
@@ -813,7 +805,7 @@ export class GraphManager {
         const wrapper = this.resources.get(resourceId);
         if (!wrapper) throw new Error(`Resource ${resourceId} not found for readback.`);
 
-        const srcBuffer = wrapper.getCurrentBuffer();
+        const srcBuffer = wrapper.getBuffer(0);
         const copySize = overrideByteSize || srcBuffer.size;
 
         // Staging Buffer が無ければ作成 (Lazy Creation)

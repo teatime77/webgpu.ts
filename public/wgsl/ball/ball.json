@@ -14,8 +14,8 @@
         "CameraParams": { "type": "uniform", "fields": { "viewProjection": "mat4x4<f32>", "view": "mat4x4<f32>" } },
         "BaseSphere": { "type": "storage", "format": "f32", "count": "$metadata.baseSphereFloatCount" }, 
         
-        "ParticlePos": { "type": "storage", "access":"read_write", "format": "vec4<f32>", "count": "$metadata.particleCount", "pingPong": true },
-        "ParticleVel": { "type": "storage", "access":"read_write", "format": "vec4<f32>", "count": "$metadata.particleCount", "pingPong": true },
+        "ParticlePos": { "type": "storage", "format": "vec4<f32>", "count": "$metadata.particleCount", "bufferCount": 2 },
+        "ParticleVel": { "type": "storage", "format": "vec4<f32>", "count": "$metadata.particleCount", "bufferCount": 2 },
         
         "MatCapTex": { "type": "texture" },
         "MatCapSampler": { "type": "sampler" }
@@ -28,8 +28,8 @@
             "shader": "init_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
             "bindings": [
-                { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "current", "varName": "posOut" },
-                { "group": 0, "binding": 1, "resource": "ParticleVel", "state": "current", "varName": "velOut" }
+                { "group": 0, "binding": 0, "resource": "ParticlePos", "historyLevel": 0, "varName": "posOut", "access": "read_write" },
+                { "group": 0, "binding": 1, "resource": "ParticleVel", "historyLevel": 0, "varName": "velOut", "access": "read_write" }
             ]
         }
         ,
@@ -39,10 +39,10 @@
             "shader": "update_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
             "bindings": [
-                { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "previous", "varName": "posIn" },
-                { "group": 0, "binding": 1, "resource": "ParticlePos", "state": "current",  "varName": "posOut" },
-                { "group": 0, "binding": 2, "resource": "ParticleVel", "state": "previous", "varName": "velIn" },
-                { "group": 0, "binding": 3, "resource": "ParticleVel", "state": "current",  "varName": "velOut" }
+                { "group": 0, "binding": 0, "resource": "ParticlePos", "historyLevel": 1, "varName": "posIn" },
+                { "group": 0, "binding": 1, "resource": "ParticlePos", "historyLevel": 0,  "varName": "posOut", "access": "read_write" },
+                { "group": 0, "binding": 2, "resource": "ParticleVel", "historyLevel": 1, "varName": "velIn" },
+                { "group": 0, "binding": 3, "resource": "ParticleVel", "historyLevel": 0,  "varName": "velOut", "access": "read_write" }
             ]
         }
         ,
@@ -55,7 +55,7 @@
             "bindings": [
                 { "group": 0, "binding": 0, "resource": "CameraParams", "varName": "camera" },
                 { "group": 0, "binding": 1, "resource": "BaseSphere" },
-                { "group": 0, "binding": 2, "resource": "ParticlePos", "state": "current", "access":"read" },
+                { "group": 0, "binding": 2, "resource": "ParticlePos" },
                 { "group": 0, "binding": 3, "resource": "MatCapTex" },
                 { "group": 0, "binding": 4, "resource": "MatCapSampler" }
             ],
