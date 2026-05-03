@@ -41,22 +41,26 @@ export interface BaseNodeDef {
 
 export interface ComputeNodeDef extends BaseNodeDef {
     type: 'compute';
-    dispatch: {
-        type: 'direct' | 'indirect';
-        // [X, Y, Z] の各次元でも "$metadata.maxParticles / 64" のような文字列を許容
-        workgroups: [number | string, number | string, number | string] | string;
-    };
+    dispatch:
+        | {
+              type: 'direct';
+              // [X, Y, Z] の各次元でも "$metadata.maxParticles / 64" のような文字列を許容
+              workgroups: [number | string, number | string, number | string] | string;
+          }
+        | { type: 'indirect'; buffer: string; offset?: number };
 }
 
 export interface RenderNodeDef extends BaseNodeDef {
     type: 'render';
     topology: 'point-list' | 'line-list' | 'triangle-list';
     depthTest?: boolean; // 追加: 深度テストの有無
-    draw: {              // 追加: 描画コマンドの定義
-        type: 'direct' | 'indirect';
-        vertexCount: string | number;
-        instanceCount?: string | number;
-    };
+    draw:
+        | {
+              type: 'direct';
+              vertexCount: string | number;
+              instanceCount?: string | number;
+          }
+        | { type: 'indirect'; buffer: string; offset?: number };
 }
 
 export type NodeDef = ComputeNodeDef | RenderNodeDef;
@@ -598,7 +602,12 @@ export class GraphManager {
             const z = this.evaluateExpression(workgroups[2] || 1);
             pass.dispatchWorkgroups(x, y, z);
         } else if (nodeDef.dispatch.type === 'indirect') {
-            // (オプション) 間接ディスパッチの実装
+            const wrapper = this.resources.get(nodeDef.dispatch.buffer);
+            if (!wrapper) {
+                throw new Error(`Indirect dispatch buffer resource "${nodeDef.dispatch.buffer}" not found for node ${nodeId}.`);
+            }
+            const indirectBuffer = wrapper.getBuffer(0);
+            pass.dispatchWorkgroupsIndirect(indirectBuffer, nodeDef.dispatch.offset || 0);
         }
 
         pass.end();
@@ -778,9 +787,27 @@ export class GraphManager {
             const instanceCount = this.evaluateExpression(nodeDef.draw.instanceCount || 1);
             pass.draw(vertexCount, instanceCount, 0, 0);
         } else if (nodeDef.draw.type === 'indirect') {
-             // 間接描画 (GPU-Driven Rendering) の実装
-             // pass.drawIndirect(...)
+            const wrapper = this.resources.get(nodeDef.draw.buffer);
+            if (!wrapper) {
+                throw new Error(`Indirect draw buffer resource "${nodeDef.draw.buffer}" not found for node ${nodeId}.`);
+            }
+            const indirectBuffer = wrapper.getBuffer(0);
+            const byteOffset = nodeDef.draw.offset || 0;
+            if (this.renderPipelineUsesIndexedDraw(pipeline)) {
+                pass.drawIndexedIndirect(indirectBuffer, byteOffset);
+            } else {
+                pass.drawIndirect(indirectBuffer, byteOffset);
+            }
         }
+    }
+
+    /**
+     * 間接描画が drawIndexedIndirect か drawIndirect か。
+     * WebGPU ではインデックス形式はパス上の setIndexBuffer で決まり GPURenderPipeline には載らないため、
+     * インデックス付きレンダーを組み込む際はこの判定を実データに合わせて更新する。
+     */
+    private renderPipelineUsesIndexedDraw(_pipeline: GPURenderPipeline): boolean {
+        return false;
     }
 
     // ========================================================================
