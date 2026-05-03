@@ -36,14 +36,6 @@ let animationId: number | null = null;
 // ※ 上部に sphereSchema と wgslCodes が定義されている前提です。
 
 export async function initControl(schemaName : string) {
-    // --- (HMR二重起動防止処理などそのまま) ---
-    if ((window as any).isSimulationRunning) {
-        if ((window as any).currentAnimationId) {
-            cancelAnimationFrame((window as any).currentAnimationId);
-        }
-    }
-    (window as any).isSimulationRunning = true;
-
     // 1. WebGPUデバイスとCanvasの取得
     const adapter = await navigator.gpu.requestAdapter();
     const device = await adapter!.requestDevice();
@@ -79,7 +71,9 @@ export async function initControl(schemaName : string) {
     });
 
     // ② エンジンのインスタンス化とコンテキスト設定
-    const engine = new GraphManager(device);
+    const engine = new GraphManager(device, schemaName);
+    await engine.initGraphManager();
+    
     engine.setContext(context, format, canvas.width, canvas.height);
 
     // ③ 外部リソース（テクスチャ）をエンジンに登録

@@ -98,6 +98,7 @@ var KeywordMap : string[] = [
     "for",
     "of",
     "parallel",
+    "yield",
 
     "@group",
     "@binding",

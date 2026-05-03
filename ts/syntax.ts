@@ -197,6 +197,10 @@ export abstract class AbstractSyntaxNode {
     ancestorBlocks() : BlockStatement[] {
         return this.ancestors().filter(x => x instanceof BlockStatement);
     }
+
+    nest() : number {
+        return this.ancestors().length;
+    }
 }
 
 export abstract class Type extends AbstractSyntaxNode {
@@ -836,6 +840,16 @@ export class ReturnStatement extends Statement {
     }
 }
 
+export class YieldStatement extends Statement {
+    getAll(alls: AbstractSyntaxNode[]) : void{     
+        alls.push(this);
+    }
+
+    toString() : string {
+        return "yield;";
+    }
+}
+
 export class BlockStatement extends Statement {
     statements : Statement[];
 
@@ -867,7 +881,8 @@ export class BlockStatement extends Statement {
     }
 
     toString() : string {
-        const s1 = this.statements.map(x => `${x}`).join("\n") + "\n";
+        const tab = "    ".repeat(this.nest());
+        const s1 = this.statements.map(x => `${tab}${x}`).join("\n") + "\n";
 
         return `{\n${s1}}\n`;
     }

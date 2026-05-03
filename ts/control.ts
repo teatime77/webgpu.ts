@@ -2,7 +2,13 @@
 // 1. 型定義 (Types & Interfaces)
 // ============================================================================
 
+import { assert, fetchText, msg, MyError } from "@i18n";
+import { Context, Parser } from "./parser";
+import { lexicalAnalysis, TokenType } from "./lex";
+import { App, BlockStatement, CallStatement, RefVar, setParentSub, Statement, WhileStatement, YieldStatement } from "./syntax";
+
 export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
+export type GenType    = NodeDef | CallStatement | YieldStatement;
 
 export interface MetaData {
     [key: string]: number | string | boolean | number[]; 
@@ -27,9 +33,9 @@ export interface BindingDefinition {
 }
 
 export interface BaseNodeDef {
+    id : string,
     type: 'compute' | 'render' | 'reduction' | 'readback';
     shader: string;
-    dependencies?: string[];
     bindings: BindingDefinition[];
 }
 
@@ -66,11 +72,7 @@ export interface SimulationSchema {
     version: string;
     metadata: MetaData;
     resources: Record<string, ResourceDef>;
-    nodes: Record<string, NodeDef>;
-    stateMachine: {
-        initialState: string;
-        states: Record<string, StateDef>;
-    };
+    nodes: NodeDef[];
 }
 
 // 型定義の追加
@@ -79,6 +81,12 @@ interface UniformLayoutInfo {
     offsets: Record<string, { byteOffset: number; format: string }>;
 }
 
+function getNodeById(nodes: NodeDef[], id : string) : NodeDef {
+    const node = nodes.find(x => x.id == id)!;
+    assert(node != undefined);
+
+    return node;
+}
 
 // ============================================================================
 // 2. リソース管理ラッパー (ResourceWrapper)
@@ -123,7 +131,7 @@ export class WgslHeaderGenerator {
     
     /** 特定のノード用のWGSL宣言部を自動生成する */
     public static generateForNode(schema: SimulationSchema, nodeId: string): string {
-        const node = schema.nodes[nodeId];
+        const node = getNodeById(schema.nodes, nodeId);
         if (!node) throw new Error(`Node ${nodeId} not found.`);
 
         let header = `// ==========================================\n`;
@@ -203,11 +211,11 @@ export class WgslHeaderGenerator {
 
 export class GraphManager {
     private device: GPUDevice;
+    private schemaName : string;
     public schema!: SimulationSchema;
+    private script : BlockStatement | undefined;
+    private scriptGen : Generator<GenType> | undefined;
     public resources: Map<string, ResourceWrapper> = new Map();
-
-    // --- 実行制御用の状態 ---
-    private currentStateId: string = '';
 
     // Uniformバッファのレイアウト設計図をキャッシュする
     private uniformLayouts: Map<string, UniformLayoutInfo> = new Map();
@@ -236,8 +244,74 @@ export class GraphManager {
 
     private externalResources: Map<string, GPUBindingResource> = new Map();
 
-    constructor(device: GPUDevice) {
+    constructor(device: GPUDevice, schemaName : string) {
         this.device = device;
+        this.schemaName = schemaName;
+    }
+
+    async parseSchemaScript(){
+        const jsText = await fetchText(`./wgsl/${this.schemaName}/${this.schemaName}.js`);
+        const tokens = lexicalAnalysis(jsText);
+        const parser = new Parser(tokens, 0);
+
+        const ctx = Context.unknown;
+        const statements : Statement[] = [];
+        while (!parser.isEoT()) {
+            const statement = parser.parseStatement(ctx);
+            statements.push(statement);
+        }
+
+        this.script = new BlockStatement(statements);
+        setParentSub(this.script, this.script.statements);
+        this.scriptGen = this.exec(this.script);
+    }
+
+    *exec(stmt : Statement) : Generator<GenType> {
+        if(stmt instanceof CallStatement){
+            const app = stmt.app;
+            const fncName = app.fncName;
+            if(fncName == "swapPingPong"){
+
+                assert(app.args.every(x => x instanceof RefVar));
+                const varNames = app.args.map(x => (x as RefVar).name);
+                // msg(`ping-pong:${varNames.join(", ")}`);
+                yield stmt;
+            }
+            else{
+
+                const node = getNodeById(this.schema.nodes, fncName);
+                if(node == undefined){
+                    throw new MyError();
+                }
+
+                // msg(`gen:call ${fncName} node:${node}`);
+                yield node;
+            }
+        }
+        else if(stmt instanceof YieldStatement){
+            // msg("gen:yield");
+            yield stmt;
+        }
+        else if(stmt instanceof BlockStatement){
+            // msg("gen:block");
+            for(const child of stmt.statements){
+                yield* this.exec(child);
+            }
+        }
+        else if(stmt instanceof WhileStatement){
+            // msg("gen:while");
+            assert(stmt.condition instanceof RefVar && stmt.condition.name == "true");
+            while(true){
+                yield* this.exec(stmt.block);
+            }
+        }
+        else{
+            throw new MyError();
+        }
+    }
+
+    async initGraphManager(){
+        await this.parseSchemaScript();
     }
 
     public setExternalResource(id: string, resource: GPUBindingResource) {
@@ -346,9 +420,9 @@ export class GraphManager {
      */
     public async compilePipelines(wgslCodes: Record<string, string>) {
         console.log("Compiling pipelines...");
-        this.currentStateId = this.schema.stateMachine.initialState;
 
-        for (const [nodeId, nodeDef] of Object.entries(this.schema.nodes)) {
+        for (const nodeDef of this.schema.nodes) {
+            const nodeId = nodeDef.id;
             // --- 共通: シェーダモジュールの作成 ---
             const header = WgslHeaderGenerator.generateForNode(this.schema, nodeId);
             const fullCode = header + (wgslCodes[nodeDef.shader] || '');
@@ -397,61 +471,73 @@ export class GraphManager {
         console.log("All pipelines compiled successfully.");
     }
 
-    // GraphManager クラス内の任意の場所に追加
-    public getCurrentStateId(): string {
-        return this.currentStateId;
+    execNode(encoder: GPUCommandEncoder, renderPass: GPURenderPassEncoder | null, nodeId : string, nodeDef : NodeDef) : GPURenderPassEncoder | null{            
+        if (nodeDef.type === 'compute') {
+            if (renderPass) {
+                renderPass.end();
+                renderPass = null;
+            }
+            this.encodeComputeNode(encoder, nodeId, nodeDef as ComputeNodeDef);
+        } 
+        else if (nodeDef.type === 'render') {
+            const renderNode = nodeDef as RenderNodeDef; // 型を確定させる
+
+            // レンダーパスの遅延初期化
+            if (!renderPass && this.canvasContext) {
+                const textureView = this.canvasContext.getCurrentTexture().createView();
+                
+                // 🚨 修正: 現在のノードが depthTest を要求しているかチェック
+                const useDepth = renderNode.depthTest === true && this.depthTextureView !== null;
+
+                renderPass = encoder.beginRenderPass({
+                    label: `RenderPass_${nodeId}`,
+                    colorAttachments: [{
+                        view: textureView,
+                        clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
+                        loadOp: 'clear',
+                        storeOp: 'store',
+                    }],
+                    // 🚨 修正: 要求されている場合のみデプスバッファをアタッチする
+                    depthStencilAttachment: useDepth ? {
+                        view: this.depthTextureView!,
+                        depthClearValue: 1.0,
+                        depthLoadOp: 'clear',
+                        depthStoreOp: 'store',
+                    } : undefined
+                });
+            }
+            
+            if (renderPass) {
+                this.encodeRenderNode(renderPass, nodeId, renderNode);
+            }
+        }
+
+        return renderPass;
     }
 
     // ========================================================================
     // 2. 実行フェーズ (Execution Loop)
     // ========================================================================
     public step() {
-        const stateDef = this.schema.stateMachine.states[this.currentStateId];
-        if (!stateDef) throw new Error(`State ${this.currentStateId} not found.`);
-
-        const encoder = this.device.createCommandEncoder({ label: `Encoder_${this.currentStateId}` });
+        const encoder = this.device.createCommandEncoder();
         let renderPass: GPURenderPassEncoder | null = null;
 
-        for (const nodeId of stateDef.execute) {
-            const nodeDef = this.schema.nodes[nodeId];
-            
-            if (nodeDef.type === 'compute') {
-                if (renderPass) {
-                    renderPass.end();
-                    renderPass = null;
+        let result: IteratorResult<GenType, any> | undefined;
+        if(this.scriptGen != undefined){
+            while(true){
+                result = this.scriptGen.next();
+                if(result.done){
+                    this.scriptGen = undefined;
+                    msg("generator completed.");
+                    break;
                 }
-                this.encodeComputeNode(encoder, nodeId, nodeDef as ComputeNodeDef);
-            } 
-            else if (nodeDef.type === 'render') {
-                const renderNode = nodeDef as RenderNodeDef; // 型を確定させる
-
-                // レンダーパスの遅延初期化
-                if (!renderPass && this.canvasContext) {
-                    const textureView = this.canvasContext.getCurrentTexture().createView();
-                    
-                    // 🚨 修正: 現在のノードが depthTest を要求しているかチェック
-                    const useDepth = renderNode.depthTest === true && this.depthTextureView !== null;
-
-                    renderPass = encoder.beginRenderPass({
-                        label: `RenderPass_${this.currentStateId}`,
-                        colorAttachments: [{
-                            view: textureView,
-                            clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
-                            loadOp: 'clear',
-                            storeOp: 'store',
-                        }],
-                        // 🚨 修正: 要求されている場合のみデプスバッファをアタッチする
-                        depthStencilAttachment: useDepth ? {
-                            view: this.depthTextureView!,
-                            depthClearValue: 1.0,
-                            depthLoadOp: 'clear',
-                            depthStoreOp: 'store',
-                        } : undefined
-                    });
+                if(result.value instanceof CallStatement || result.value instanceof YieldStatement){
+                    break;
                 }
-                
-                if (renderPass) {
-                    this.encodeRenderNode(renderPass, nodeId, renderNode);
+                else{
+
+                    const nodeDef = result.value;
+                    renderPass = this.execNode(encoder, renderPass, nodeDef.id, nodeDef);
                 }
             }
         }
@@ -476,17 +562,20 @@ export class GraphManager {
             this.processAsyncMapping(rb);
         }
 
-        // 5. ステート終了時のアクション (Ping-Pongバッファのスワップ等)
-        if (stateDef.onExit) {
-            for (const action of stateDef.onExit) {
-                if (action.action === 'swapPingPong') {
-                    this.swapPingPongResources(action.resources);
-                }
+        if(result != undefined){
+            if(result.value instanceof CallStatement){
+                const app = result.value.app;
+                assert(app.args.every(x => x instanceof RefVar));
+                const varNames = app.args.map(x => (x as RefVar).name);
+                this.swapPingPongResources(varNames);
             }
-        }
+            else{
+                throw new MyError();
+            }
 
-        // 6. トランジション(条件分岐)の評価とステート移行
-        this.evaluateTransitions(stateDef.transitions);
+            result = this.scriptGen!.next();
+            assert(result.value instanceof YieldStatement);
+        }
     }
 
     // ========================================================================
@@ -559,27 +648,6 @@ export class GraphManager {
 
         this.bindGroupCache.set(cacheKey, bindGroup);
         return bindGroup;
-    }
-
-
-    // ========================================================================
-    // 4. ステートマシンの遷移評価
-    // ========================================================================
-
-    private evaluateTransitions(transitions: { condition: string; target: string }[]) {
-        for (const trans of transitions) {
-            if (trans.condition === 'true' || trans.condition === 'default') {
-                this.currentStateId = trans.target;
-                return;
-            }
-            
-            // 例: "current_md_step < md_steps" などの評価
-            const conditionMet = this.evaluateExpression(trans.condition) as unknown as boolean;
-            if (conditionMet) {
-                this.currentStateId = trans.target;
-                return;
-            }
-        }
     }
 
     // ========================================================================

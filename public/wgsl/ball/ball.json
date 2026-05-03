@@ -21,8 +21,9 @@
         "MatCapSampler": { "type": "sampler" }
     },
 
-    "nodes": {
-        "InitParticles": {
+    "nodes": [
+        {
+            "id" : "InitParticles",
             "type": "compute",
             "shader": "init_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -30,8 +31,10 @@
                 { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "current", "varName": "posOut" },
                 { "group": 0, "binding": 1, "resource": "ParticleVel", "state": "current", "varName": "velOut" }
             ]
-        },
-        "UpdateParticles": {
+        }
+        ,
+        {
+            "id" : "UpdateParticles",
             "type": "compute",
             "shader": "update_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -41,8 +44,10 @@
                 { "group": 0, "binding": 2, "resource": "ParticleVel", "state": "previous", "varName": "velIn" },
                 { "group": 0, "binding": 3, "resource": "ParticleVel", "state": "current",  "varName": "velOut" }
             ]
-        },
-        "RenderParticles": {
+        }
+        ,
+        {
+            "id" : "RenderParticles",
             "type": "render",
             "shader": "matcap_spheres",
             "topology": "triangle-list",
@@ -56,21 +61,5 @@
             ],
             "draw": { "type": "direct", "vertexCount": "$metadata.baseSphereVertexCount", "instanceCount": "$metadata.particleCount" }
         }
-    },
-
-    "stateMachine": {
-        "initialState": "State_Initialize",
-        "states": {
-            "State_Initialize": {
-                "execute": ["InitParticles", "RenderParticles"],
-                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
-                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
-            },
-            "State_Simulate": {
-                "execute": ["UpdateParticles", "RenderParticles"],
-                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
-                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
-            }
-        }
-    }
+    ]
 }

@@ -24,8 +24,9 @@
         "MatCapSampler": { "type": "sampler" }
     },
 
-    "nodes": {
-        "InitParticles": {
+    "nodes": [
+        {
+            "id": "InitParticles",
             "type": "compute",
             "shader": "init_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -33,8 +34,10 @@
                 { "group": 0, "binding": 0, "resource": "ParticlePos", "state": "current", "varName": "posOut" },
                 { "group": 0, "binding": 1, "resource": "ParticleVel", "state": "current", "varName": "velOut" }
             ]
-        },
-        "UpdateParticles": {
+        }
+        ,
+        {
+            "id": "UpdateParticles",
             "type": "compute",
             "shader": "update_particles",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -44,16 +47,20 @@
                 { "group": 0, "binding": 2, "resource": "ParticleVel", "state": "previous", "varName": "velIn", "access": "read" },
                 { "group": 0, "binding": 3, "resource": "ParticleVel", "state": "current",  "varName": "velOut", "access": "read_write" } 
             ]
-        },
-        "ClearGrid": {
+        }
+        ,
+        {
+            "id": "ClearGrid",
             "type": "compute",
             "shader": "clear_grid",
             "dispatch": { "type": "direct", "workgroups": ["4096 / 64", 1, 1] },
             "bindings": [
                 { "group": 0, "binding": 0, "resource": "GridCounts", "varName": "gridCounts", "access": "read_write" }
             ]
-        },
-        "BuildGrid": {
+        }
+        ,
+        {
+            "id": "BuildGrid",
             "type": "compute",
             "shader": "build_grid",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -62,8 +69,10 @@
                 { "group": 0, "binding": 1, "resource": "GridCounts", "varName": "gridCounts", "access": "read_write" },
                 { "group": 0, "binding": 2, "resource": "GridCells", "varName": "gridCells", "access": "read_write" }
             ]
-        },
-        "ResolveCollisions": {
+        }
+        ,
+        {
+            "id": "ResolveCollisions",
             "type": "compute",
             "shader": "resolve_collisions",
             "dispatch": { "type": "direct", "workgroups": ["$metadata.particleCount / 64", 1, 1] },
@@ -73,8 +82,10 @@
                 { "group": 0, "binding": 2, "resource": "GridCounts", "varName": "gridCounts", "access": "read_write" },
                 { "group": 0, "binding": 3, "resource": "GridCells", "varName": "gridCells", "access": "read" }
             ]
-        },
-        "RenderParticles": {
+        }
+        ,
+        {
+            "id": "RenderParticles",
             "type": "render",
             "shader": "matcap_spheres",
             "topology": "triangle-list",
@@ -88,27 +99,5 @@
             ],
             "draw": { "type": "direct", "vertexCount": "$metadata.baseSphereVertexCount", "instanceCount": "$metadata.particleCount" }
         }
-    },
-
-    "stateMachine": {
-        "initialState": "State_Initialize",
-        "states": {
-            "State_Initialize": {
-                "execute": ["InitParticles", "RenderParticles"],
-                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
-                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
-            },
-            "State_Simulate": {
-                "execute": [
-                    "UpdateParticles", 
-                    "ClearGrid", 
-                    "BuildGrid", 
-                    "ResolveCollisions", 
-                    "RenderParticles"
-                ],
-                "onExit": [{ "action": "swapPingPong", "resources": ["ParticlePos", "ParticleVel"] }],
-                "transitions": [{ "condition": "true", "target": "State_Simulate" }]
-            }
-        }
-    }
+    ]
 }

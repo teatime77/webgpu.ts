@@ -1,7 +1,7 @@
 import { assert, msg, MyError  } from "@i18n";
 import { error } from "./util.js";
 import { Token, TokenSubType, TokenType } from "./lex.js";
-import { Modifier, Struct, Type, Variable, Fn, Field, BufferUsage, ShaderType, BufferReadWrite, SimpleType, ArrayType, Domain, RefVar, App, Term, indexOpr, ConstNum, Str, ReturnStatement, isAssignmentToken, BlockStatement, Statement, IfStatement, WhileStatement, ForStatement, ParallelStatement, VariableDeclaration, CallStatement, Module } from "./syntax"
+import { Modifier, Struct, Type, Variable, Fn, Field, BufferUsage, ShaderType, BufferReadWrite, SimpleType, ArrayType, Domain, RefVar, App, Term, indexOpr, ConstNum, Str, ReturnStatement, isAssignmentToken, BlockStatement, Statement, IfStatement, WhileStatement, ForStatement, ParallelStatement, VariableDeclaration, CallStatement, Module, YieldStatement } from "./syntax"
 
 function operator(opr : string) : RefVar {
     return new RefVar(opr);
@@ -764,6 +764,13 @@ export class Parser {
         return new ReturnStatement(value);
     }
 
+    parseYield(ctx : Context) : YieldStatement {
+        this.nextToken("yield");
+        this.nextToken(";");
+
+        return new YieldStatement();
+    }
+
     parseAssignment(ctx : Context) : App {
         const trm1 = this.PrimaryExpression(ctx);
 
@@ -888,6 +895,9 @@ export class Parser {
         }
         else if(this.token.text == "return"){
             return this.parseReturn(ctx);
+        }
+        else if(this.token.text == "yield"){
+            return this.parseYield(ctx);
         }
         else if(this.token.text == "if"){
             return this.parseIf(ctx);
