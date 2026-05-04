@@ -18,7 +18,7 @@ export interface ResourceDef {
     type: 'storage' | 'uniform' | 'indirect' | 'texture' | 'sampler';
     access?: 'read' | 'read_write';
     /** Storage 等では WGSL 要素型。`type: 'texture'` のときは GPUTextureFormat 相当の文字列（省略時は `rgba8unorm`）。 */
-    format?: WgslFormat | string;
+    format?: WgslFormat;
     count?: string | number;
     bufferCount?: number;
     fields?: Record<string, string>;
@@ -189,7 +189,7 @@ export class WgslHeaderGenerator {
                 if (generatedStructs.has(bind.resource)) continue;
                 generatedStructs.add(bind.resource);
 
-                code += `struct ${bind.resource} {\n`;
+                code += `struct ${bind.resource}Struct {\n`;
                 for (const [fieldName, fieldType] of Object.entries(resource.fields)) {
                     code += `    ${fieldName}: ${fieldType},\n`;
                 }
@@ -210,7 +210,7 @@ export class WgslHeaderGenerator {
             let varName = bind.varName || bind.resource;
 
             if (resource.type === 'uniform') {
-                code += `@group(${group}) @binding(${bindingNum}) var<uniform> ${varName}: ${bind.resource};\n`;
+                code += `@group(${group}) @binding(${bindingNum}) var<uniform> ${varName}: ${bind.resource}Struct;\n`;
             } 
             else if (resource.type === 'storage') {
                 let access = bind.access;
@@ -669,12 +669,9 @@ export class GraphManager {
                 assert(app.args.every(x => x instanceof RefVar));
                 const varNames = app.args.map(x => (x as RefVar).name);
                 this.swapPingPongResources(varNames);
-            }
-            else{
-                throw new MyError();
+                result = this.scriptGen!.next();
             }
 
-            result = this.scriptGen!.next();
             assert(result.value instanceof YieldStatement);
         }
     }
