@@ -815,6 +815,93 @@ export function makeArrow(compute  : ComputePipeline, shape : ShapeInfo) : Compu
     return [ disc1, tube, disc2, cone ];
 }
 
+export function makeArrowMesh(shape: ShapeInfo): Float32Array {
+    const radialSegments = shape.numDivision ?? 16;
+    const shaftRadius = 0.01;  // 0.05 -> 0.01 に細く
+    const headRadius = 0.03;   // 0.15 -> 0.03 に細く
+    const headLength = 0.05;   // 0.20 -> 0.05 に短く
+
+    
+    // 1. Shaft side (radialSegments * 2 triangles)
+    // 2. Head base (radialSegments triangles)
+    // 3. Head side (radialSegments triangles)
+    // Total triangles = radialSegments * 4
+    // Total vertices = radialSegments * 12
+    const vertexCount = radialSegments * 12;
+    const vertexArray = new Float32Array(vertexCount * 6);
+    
+    let idx = 0;
+    
+    function pushVertex(x: number, y: number, z: number, nx: number, ny: number, nz: number) {
+        vertexArray[idx++] = x;
+        vertexArray[idx++] = y;
+        vertexArray[idx++] = z;
+        vertexArray[idx++] = nx;
+        vertexArray[idx++] = ny;
+        vertexArray[idx++] = nz;
+    }
+    
+    for (let i = 0; i < radialSegments; i++) {
+        const theta1 = (i * 2 * Math.PI) / radialSegments;
+        const theta2 = ((i + 1) * 2 * Math.PI) / radialSegments;
+        
+        const cos1 = Math.cos(theta1);
+        const sin1 = Math.sin(theta1);
+        const cos2 = Math.cos(theta2);
+        const sin2 = Math.sin(theta2);
+        
+        // --- 1. Shaft side ---
+        pushVertex(cos1 * shaftRadius, 0.0, sin1 * shaftRadius, cos1, 0, sin1);
+        pushVertex(cos2 * shaftRadius, 0.0, sin2 * shaftRadius, cos2, 0, sin2);
+        pushVertex(cos1 * shaftRadius, 1.0, sin1 * shaftRadius, cos1, 0, sin1);
+        
+        pushVertex(cos1 * shaftRadius, 1.0, sin1 * shaftRadius, cos1, 0, sin1);
+        pushVertex(cos2 * shaftRadius, 0.0, sin2 * shaftRadius, cos2, 0, sin2);
+        pushVertex(cos2 * shaftRadius, 1.0, sin2 * shaftRadius, cos2, 0, sin2);
+        
+        // --- 2. Head base ---
+        pushVertex(0, 1.0, 0, 0, -1, 0);
+        pushVertex(cos2 * headRadius, 1.0, sin2 * headRadius, 0, -1, 0);
+        pushVertex(cos1 * headRadius, 1.0, sin1 * headRadius, 0, -1, 0);
+        
+        // --- 3. Head side ---
+        const slant = Math.sqrt(headRadius * headRadius + headLength * headLength);
+        const ny = headRadius / slant;
+        const nx1 = cos1 * headLength / slant;
+        const nz1 = sin1 * headLength / slant;
+        const nx2 = cos2 * headLength / slant;
+        const nz2 = sin2 * headLength / slant;
+        
+        pushVertex(cos1 * headRadius, 1.0, sin1 * headRadius, nx1, ny, nz1);
+        pushVertex(cos2 * headRadius, 1.0, sin2 * headRadius, nx2, ny, nz2);
+        
+        const nx_mid = (nx1 + nx2) / 2;
+        const nz_mid = (nz1 + nz2) / 2;
+        const len_mid = Math.sqrt(nx_mid*nx_mid + ny*ny + nz_mid*nz_mid);
+        pushVertex(0, 1.0 + headLength, 0, nx_mid/len_mid, ny/len_mid, nz_mid/len_mid);
+    }
+    
+    if(shape.scale != undefined){
+        const [sx, sy, sz] = shape.scale;
+        for(let i = 0; i < vertexArray.length; i +=6 ){
+            vertexArray[i    ] *= sx;
+            vertexArray[i + 1] *= sy;
+            vertexArray[i + 2] *= sz;
+        }
+    }
+
+    if(shape.position != undefined){
+        const [dx, dy, dz] = shape.position;
+        for(let i = 0; i < vertexArray.length; i +=6 ){
+            vertexArray[i    ] += dx;
+            vertexArray[i + 1] += dy;
+            vertexArray[i + 2] += dz;
+        }
+    }
+
+    return vertexArray;
+}
+
 export function makeGeodesicPolyhedron(shape : ShapeInfo) : Float32Array {
     // Use the subdivision level from shape.divideCount, with a fallback to 2.
     const divide_cnt = shape.divideCount ?? 2;

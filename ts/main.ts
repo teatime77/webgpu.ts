@@ -28,7 +28,7 @@ async function loadShaders(url: string): Promise<Record<string, string>> {
 
 import { GraphManager } from './control';
 import { ShapeInfo } from './package';
-import { makeGeodesicPolyhedron } from './primitive';
+import { makeGeodesicPolyhedron, makeArrowMesh } from './primitive';
 
 // ホットリロード(HMR)時の二重起動を防ぐためのグローバル変数
 let animationId: number | null = null;
@@ -81,22 +81,32 @@ export async function initControl(schemaName : string) {
     engine.setExternalResource('MatCapSampler', sampler);
 
     // 🌟 修正: スキーマをロードする【前】に実際の頂点データを生成し、メタデータを書き換える
-    // ⑤ GeodesicPolyhedron の頂点データを BaseSphere バッファに書き込む
     const sphereVertices = makeGeodesicPolyhedron({divideCount : 3} as ShapeInfo);
+    const arrowVertices = makeArrowMesh({numDivision: 16} as ShapeInfo);
     
-    const sphereSchema = await fetchJson(`./wgsl/${schemaName}/${schemaName}.json`) as SimulationSchema;
+    const schema = await fetchJson(`./wgsl/${schemaName}/${schemaName}.json`) as SimulationSchema;
 
-    sphereSchema.metadata.baseSphereFloatCount = sphereVertices.length;
-    sphereSchema.metadata.baseSphereVertexCount = sphereVertices.length / 6; // x,y,z,nx,ny,nz
+    schema.metadata.baseSphereFloatCount = sphereVertices.length;
+    schema.metadata.baseSphereVertexCount = sphereVertices.length / 6; // x,y,z,nx,ny,nz
+
+    schema.metadata.baseArrowFloatCount = arrowVertices.length;
+    schema.metadata.baseArrowVertexCount = arrowVertices.length / 6;
 
     // ④ スキーマのロード（ここでバッファが確保される）
-    engine.loadSchema(sphereSchema); // 🚨 gameOfLifeSchema から変更！
+    engine.loadSchema(schema);
 
     if(engine.resources.has('BaseSphere')){
         device.queue.writeBuffer(
             engine.resources.get('BaseSphere')!.getBuffer(0), 
             0, 
             sphereVertices
+        );
+    }
+    if(engine.resources.has('BaseArrow')){
+        device.queue.writeBuffer(
+            engine.resources.get('BaseArrow')!.getBuffer(0), 
+            0, 
+            arrowVertices
         );
     }
 
@@ -137,6 +147,7 @@ export async function initControl(schemaName : string) {
 
         // 3. エンジンのメタデータ(GPUのUniformバッファ)を更新
         engine.updateVariables({
+            time: performance.now() / 1000.0,
             viewProjection: matrices.viewProjection as number[],
             view: matrices.view
         });

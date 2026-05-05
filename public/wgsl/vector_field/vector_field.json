@@ -1,0 +1,73 @@
+{
+    "name": "vector_field",
+    "version": "1.0",
+    "metadata": {
+        "gridWidth": 20,
+        "gridHeight": 20,
+        "time": 0.0,
+        "baseArrowFloatCount": 0,
+        "baseArrowVertexCount": 0
+    },
+    "resources": {
+        "Params": {
+            "type": "uniform",
+            "fields": {
+                "gridWidth": "f32",
+                "gridHeight": "f32",
+                "time": "f32"
+            }
+        },
+        "Camera": {
+            "type": "uniform",
+            "fields": {
+                "viewProjection": "mat4x4<f32>",
+                "view": "mat4x4<f32>"
+            }
+        },
+        "VectorFieldData": {
+            "type": "storage",
+            "access": "read_write",
+            "format": "vec4<f32>",
+            "count": "$metadata.gridWidth * $metadata.gridHeight" 
+        },
+        "BaseArrow": {
+            "type": "storage",
+            "access": "read",
+            "format": "f32",
+            "count": "$metadata.baseArrowFloatCount"
+        }
+    },
+    "nodes": [
+        {
+            "id": "compute_vector_field",
+            "type": "compute",
+            "shader": "compute_vector_field",
+            "dispatch": {
+                "type": "direct",
+                "workgroups": ["$metadata.gridWidth / 8 + 1", "$metadata.gridHeight / 8 + 1", 1]
+            },
+            "bindings": [
+                { "binding": 0, "resource": "Params" },
+                { "binding": 1, "resource": "VectorFieldData" }
+            ]
+        },
+        {
+            "id": "render_vector_field",
+            "type": "render",
+            "shader": "render_vector_field",
+            "topology": "triangle-list",
+            "depthTest": true,
+            "draw": {
+                "type": "direct",
+                "vertexCount": "$metadata.baseArrowVertexCount",
+                "instanceCount": "$metadata.gridWidth * $metadata.gridHeight"
+            },
+            "bindings": [
+                { "binding": 0, "resource": "Params" },
+                { "binding": 1, "resource": "Camera" },
+                { "binding": 2, "resource": "VectorFieldData", "access": "read" },
+                { "binding": 3, "resource": "BaseArrow", "access": "read" }
+            ]
+        }
+    ]
+}
