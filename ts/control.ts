@@ -5,7 +5,7 @@
 import { assert, fetchText, msg, MyError } from "@i18n";
 import { Context, Parser } from "./parser";
 import { lexicalAnalysis, TokenType } from "./lex";
-import { App, BlockStatement, CallStatement, RefVar, setParentSub, Statement, WhileStatement, ForStatement, YieldStatement, ConstNum } from "./syntax";
+import { App, BlockStatement, CallStatement, ConstNum, ForStatement, RefVar, setParentSub, Statement, Term, WhileStatement, YieldStatement } from "./syntax";
 
 export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
 export type GenType    = NodeDef | CallStatement | YieldStatement;
@@ -383,8 +383,106 @@ export class GraphManager {
     public loadSchema(schema: SimulationSchema) {
         console.log(`Loading Simulation: ${schema.name} (v${schema.version})`);
         this.schema = schema;
+        this.resolveMetaExpressions(); // 文字列メタデータを式として評価
         this.buildUniformLayouts(); // アロケーションの前にレイアウトを計算
         this.allocateResources(schema.resources);
+    }
+
+    // ========================================================================
+    // メタデータ式の評価 (JSON metadata expressions)
+    //
+    // metadata の値が文字列の場合は式として評価し、評価結果（数値または数値配列）
+    // で置き換える。`Object.keys` の順序は JSON の挿入順と一致するので、
+    // JSON 内で依存元 → 依存先の順に並べておけば一回のパスで解決できる。
+    // ========================================================================
+
+    private resolveMetaExpressions() {
+        for (const k of Object.keys(this.schema.metadata)) {
+            const v = this.schema.metadata[k];
+            if (typeof v === 'string') {
+                this.schema.metadata[k] = this.evaluateMetaExpr(v);
+            }
+        }
+    }
+
+    private evaluateMetaExpr(expr: string): number | number[] {
+        const tokens = lexicalAnalysis(expr);
+        const parser = new Parser(tokens, 0);
+        const ast = parser.LogicalExpression(Context.unknown);
+        return this.evalTerm(ast);
+    }
+
+    private evalTerm(t: Term): number | number[] {
+        if (t instanceof ConstNum) {
+            return t.sign * t.value;
+        }
+        if (t instanceof RefVar) {
+            const v = this.schema.metadata[t.name];
+            if (typeof v !== 'number' && !Array.isArray(v)) {
+                throw new Error(
+                    `Metadata expression references "${t.name}" which is not a number/array (got ${typeof v}). ` +
+                    `Make sure it is listed before any expression that uses it.`
+                );
+            }
+            return (t.sign === -1 && typeof v === 'number') ? -v : v;
+        }
+        if (t instanceof App) {
+            const r = this.evalApp(t);
+            return (t.sign === -1 && typeof r === 'number') ? -r : r;
+        }
+        throw new MyError();
+    }
+
+    private evalScalar(t: Term): number {
+        const v = this.evalTerm(t);
+        if (typeof v !== 'number') {
+            throw new Error(`Expected a scalar in arithmetic position`);
+        }
+        return v;
+    }
+
+    private evalApp(a: App): number | number[] {
+        const fn = a.fncName;
+
+        // [a, b, c] -> number[]
+        if (fn === '[]') {
+            return a.args.map(x => this.evalScalar(x));
+        }
+
+        // arithmetic — parser folds same-precedence operators left-to-right
+        // and bakes unary minus into Term.sign, so '+' is just a sum.
+        switch (fn) {
+            case '+': {
+                let acc = 0;
+                for (const x of a.args) acc += this.evalScalar(x);
+                return acc;
+            }
+            case '*': {
+                let acc = 1;
+                for (const x of a.args) acc *= this.evalScalar(x);
+                return acc;
+            }
+            case '/': {
+                let acc = this.evalScalar(a.args[0]);
+                for (let i = 1; i < a.args.length; i++) acc /= this.evalScalar(a.args[i]);
+                return acc;
+            }
+            case '%': {
+                let acc = this.evalScalar(a.args[0]);
+                for (let i = 1; i < a.args.length; i++) acc %= this.evalScalar(a.args[i]);
+                return acc;
+            }
+            case '^':
+                return Math.pow(this.evalScalar(a.args[0]), this.evalScalar(a.args[1]));
+        }
+
+        // function call: route to Math.<name> if present (sin, cos, floor, ceil, min, max, sqrt, ...)
+        const mf = (Math as any)[fn];
+        if (typeof mf === 'function') {
+            return mf(...a.args.map(x => this.evalScalar(x)));
+        }
+
+        throw new Error(`Unknown function in metadata expression: ${fn}`);
     }
 
     /** リソース定義から GPUBuffer / GPUTexture を動的に確保する */

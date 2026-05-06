@@ -2,17 +2,17 @@
   "name": "fem_cg",
   "version": "1.0",
   "metadata": {
-    "numNodes": 0,
-    "numElements": 0,
+    "segmentsX": 10,
+    "segmentsY": 10,
+    "gridWidth": 2.0,
+    "gridHeight": 2.0,
     "cg_iters": 100,
     "dt": 0.01,
     "stiffness": 1.0,
     "gravity": 0.05,
     "damping": 0.99,
-    "gridWidth": 2.0,
-    "gridHeight": 2.0,
-    "segmentsX": 10,
-    "segmentsY": 10
+    "numNodes":    "(segmentsX + 1) * (segmentsY + 1)",
+    "numElements": "segmentsX * segmentsY * 2"
   },
   "resources": {
     "Params": {
