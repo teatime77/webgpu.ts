@@ -91,7 +91,7 @@ export async function initControl(schemaName : string) {
     schema.metadata.baseArrowFloatCount = arrowVertices.length;
     schema.metadata.baseArrowVertexCount = arrowVertices.length / 6;
 
-    if (schemaName === 'fem_cg') {
+    if (schemaName === 'fem_cg' || schemaName === 'fem_cg2') {
         const segmentsX = 10;
         const segmentsY = 10;
         schema.metadata.segmentsX = segmentsX;

@@ -1,0 +1,185 @@
+{
+  "name": "fem_cg",
+  "version": "1.0",
+  "metadata": {
+    "numNodes": 0,
+    "numElements": 0,
+    "cg_iters": 100,
+    "dt": 0.01,
+    "stiffness": 1.0,
+    "gravity": 0.05,
+    "damping": 0.99,
+    "gridWidth": 2.0,
+    "gridHeight": 2.0,
+    "segmentsX": 10,
+    "segmentsY": 10
+  },
+  "resources": {
+    "Params": {
+      "type": "uniform",
+      "fields": {
+        "dt": "f32",
+        "stiffness": "f32",
+        "gravity": "f32",
+        "damping": "f32",
+        "gridWidth": "f32",
+        "gridHeight": "f32",
+        "segmentsX": "f32",
+        "segmentsY": "f32",
+        "numNodes": "f32",
+        "numElements": "f32"
+      }
+    },
+    "X": { "type": "storage", "access": "read_write", "format": "f32", "count": "$metadata.numNodes * 3" },
+    "B": { "type": "storage", "access": "read_write", "format": "f32", "count": "$metadata.numNodes * 3" },
+    "P": { "type": "storage", "access": "read_write", "format": "f32", "count": "$metadata.numNodes * 3" },
+    "R": { "type": "storage", "access": "read_write", "format": "f32", "count": "$metadata.numNodes * 3" },
+    "Q": { "type": "storage", "access": "read_write", "format": "atomic<i32>", "count": "$metadata.numNodes * 3" },
+    
+    "Scalars": { 
+      "type": "storage", 
+      "access": "read_write", 
+      "format": "f32", 
+      "count": 8 
+    },
+    
+    "Elements": { "type": "storage", "access": "read_write", "format": "u32", "count": "$metadata.numElements * 3" },
+    "RestPositions": { "type": "storage", "access": "read_write", "format": "f32", "count": "$metadata.numNodes * 3" }
+  },
+  "nodes": [
+    {
+      "id": "init_positions",
+      "type": "compute",
+      "shader": "init_positions",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numNodes / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "RestPositions" },
+        { "binding": 1, "resource": "X" },
+        { "binding": 2, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "init_elements",
+      "type": "compute",
+      "shader": "init_elements",
+      "dispatch": { "type": "direct", "workgroups": ["($metadata.segmentsX * $metadata.segmentsY) / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "Elements" },
+        { "binding": 1, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "init_b",
+      "type": "compute",
+      "shader": "init_b",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numNodes / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "B" },
+        { "binding": 1, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "cg_init",
+      "type": "compute",
+      "shader": "cg_init",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numNodes / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "X" },
+        { "binding": 1, "resource": "B" },
+        { "binding": 2, "resource": "R" },
+        { "binding": 3, "resource": "P" },
+        { "binding": 4, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "calc_rho",
+      "type": "compute",
+      "shader": "calc_rho",
+      "dispatch": { "type": "direct", "workgroups": [1, 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "R" },
+        { "binding": 1, "resource": "Scalars" }
+      ]
+    },
+    {
+      "id": "clear_q",
+      "type": "compute",
+      "shader": "clear_q",
+      "dispatch": { "type": "direct", "workgroups": ["($metadata.numNodes * 3) / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "Q" }
+      ]
+    },
+    {
+      "id": "apply_A",
+      "type": "compute",
+      "shader": "apply_A",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numElements / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "P" },
+        { "binding": 1, "resource": "Q" },
+        { "binding": 2, "resource": "Elements" },
+        { "binding": 3, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "calc_p_q",
+      "type": "compute",
+      "shader": "calc_p_q",
+      "dispatch": { "type": "direct", "workgroups": [1, 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "P" },
+        { "binding": 1, "resource": "Q" },
+        { "binding": 2, "resource": "Scalars" }
+      ]
+    },
+    {
+      "id": "update_x_r",
+      "type": "compute",
+      "shader": "update_x_r",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numNodes / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "X" },
+        { "binding": 1, "resource": "R" },
+        { "binding": 2, "resource": "P" },
+        { "binding": 3, "resource": "Q" },
+        { "binding": 4, "resource": "Scalars" },
+        { "binding": 5, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "calc_new_rho",
+      "type": "compute",
+      "shader": "calc_new_rho",
+      "dispatch": { "type": "direct", "workgroups": [1, 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "R" },
+        { "binding": 1, "resource": "Scalars" }
+      ]
+    },
+    {
+      "id": "update_p",
+      "type": "compute",
+      "shader": "update_p",
+      "dispatch": { "type": "direct", "workgroups": ["$metadata.numNodes / 64 + 1", 1, 1] },
+      "bindings": [
+        { "binding": 0, "resource": "P" },
+        { "binding": 1, "resource": "R" },
+        { "binding": 2, "resource": "Scalars" },
+        { "binding": 3, "resource": "Params" }
+      ]
+    },
+    {
+      "id": "render_mesh",
+      "type": "render",
+      "shader": "render_mesh",
+      "topology": "triangle-list",
+      "draw": { "type": "direct", "vertexCount": "$metadata.numElements * 3" },
+      "bindings": [
+        { "binding": 0, "resource": "X", "access": "read" },
+        { "binding": 1, "resource": "Elements", "access": "read" },
+        { "binding": 2, "resource": "RestPositions", "access": "read" }
+      ]
+    }
+  ]
+}
