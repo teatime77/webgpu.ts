@@ -5,7 +5,7 @@
 import { assert, fetchText, msg, MyError } from "@i18n";
 import { Context, Parser } from "./parser";
 import { lexicalAnalysis, TokenType } from "./lex";
-import { App, BlockStatement, CallStatement, RefVar, setParentSub, Statement, WhileStatement, YieldStatement } from "./syntax";
+import { App, BlockStatement, CallStatement, RefVar, setParentSub, Statement, WhileStatement, ForStatement, YieldStatement, ConstNum } from "./syntax";
 
 export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
 export type GenType    = NodeDef | CallStatement | YieldStatement;
@@ -283,7 +283,7 @@ export class GraphManager {
         this.schemaName = schemaName;
     }
 
-    async parseSchemaScript(){
+    async parseSchemaScript(schema: SimulationSchema){
         const jsText = await fetchText(`./wgsl/${this.schemaName}/${this.schemaName}.js`);
         const tokens = lexicalAnalysis(jsText);
         const parser = new Parser(tokens, 0);
@@ -297,10 +297,10 @@ export class GraphManager {
 
         this.script = new BlockStatement(statements);
         setParentSub(this.script, this.script.statements);
-        this.scriptGen = this.exec(this.script);
+        this.scriptGen = this.exec(schema,this.script);
     }
 
-    *exec(stmt : Statement) : Generator<GenType> {
+    *exec(schema: SimulationSchema, stmt : Statement) : Generator<GenType> {
         if(stmt instanceof CallStatement){
             const app = stmt.app;
             const fncName = app.fncName;
@@ -329,23 +329,50 @@ export class GraphManager {
         else if(stmt instanceof BlockStatement){
             // msg("gen:block");
             for(const child of stmt.statements){
-                yield* this.exec(child);
+                yield* this.exec(schema, child);
             }
         }
         else if(stmt instanceof WhileStatement){
             // msg("gen:while");
             assert(stmt.condition instanceof RefVar && stmt.condition.name == "true");
             while(true){
-                yield* this.exec(stmt.block);
+                yield* this.exec(schema, stmt.block);
+            }
+        }
+        else if(stmt instanceof ForStatement){
+            // msg("gen:while");
+            assert(stmt.list instanceof App);
+            const app = stmt.list as App;
+            assert(app.fncName == "range");
+            const arg = app.args[0];
+            let iteration : number;
+
+            if(arg instanceof ConstNum){
+                iteration = arg.int();
+            }
+            else if(arg instanceof App && arg.fncName == "."){
+                const trm1 = arg.args[0];
+                const trm2 = arg.args[1] as RefVar;
+                assert(trm1 instanceof RefVar && trm1.name == "metadata");
+                assert(trm2 instanceof RefVar);
+                const key = trm2.name;
+                const val = schema.metadata[key];
+                if(typeof val !== 'number'){
+                    throw new MyError();
+                }
+                iteration = val;
+            }
+            else{
+                throw new MyError();
+            }
+            
+            for(let i = 0; i < iteration; i++){
+                yield* this.exec(schema, stmt.block);
             }
         }
         else{
             throw new MyError();
         }
-    }
-
-    async initGraphManager(){
-        await this.parseSchemaScript();
     }
 
     public setExternalResource(id: string, resource: GPUBindingResource) {

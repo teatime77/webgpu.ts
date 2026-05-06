@@ -954,24 +954,26 @@ export class ForStatement extends Statement {
     initializer: Variable;
     condition: Term | undefined;
     update: Term | undefined;
-    body: BlockStatement;
+    list      : Term | undefined;
+    block: BlockStatement;
 
-    constructor(initializer: Variable, condition: Term | undefined, update: Term | undefined, body: BlockStatement) {
+    constructor(initializer: Variable, condition: Term | undefined, update: Term | undefined, list: Term | undefined, body: BlockStatement) {
         super();
         this.initializer = initializer;
         this.condition = condition;
         this.update = update;
-        this.body = body;
+        this.list = list;
+        this.block = body;
     }
 
     setParent(parent : AbstractSyntaxNode){
         super.setParent(parent);
-        setParentSub(this, this.initializer, this.condition, this.update, this.body);
+        setParentSub(this, this.initializer, this.condition, this.update, this.block);
     }
 
     getAll(alls: AbstractSyntaxNode[]) : void{        
         alls.push(this);
-        getAllSub(alls, this.initializer.initializer, this.condition, this.update, this.body);
+        getAllSub(alls, this.initializer.initializer, this.condition, this.update, this.block);
     }
 }
 

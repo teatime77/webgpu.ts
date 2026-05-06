@@ -475,14 +475,7 @@ export class Parser {
                     trm2 = new App(operator(","), terms);
                 }
 
-                if(this.current() == "."){
-                    this.nextToken(".");
-                    const id = this.readId(ctx);
-                    return new App(operator("."), [trm2, id]);
-                }
-                else{
-                    return trm2;
-                }
+                return trm2;
             }
         }
         else if(this.token.text == '{'){
@@ -505,8 +498,20 @@ export class Parser {
         return trm;
     }
 
+    DotExpression(ctx : Context) : Term {
+        const trm = this.PrimaryExpression(ctx);
+        if(this.current() == "."){
+            this.nextToken(".");
+            const id = this.readId(ctx);
+            return new App(operator("."), [trm, id]);
+        }
+        else{
+            return trm;
+        }
+    }
+
     PowerExpression(ctx : Context) : Term {
-        const trm1 = this.PrimaryExpression(ctx);
+        const trm1 = this.DotExpression(ctx);
         if(this.token.text == "^"){
 
             this.nextToken("^");
@@ -772,7 +777,7 @@ export class Parser {
     }
 
     parseAssignment(ctx : Context) : App {
-        const trm1 = this.PrimaryExpression(ctx);
+        const trm1 = this.DotExpression(ctx);
 
         if(isAssignmentToken(this.current())){
             const opr = this.current();
@@ -847,12 +852,13 @@ export class Parser {
 
         let condition : Term | undefined;
         let update    : Term | undefined;
+        let list      : Term | undefined;
 
         if(this.current() == "of"){
 
             this.nextToken('of');
 
-            this.ArithmeticExpression(ctx);
+            list = this.ArithmeticExpression(ctx);
         }
         else{
 
@@ -868,7 +874,7 @@ export class Parser {
 
         const body = this.parseBlock(ctx);
 
-        return new ForStatement(initializer, condition, update, body);
+        return new ForStatement(initializer, condition, update, list, body);
     }
 
     parseParallel(ctx : Context): ParallelStatement {

@@ -72,7 +72,6 @@ export async function initControl(schemaName : string) {
 
     // ② エンジンのインスタンス化とコンテキスト設定
     const engine = new GraphManager(device, schemaName);
-    await engine.initGraphManager();
     
     engine.setContext(context, format, canvas.width, canvas.height);
 
@@ -91,6 +90,20 @@ export async function initControl(schemaName : string) {
 
     schema.metadata.baseArrowFloatCount = arrowVertices.length;
     schema.metadata.baseArrowVertexCount = arrowVertices.length / 6;
+
+    if (schemaName === 'fem_cg') {
+        const segmentsX = 10;
+        const segmentsY = 10;
+        schema.metadata.segmentsX = segmentsX;
+        schema.metadata.segmentsY = segmentsY;
+        schema.metadata.gridWidth = 2.0;
+        schema.metadata.gridHeight = 2.0;
+        schema.metadata.numNodes = (segmentsX + 1) * (segmentsY + 1);
+        schema.metadata.numElements = segmentsX * segmentsY * 2;
+    }
+
+    await engine.parseSchemaScript(schema);
+
 
     // ④ スキーマのロード（ここでバッファが確保される）
     engine.loadSchema(schema);
