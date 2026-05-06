@@ -13,3 +13,4 @@ dist
 tsconfig.tsbuildinfo
 lib
 public/script
+build/sims/*.ts

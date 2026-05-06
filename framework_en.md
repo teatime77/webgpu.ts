@@ -58,3 +58,48 @@ A collection of utilities for generating base 3D meshes (vertex arrays) on the C
 3. **Diverse Representations with a Single Mesh (e.g., Vector Field Arrows)**
    - Complex shapes like arrows are generated as a "single base mesh" rather than being split into cylinders and cones.
    - By using conditional branching in the vertex shader (e.g., "if the Y coordinate is 1.0 or less, stretch it as the shaft; if 1.0 or more, translate it as the head"), a large number of variable-length objects are drawn with a single draw call (Instancing).
+
+---
+
+## 4. Current Status (May 2026)
+
+Recent updates have been completed:
+
+1. **Schema validator with "did you mean" suggestions**
+   - Added in `ts/schema_validator.ts`.
+   - Integrated into `GraphManager.loadSchema()` in `ts/control.ts`.
+   - Validates root fields, metadata expression references, resources, nodes, bindings, dispatch/draw definitions, and `uis`.
+   - Produces typo suggestions (e.g., unknown key/type/resource names).
+
+2. **WebGPU type definitions**
+   - Installed `@webgpu/types` and enabled it in `webgpu/tsconfig.json` (`compilerOptions.types`).
+
+3. **TypeScript authoring pipeline prototype**
+   - Added builder API:
+     - `ts/builder/index.ts`
+     - `ts/builder/dsl.ts`
+     - `ts/builder/serialize.ts`
+   - Added CLI:
+     - `build/cli.ts`
+   - Added authored simulation examples:
+     - `build/sims/fem_cg.ts`
+     - `build/sims/ball.ts`
+   - The CLI can generate JSON + DSL from TypeScript and compare against canonical runtime files:
+     - `npx tsx webgpu/build/cli.ts webgpu/build/sims/fem_cg.ts --check`
+     - `npx tsx webgpu/build/cli.ts webgpu/build/sims/ball.ts --check`
+
+### Recommended production model
+
+- **Authoring**: TypeScript (for AI productivity and type safety).
+- **Published/runtime content**: JSON + WGSL + DSL only.
+- **Browser runtime** should continue loading only JSON/WGSL/DSL artifacts (no user TypeScript execution).
+
+---
+
+## 5. Suggested Prompt for a New Chat
+
+When starting a new chat, use this:
+
+> Please read `framework_en.md` first.  
+> We use TypeScript as authoring source and emit JSON+WGSL+DSL as runtime artifacts.  
+> Continue from the current builder prototype (`ts/builder/*`, `build/cli.ts`, `build/sims/*`) and help me [your next task].
