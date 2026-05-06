@@ -6,6 +6,7 @@ import { assert, fetchText, msg, MyError } from "@i18n";
 import { Context, Parser } from "./parser";
 import { lexicalAnalysis, TokenType } from "./lex";
 import { App, BlockStatement, CallStatement, ConstNum, ForStatement, RefVar, setParentSub, Statement, Term, WhileStatement, YieldStatement } from "./syntax";
+import { assertValidSchema, formatIssues, validateSchema } from "./schema_validator";
 
 export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
 export type GenType    = NodeDef | CallStatement | YieldStatement;
@@ -431,6 +432,14 @@ export class GraphManager {
     /** JSONスキーマをロードし、GPUリソースを確保する */
     public loadSchema(schema: SimulationSchema) {
         console.log(`Loading Simulation: ${schema.name} (v${schema.version})`);
+
+        // Validate first — any structural errors throw with "did you mean" hints.
+        // Warnings are surfaced through console.warn but do not abort the load.
+        const issues = validateSchema(schema);
+        const warnings = issues.filter(i => i.level === "warning");
+        if (warnings.length > 0) console.warn(formatIssues(warnings, schema.name));
+        assertValidSchema(schema);
+
         this.schema = schema;
         this.resolveMetaExpressions(); // 文字列メタデータを式として評価
         this.buildUniformLayouts(); // アロケーションの前にレイアウトを計算
