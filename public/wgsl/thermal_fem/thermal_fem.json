@@ -1,0 +1,205 @@
+{
+  "name": "thermal_fem",
+  "version": "1.0",
+  "uis": [
+    {
+      "name": "thermalDiffusivity",
+      "label": "Thermal Diffusivity",
+      "min": 0.01,
+      "max": 2,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "sourceTemperature",
+      "label": "Source Temperature",
+      "min": 0.1,
+      "max": 3,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "ambientTemperature",
+      "label": "Ambient Temperature",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "cooling",
+      "label": "Cooling",
+      "min": 0,
+      "max": 0.2,
+      "step": 0.001,
+      "type": "range"
+    },
+    {
+      "name": "_restart",
+      "label": "Restart",
+      "action": "restart",
+      "type": "button"
+    }
+  ],
+  "metadata": {
+    "gridWidth": 96,
+    "gridHeight": 96,
+    "dt": 0.12,
+    "thermalDiffusivity": 0.35,
+    "sourceTemperature": 1.7,
+    "ambientTemperature": 0.12,
+    "cooling": 0.01,
+    "heightScale": 0.6
+  },
+  "resources": {
+    "Params": {
+      "type": "uniform",
+      "fields": {
+        "gridWidth": "f32",
+        "gridHeight": "f32",
+        "dt": "f32",
+        "thermalDiffusivity": "f32",
+        "sourceTemperature": "f32",
+        "ambientTemperature": "f32",
+        "cooling": "f32",
+        "heightScale": "f32"
+      }
+    },
+    "Camera": {
+      "type": "uniform",
+      "fields": {
+        "viewProjection": "mat4x4<f32>",
+        "view": "mat4x4<f32>"
+      }
+    },
+    "Temperature": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "f32",
+      "count": "$metadata.gridWidth * $metadata.gridHeight",
+      "bufferCount": 2
+    },
+    "SurfaceData": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "vec4<f32>",
+      "count": "$metadata.gridWidth * $metadata.gridHeight * 2"
+    }
+  },
+  "nodes": [
+    {
+      "id": "init_temperature",
+      "type": "compute",
+      "shader": "init_temperature",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Temperature",
+          "historyLevel": 0,
+          "varName": "tempOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "fem_step",
+      "type": "compute",
+      "shader": "fem_step",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Temperature",
+          "historyLevel": 1,
+          "varName": "tempIn"
+        },
+        {
+          "binding": 2,
+          "resource": "Temperature",
+          "historyLevel": 0,
+          "varName": "tempOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "build_surface",
+      "type": "compute",
+      "shader": "build_surface",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Temperature",
+          "historyLevel": 0,
+          "varName": "tempIn"
+        },
+        {
+          "binding": 2,
+          "resource": "SurfaceData",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "render_surface",
+      "type": "render",
+      "shader": "render_surface",
+      "topology": "triangle-list",
+      "depthTest": true,
+      "draw": {
+        "type": "direct",
+        "vertexCount": "($metadata.gridWidth - 1) * ($metadata.gridHeight - 1) * 6"
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Camera"
+        },
+        {
+          "binding": 2,
+          "resource": "SurfaceData",
+          "access": "read"
+        }
+      ]
+    }
+  ]
+}
