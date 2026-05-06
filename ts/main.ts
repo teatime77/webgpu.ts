@@ -29,6 +29,7 @@ async function loadShaders(url: string): Promise<Record<string, string>> {
 import { GraphManager } from './control';
 import { ShapeInfo } from './package';
 import { makeGeodesicPolyhedron, makeArrowMesh } from './primitive';
+import { buildUI } from './sim_ui';
 
 // ホットリロード(HMR)時の二重起動を防ぐためのグローバル変数
 let animationId: number | null = null;
@@ -136,6 +137,11 @@ export async function initControl(schemaName : string) {
         viewProjection: viewProjMatrix, // カメラのプロジェクション * ビュー行列
         view: identityMatrix            // カメラのビュー行列 (MatCap計算用)
     });
+
+    // ========================================================
+    // UIパネルの構築 (schema.uis があれば自動生成)
+    // ========================================================
+    buildUI(engine, schema);
 
     // ========================================================
     // メインループ

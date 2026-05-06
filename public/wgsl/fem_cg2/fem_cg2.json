@@ -1,6 +1,18 @@
 {
   "name": "fem_cg2",
   "version": "1.0",
+  "uis": [
+    { "name": "stiffness", "label": "Young's modulus E", "type": "range",
+      "scale": "log", "min": 0.01, "max": 100.0, "step": 0.01, "format": "%.3f" },
+    { "name": "poisson",   "label": "Poisson's ratio",   "type": "range",
+      "min": 0.0, "max": 0.49, "step": 0.01 },
+    { "name": "gravity",   "label": "Gravity",           "type": "range",
+      "min": 0.0, "max": 0.2, "step": 0.001, "restart": true },
+    { "name": "cg_iters",  "label": "CG iterations",     "type": "int",
+      "min": 1, "max": 500, "step": 1 },
+    { "name": "_restart",  "label": "Restart",           "type": "button", "action": "restart" },
+    { "name": "_reset",    "label": "Reset defaults",    "type": "button", "action": "reset" }
+  ],
   "metadata": {
     "segmentsX": 10,
     "segmentsY": 10,

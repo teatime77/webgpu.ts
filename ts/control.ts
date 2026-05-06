@@ -79,12 +79,46 @@ export interface StateDef {
     transitions: { condition: string; target: string }[];
 }
 
+export interface UiDef {
+    /** Metadata key this control writes to (or a synthetic id like "_restart" for buttons). */
+    name: string;
+    /** Control kind. */
+    type: 'range' | 'int' | 'checkbox' | 'select' | 'button';
+    /** Optional human-readable label (defaults to `name`). */
+    label?: string;
+
+    // --- range / int ---
+    min?: number;
+    max?: number;
+    step?: number;
+    /** `"log"` maps the slider position through 10^x; default is `"linear"`. */
+    scale?: 'linear' | 'log';
+
+    // --- select ---
+    options?: { value: number | string; label: string }[];
+
+    // --- common behavior ---
+    /** When true, the DSL generator restarts after the value changes. Default: false. */
+    restart?: boolean;
+    /** When true, fires on every drag step (`input`); when false, only on release (`change`).
+     *  Default: !restart  (so a "restart" slider commits on release, others commit live). */
+    live?: boolean;
+    /** Display format for the value readout (e.g. "%.3f", "%.2e", "%d"). */
+    format?: string;
+
+    // --- button ---
+    /** What a button does. `"restart"` re-runs the DSL; `"reset"` restores all defaults. */
+    action?: 'restart' | 'reset';
+}
+
 export interface SimulationSchema {
     name: string;
     version: string;
     metadata: MetaData;
     resources: Record<string, ResourceDef>;
     nodes: NodeDef[];
+    /** Optional UI controls bound to metadata fields. */
+    uis?: UiDef[];
 }
 
 // 型定義の追加
@@ -298,6 +332,21 @@ export class GraphManager {
         this.script = new BlockStatement(statements);
         setParentSub(this.script, this.script.statements);
         this.scriptGen = this.exec(schema,this.script);
+    }
+
+    /**
+     * Restart the DSL generator from the top of the .js file.
+     * GPU buffers are not zeroed here -- the DSL's first statements
+     * (typically `init_*()` calls) are expected to reinitialize them.
+     * Ping-pong rings are reset so the first frame after restart starts at slot 0.
+     */
+    public restartScript() {
+        if (this.script) {
+            this.scriptGen = this.exec(this.schema, this.script);
+        }
+        for (const r of this.resources.values()) {
+            r.currentIndex = 0;
+        }
     }
 
     *exec(schema: SimulationSchema, stmt : Statement) : Generator<GenType> {
