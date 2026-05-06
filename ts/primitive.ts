@@ -815,7 +815,7 @@ export function makeArrow(compute  : ComputePipeline, shape : ShapeInfo) : Compu
     return [ disc1, tube, disc2, cone ];
 }
 
-export function makeArrowMesh(shape: ShapeInfo): Float32Array {
+export function makeArrowMesh(shape: ShapeInfo): Float32Array<ArrayBuffer> {
     const radialSegments = shape.numDivision ?? 16;
     const shaftRadius = 0.01;  // 0.05 -> 0.01 に細く
     const headRadius = 0.03;   // 0.15 -> 0.03 に細く
@@ -902,7 +902,7 @@ export function makeArrowMesh(shape: ShapeInfo): Float32Array {
     return vertexArray;
 }
 
-export function makeGeodesicPolyhedron(shape : ShapeInfo) : Float32Array {
+export function makeGeodesicPolyhedron(shape : ShapeInfo) : Float32Array<ArrayBuffer> {
     // Use the subdivision level from shape.divideCount, with a fallback to 2.
     const divide_cnt = shape.divideCount ?? 2;
     const [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
