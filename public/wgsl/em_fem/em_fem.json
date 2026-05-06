@@ -1,0 +1,203 @@
+{
+  "name": "em_fem",
+  "version": "1.0",
+  "uis": [
+    {
+      "name": "permittivity",
+      "label": "Permittivity",
+      "min": 0.1,
+      "max": 5,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "chargeStrength",
+      "label": "Charge Strength",
+      "min": -2,
+      "max": 2,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "relaxation",
+      "label": "Relaxation",
+      "min": 0.1,
+      "max": 1,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "heightScale",
+      "label": "Height Scale",
+      "min": 0.05,
+      "max": 1.5,
+      "step": 0.01,
+      "type": "range"
+    },
+    {
+      "name": "_restart",
+      "label": "Restart",
+      "action": "restart",
+      "type": "button"
+    }
+  ],
+  "metadata": {
+    "gridWidth": 96,
+    "gridHeight": 96,
+    "permittivity": 1,
+    "chargeStrength": 1,
+    "relaxation": 0.92,
+    "heightScale": 0.45,
+    "sourceRadius": 7
+  },
+  "resources": {
+    "Params": {
+      "type": "uniform",
+      "fields": {
+        "gridWidth": "f32",
+        "gridHeight": "f32",
+        "permittivity": "f32",
+        "chargeStrength": "f32",
+        "relaxation": "f32",
+        "heightScale": "f32",
+        "sourceRadius": "f32"
+      }
+    },
+    "Camera": {
+      "type": "uniform",
+      "fields": {
+        "viewProjection": "mat4x4<f32>",
+        "view": "mat4x4<f32>"
+      }
+    },
+    "Potential": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "f32",
+      "count": "$metadata.gridWidth * $metadata.gridHeight",
+      "bufferCount": 2
+    },
+    "SurfaceData": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "vec4<f32>",
+      "count": "$metadata.gridWidth * $metadata.gridHeight * 2"
+    }
+  },
+  "nodes": [
+    {
+      "id": "init_potential",
+      "type": "compute",
+      "shader": "init_potential",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Potential",
+          "historyLevel": 0,
+          "varName": "phiOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "solve_potential",
+      "type": "compute",
+      "shader": "solve_potential",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Potential",
+          "historyLevel": 1,
+          "varName": "phiIn"
+        },
+        {
+          "binding": 2,
+          "resource": "Potential",
+          "historyLevel": 0,
+          "varName": "phiOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "build_surface",
+      "type": "compute",
+      "shader": "build_surface",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8 + 1",
+          "$metadata.gridHeight / 8 + 1",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Potential",
+          "historyLevel": 0,
+          "varName": "phiIn"
+        },
+        {
+          "binding": 2,
+          "resource": "SurfaceData",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "render_surface",
+      "type": "render",
+      "shader": "render_surface",
+      "topology": "triangle-list",
+      "depthTest": true,
+      "draw": {
+        "type": "direct",
+        "vertexCount": "($metadata.gridWidth - 1) * ($metadata.gridHeight - 1) * 6"
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "Params"
+        },
+        {
+          "binding": 1,
+          "resource": "Camera"
+        },
+        {
+          "binding": 2,
+          "resource": "SurfaceData",
+          "access": "read"
+        }
+      ]
+    }
+  ]
+}
