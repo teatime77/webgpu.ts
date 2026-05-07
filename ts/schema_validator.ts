@@ -1,7 +1,7 @@
 // ============================================================================
 // Schema Validator with "Did you mean?" suggestions
 // ----------------------------------------------------------------------------
-// Validates a SimulationSchema (the JSON loaded from public/wgsl/<name>/<name>.json)
+// Validates a SimulationSchema (JSON from public/engines/physics/<name>/ or public/wgsl/<name>/)
 // against the structural and semantic rules enforced by control.ts. Unknown keys,
 // invalid enums, and dangling references all produce an issue with a Levenshtein-
 // based suggestion of the closest valid name.

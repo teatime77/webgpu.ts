@@ -7,6 +7,7 @@ import { Context, Parser } from "./parser";
 import { lexicalAnalysis, TokenType } from "./lex";
 import { App, BlockStatement, CallStatement, ConstNum, ForStatement, RefVar, setParentSub, Statement, Term, WhileStatement, YieldStatement } from "./syntax";
 import { assertValidSchema, formatIssues, validateSchema } from "./schema_validator";
+import { simulationAssetBaseUrl } from "./schema_public_path";
 
 export type WgslFormat = 'f32' | 'u32' | 'i32' | 'vec2<f32>' | 'vec3<f32>' | 'vec4<f32>' | 'mat4x4<f32>' | 'atomic<u32>' | 'atomic<i32>';
 export type GenType    = NodeDef | CallStatement | YieldStatement;
@@ -319,7 +320,7 @@ export class GraphManager {
     }
 
     async parseSchemaScript(schema: SimulationSchema){
-        const jsText = await fetchText(`./wgsl/${this.schemaName}/${this.schemaName}.js`);
+        const jsText = await fetchText(`${simulationAssetBaseUrl(this.schemaName)}/${this.schemaName}.js`);
         const tokens = lexicalAnalysis(jsText);
         const parser = new Parser(tokens, 0);
 

@@ -27,12 +27,28 @@ async function loadShaders(url: string): Promise<Record<string, string>> {
 }
 
 import { GraphManager } from './control';
+import { simulationAssetBaseUrl } from './schema_public_path';
 import { ShapeInfo } from './package';
 import { makeGeodesicPolyhedron, makeArrowMesh } from './primitive';
 import { buildUI } from './sim_ui';
 
 // ホットリロード(HMR)時の二重起動を防ぐためのグローバル変数
 let animationId: number | null = null;
+
+/** Default wall time for `schema=all` before switching to the next physics engine. */
+export const PHYSICS_SCHEMA_DEMO_DWELL_MS = 3_000;
+
+export function stopGraphSchemaAnimation(): void {
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+}
+
+export interface InitControlOptions {
+    /** If set, stop the render loop after this many ms (sequential `schema=all` demos). */
+    dwellMs?: number;
+}
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -162,7 +178,9 @@ function setupCapturePanel(canvas: HTMLCanvasElement, schemaName: string): void 
 
 // ※ 上部に sphereSchema と wgslCodes が定義されている前提です。
 
-export async function initControl(schemaName : string) {
+export async function initControl(schemaName: string, options?: InitControlOptions): Promise<void> {
+    stopGraphSchemaAnimation();
+
     // 1. WebGPUデバイスとCanvasの取得
     const adapter = await navigator.gpu.requestAdapter();
     const device = await adapter!.requestDevice();
@@ -210,7 +228,7 @@ export async function initControl(schemaName : string) {
     const sphereVertices = makeGeodesicPolyhedron({divideCount : 3} as ShapeInfo);
     const arrowVertices = makeArrowMesh({numDivision: 16} as ShapeInfo);
     
-    const schema = await fetchJson(`./wgsl/${schemaName}/${schemaName}.json`) as SimulationSchema;
+    const schema = await fetchJson(`${simulationAssetBaseUrl(schemaName)}/${schemaName}.json`) as SimulationSchema;
 
     schema.metadata.baseSphereFloatCount = sphereVertices.length;
     schema.metadata.baseSphereVertexCount = sphereVertices.length / 6; // x,y,z,nx,ny,nz
@@ -242,7 +260,7 @@ export async function initControl(schemaName : string) {
     // ========================================================
     // パイプラインコンパイルと変数更新
     // ========================================================
-    const codes = await loadShaders(`./wgsl/${schemaName}/${schemaName}.wgsl`);
+    const codes = await loadShaders(`${simulationAssetBaseUrl(schemaName)}/${schemaName}.wgsl`);
     await engine.compilePipelines(codes);
 
     // カメラ行列や粒子数の初期設定
@@ -258,10 +276,13 @@ export async function initControl(schemaName : string) {
         0, 0, 0,   1
     ];
 
+    const initialParticleCount = typeof schema.metadata.particleCount === "number"
+        ? schema.metadata.particleCount
+        : 1024;
     engine.updateVariables({
-        particleCount: 1024, // 描画する粒子の数
-        viewProjection: viewProjMatrix, // カメラのプロジェクション * ビュー行列
-        view: identityMatrix            // カメラのビュー行列 (MatCap計算用)
+        particleCount: initialParticleCount,
+        viewProjection: viewProjMatrix,
+        view: identityMatrix,
     });
 
     // ========================================================
@@ -295,4 +316,9 @@ export async function initControl(schemaName : string) {
     }
     
     frame();
+
+    if (options?.dwellMs != null && options.dwellMs > 0) {
+        await sleep(options.dwellMs);
+        stopGraphSchemaAnimation();
+    }
 }

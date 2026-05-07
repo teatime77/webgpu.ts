@@ -2,10 +2,12 @@
  * Runnable checks for serializer + DSL emitter (no test framework dependency).
  * Run: npx tsx ts/builder/selftest.ts
  */
-import assert from "node:assert/strict";
-
 import type { SimulationBundle } from "./index";
 import { toDslText, toJsonText } from "./serialize";
+
+function assert(cond: boolean, msg: string) {
+    if (!cond) throw new Error(`selftest: ${msg}`);
+}
 
 function testJsonTrailingNewline() {
     const bundle: SimulationBundle = {
@@ -19,8 +21,8 @@ function testJsonTrailingNewline() {
         dsl: [{ kind: "yield" }],
     };
     const j = toJsonText(bundle);
-    assert.equal(j.endsWith("\n"), true, "JSON text should end with newline");
-    assert.deepEqual(JSON.parse(j), bundle.schema);
+    assert(j.endsWith("\n"), "JSON text should end with newline");
+    assert(JSON.stringify(JSON.parse(j)) === JSON.stringify(bundle.schema), "JSON round-trip");
 }
 
 function testDslWhileYieldBlankForMeta() {
@@ -44,11 +46,11 @@ function testDslWhileYieldBlankForMeta() {
         ],
     };
     const d = toDslText(bundle);
-    assert.match(d, /while\(true\)/);
-    assert.match(d, /for\(const i of range\(metadata\.iters\)\)/);
-    assert.match(d, /tick\(\)/);
-    assert.match(d, /yield;/);
-    assert.ok(d.startsWith("\n") || d.includes("\n\n"), "blank statement should add a newline gap");
+    assert(/while\(true\)/.test(d), "while");
+    assert(/for\(const i of range\(metadata\.iters\)\)/.test(d), "for metadata");
+    assert(/tick\(\)/.test(d), "tick");
+    assert(/yield;/.test(d), "yield");
+    assert(d.startsWith("\n") || d.includes("\n\n"), "blank newline");
 }
 
 testJsonTrailingNewline();

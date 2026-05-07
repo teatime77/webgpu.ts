@@ -21,7 +21,8 @@ import { runDiracCGSolver } from "./lgt/cg_dirac";
 import { runHMCGaugeHiggs } from "./lgt/hmc_gauge_higgs";
 import { runDynamicalFermions } from "./lgt/fermion_hmc_u1_gauge_higgs";
 import { runFermionSU2 } from "./lgt/fermion_hmc_su2_gauge_higgs";
-import { initControl } from "./main";
+import { initControl, PHYSICS_SCHEMA_DEMO_DWELL_MS } from "./main";
+import { PHYSICS_ENGINE_SCHEMA_IDS } from "./schema_public_path";
 
 const common = "@common";
 const cpu    = "@cpu";
@@ -241,8 +242,16 @@ export async function asyncBodyOnLoadTestAll(){
 export async function initWebGPU(){
     const [ origin, pathname, params, url_base] = parseURL();
 
-    if(params.has("schema")){
+    if (params.has("schema")) {
         const schemaName = params.get("schema")!;
+        if (schemaName === "all") {
+            for (const id of PHYSICS_ENGINE_SCHEMA_IDS) {
+                console.log(`[schema=all] running ${id} (~${PHYSICS_SCHEMA_DEMO_DWELL_MS / 1000}s)`);
+                await initControl(id, { dwellMs: PHYSICS_SCHEMA_DEMO_DWELL_MS });
+            }
+            console.log("[schema=all] finished list");
+            return;
+        }
         await initControl(schemaName);
         return;
     }

@@ -18,6 +18,7 @@ import { argv, exit } from "node:process";
 import type { SimulationBundle } from "../ts/builder/index";
 import { toJsonText, toDslText } from "../ts/builder/serialize";
 import { validateSchema, formatIssues } from "../ts/schema_validator";
+import { isPhysicsEngineSchema } from "../ts/schema_public_path";
 
 // Tiny tokenizer for the DSL semantic compare. Anything ignored here is also
 // ignored by the project's parser. We deliberately don't import the real lexer
@@ -129,11 +130,13 @@ async function main() {
     const dslText = toDslText(bundle);
 
     if (args.check) {
-        // Compare against the canonical files at public/wgsl/<basename>/<basename>.{json,js}.
+        // Compare against canonical files under public/engines/physics/<id>/ or public/wgsl/<id>/.
         // We use the input TS filename — `schema.name` may be a long display name
         // (e.g. "Sphere GPU Physics") that doesn't match the short directory id.
         const baseName = basename(simPath, extname(simPath));
-        const baseDir = resolve("public/wgsl", baseName);
+        const baseDir = isPhysicsEngineSchema(baseName)
+            ? resolve("public/engines/physics", baseName)
+            : resolve("public/wgsl", baseName);
         const jsonPath = join(baseDir, `${baseName}.json`);
         const dslPath = join(baseDir, `${baseName}.js`);
 
@@ -184,7 +187,9 @@ async function main() {
     const baseName = basename(simPath, extname(simPath));
     const outDir = args.outDir
         ? resolve(args.outDir)
-        : resolve("public/wgsl", baseName);
+        : isPhysicsEngineSchema(baseName)
+            ? resolve("public/engines/physics", baseName)
+            : resolve("public/wgsl", baseName);
     mkdirSync(outDir, { recursive: true });
 
     const jsonOut = join(outDir, `${baseName}.json`);
