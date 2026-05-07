@@ -42,7 +42,7 @@ export function isMetaRef(x: unknown): x is MetaRef {
 // Public ScriptCtx exposed to authors
 // ---------------------------------------------------------------------------
 
-export interface ScriptCtx<NodeIds extends string, MetaKeys extends string> {
+export interface ScriptCtx<NodeIds extends string, MetaKeys extends string, ResourceIds extends string = string> {
     /** `call.<nodeId>()` dispatches the node by id. */
     readonly call: { [K in NodeIds]: () => void };
     /** Typed proxy of metadata names. `metadata.cg_iters` returns a sentinel for `for_`. */
@@ -52,8 +52,8 @@ export interface ScriptCtx<NodeIds extends string, MetaKeys extends string> {
     loop(body: () => void): void;
     /** `for (const i of range(count)) { body }`. `count` may be a literal number or `metadata.X`. */
     for_(count: number | MetaRef, body: () => void): void;
-    /** `swapPingPong(a, b, ...)` — argument names are resource ids (strings). */
-    swap(...resourceIds: string[]): void;
+    /** `swapPingPong(a, b, ...)` — argument names are resource ids declared on the simulation. */
+    swap(...resourceIds: ResourceIds[]): void;
     /** `yield;` — flushes the GPU queue and returns control to the host. */
     yieldFrame(): void;
     /** Emit a blank line in the produced DSL text (purely cosmetic). */
@@ -107,10 +107,11 @@ class Recorder {
 // runScript — invoke the user callback against a recorder and return the AST
 // ---------------------------------------------------------------------------
 
-export function runScript<NodeIds extends string, MetaKeys extends string>(
-    callback: (ctx: ScriptCtx<NodeIds, MetaKeys>) => void,
+export function runScript<NodeIds extends string, MetaKeys extends string, ResourceIds extends string = string>(
+    callback: (ctx: ScriptCtx<NodeIds, MetaKeys, ResourceIds>) => void,
     nodeIds: NodeIds[],
     metaKeys: MetaKeys[],
+    _resourceIds: ResourceIds[],
 ): DslStatement[] {
     const rec = new Recorder();
 
@@ -130,7 +131,7 @@ export function runScript<NodeIds extends string, MetaKeys extends string>(
         });
     }
 
-    const ctx: ScriptCtx<NodeIds, MetaKeys> = {
+    const ctx: ScriptCtx<NodeIds, MetaKeys, ResourceIds> = {
         call,
         metadata,
         loop(body) {

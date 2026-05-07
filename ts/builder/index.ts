@@ -23,6 +23,17 @@ export type TextureDimension = "1d" | "2d" | "3d";
 export type MetaValue = number | string | boolean | number[];
 export type MetaSpec = Record<string, MetaValue>;
 
+/** Resource id keys from a `resources` map (used to type bindings and `swap`). */
+export type ResourceId<R extends Record<string, ResourceObj>> = Extract<keyof R, string>;
+
+/**
+ * Builds a schema expression referencing `metadata[key]` (the engine resolves `$metadata.*`).
+ * Prefer this over raw strings so renames are easier to track.
+ */
+export function dollarMetadata<K extends string>(key: K): `$metadata.${K}` {
+    return `$metadata.${key}`;
+}
+
 // ---------------------------------------------------------------------------
 // Resource builders — return tagged JSON shapes the serializer consumes
 // ---------------------------------------------------------------------------
@@ -90,22 +101,22 @@ export function sampler(): ResourceObj {
 
 export type WorkgroupDim = number | string;
 
-export interface BindingSpec extends Omit<BindingDefinition, "binding" | "resource"> {
+export interface BindingSpec<R extends string = string> extends Omit<BindingDefinition, "binding" | "resource"> {
     binding: number;
-    resource: string;
+    resource: R;
 }
 
-export interface ComputeOpts {
+export interface ComputeOpts<R extends string = string> {
     shader: string;
     /** Direct dispatch — the engine derives [X,Y,Z]. Mutually exclusive with `indirectBuffer`. */
     workgroups?: [WorkgroupDim, WorkgroupDim, WorkgroupDim] | string;
     /** Indirect dispatch — references a buffer resource. */
-    indirectBuffer?: string;
+    indirectBuffer?: R;
     indirectOffset?: number;
-    bindings: BindingSpec[];
+    bindings: BindingSpec<R>[];
 }
 
-export interface RenderOpts {
+export interface RenderOpts<R extends string = string> {
     shader: string;
     topology: Topology;
     depthTest?: boolean;
@@ -113,23 +124,23 @@ export interface RenderOpts {
     vertexCount?: number | string;
     instanceCount?: number | string;
     /** Indirect draw. */
-    indirectBuffer?: string;
+    indirectBuffer?: R;
     indirectOffset?: number;
-    bindings: BindingSpec[];
+    bindings: BindingSpec<R>[];
 }
 
-export interface NodeBuilder {
+export interface NodeBuilder<R extends string = string> {
     readonly __kind: "node";
     /** Filled in by `defineSimulation` from the record key. */
     readonly nodeKind: "compute" | "render";
-    readonly opts: ComputeOpts | RenderOpts;
+    readonly opts: ComputeOpts<R> | RenderOpts<R>;
 }
 
-export function compute(opts: ComputeOpts): NodeBuilder {
+export function compute<R extends string = string>(opts: ComputeOpts<R>): NodeBuilder<R> {
     return { __kind: "node", nodeKind: "compute", opts };
 }
 
-export function render(opts: RenderOpts): NodeBuilder {
+export function render<R extends string = string>(opts: RenderOpts<R>): NodeBuilder<R> {
     return { __kind: "node", nodeKind: "render", opts };
 }
 
@@ -176,7 +187,7 @@ export interface SimulationBundle {
 export interface DefineSimulationSpec<
     M extends MetaSpec,
     R extends Record<string, ResourceObj>,
-    N extends Record<string, NodeBuilder>,
+    N extends Record<string, NodeBuilder<ResourceId<R>>>,
 > {
     name: string;
     version: string;
@@ -186,13 +197,13 @@ export interface DefineSimulationSpec<
     /** Node id is the record key. The builder injects it as `id` in the emitted JSON. */
     nodes: N;
     /** Imperative DSL describing per-frame execution. */
-    script: (ctx: ScriptCtx<keyof N & string, keyof M & string>) => void;
+    script: (ctx: ScriptCtx<keyof N & string, keyof M & string, ResourceId<R>>) => void;
 }
 
 export function defineSimulation<
     M extends MetaSpec,
     R extends Record<string, ResourceObj>,
-    N extends Record<string, NodeBuilder>,
+    N extends Record<string, NodeBuilder<ResourceId<R>>>,
 >(spec: DefineSimulationSpec<M, R, N>): SimulationBundle {
     // Build resources record (preserve insertion order).
     const resources: Record<string, Record<string, unknown>> = {};
@@ -207,10 +218,11 @@ export function defineSimulation<
     }
 
     // Capture DSL.
-    const dsl = runScript<keyof N & string, keyof M & string>(
+    const dsl = runScript<keyof N & string, keyof M & string, ResourceId<R>>(
         spec.script,
         Object.keys(spec.nodes) as (keyof N & string)[],
         Object.keys(spec.metadata) as (keyof M & string)[],
+        Object.keys(spec.resources) as ResourceId<R>[],
     );
 
     const schema: SimulationBundle["schema"] = {

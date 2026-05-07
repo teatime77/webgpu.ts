@@ -33,12 +33,14 @@ The core engine of the framework.
 - Parses the JSON and dynamically allocates the necessary GPUBuffer/GPUTexture.
 - Converts the DSL script into an AST using a custom parser, and executes it every frame as a Generator via the `step()` method.
 - Directly transfers CPU-side variables to Uniform buffers in binary form via `updateVariables()` (ultra-fast).
+- **DSL generator contract (`step`)**: When the generator yields a `swapPingPong(...)` call, `GraphManager` performs the resource ring swap, then immediately advances the generator again and **requires the next yield to be `yield`** (a `YieldStatement`). Authoring patterns that match this include placing `yield;` right after each `swapPingPong` (including an initial swap after `init_*` when using ping-pong buffers, similar to `ball`).
 
 ### `main.ts`
 Handles initialization and the main loop.
 - Acquires the WebGPU device and initializes the camera.
 - **Base Mesh Generation**: Base vertex data for spheres, arrows, etc., is generated using functions in `primitive.ts` (like `makeGeodesicPolyhedron`, `makeArrowMesh`, etc.) before loading the schema. The vertex count is set in the metadata, and the data is written to Storage buffers.
 - Calls `engine.updateVariables()` and executes `engine.step()` every frame.
+- **Canvas capture (debug / validation)**: A small overlay on `#app-container` offers **Capture** (single PNG download of `#world-webgpu`) and **Burst xN** (N downloads at a configurable interval in ms, e.g. 100 ms for 0.1 s steps). This is browser-only UI; it does not change runtime simulation artifacts.
 
 ### `primitive.ts`
 A collection of utilities for generating base 3D meshes (vertex arrays) on the CPU side.
@@ -72,7 +74,7 @@ Recent updates have been completed:
    - Produces typo suggestions (e.g., unknown key/type/resource names).
 
 2. **WebGPU type definitions**
-   - Installed `@webgpu/types` and enabled it in `webgpu/tsconfig.json` (`compilerOptions.types`).
+   - Installed `@webgpu/types` and enabled it in the repo `tsconfig.json` (`compilerOptions.types`).
 
 3. **TypeScript authoring pipeline prototype**
    - Added builder API:
@@ -80,13 +82,11 @@ Recent updates have been completed:
      - `ts/builder/dsl.ts`
      - `ts/builder/serialize.ts`
    - Added CLI:
-     - `build/cli.ts`
-   - Added authored simulation examples:
-     - `build/sims/fem_cg.ts`
-     - `build/sims/ball.ts`
-   - The CLI can generate JSON + DSL from TypeScript and compare against canonical runtime files:
-     - `npx tsx webgpu/build/cli.ts webgpu/build/sims/fem_cg.ts --check`
-     - `npx tsx webgpu/build/cli.ts webgpu/build/sims/ball.ts --check`
+     - `build/cli.ts` (Node-only; resolves canonical artifacts under `public/wgsl/<sim>/` from the simulation source basename)
+   - Authored simulation sources under `build/sims/` include (among others): `fem_cg`, `ball`, `collision`, `life`, `surface`, `vector_field`, `fem_cg2`, `thermal_fem`, `em_fem`, `cfd_simple`.
+   - The CLI can emit runtime artifacts and compare against checked-in files under `public/wgsl/<name>/` (from repo root), for example:
+     - `npx tsx build/cli.ts build/sims/fem_cg.ts --check`
+     - `npx tsx build/cli.ts build/sims/ball.ts --check`
 
 ### Recommended production model
 
@@ -102,4 +102,4 @@ When starting a new chat, use this:
 
 > Please read `framework_en.md` first.  
 > We use TypeScript as authoring source and emit JSON+WGSL+DSL as runtime artifacts.  
-> Continue from the current builder prototype (`ts/builder/*`, `build/cli.ts`, `build/sims/*`) and help me [your next task].
+> Continue from the current builder prototype (`ts/builder/*`, `build/cli.ts`, `build/sims/*`; canonical runtime under `public/wgsl/`) and help me [your next task].
