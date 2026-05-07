@@ -1,0 +1,412 @@
+{
+  "name": "2D Gross–Pitaevskii (mean-field BEC)",
+  "version": "2.0",
+  "uis": [
+    {
+      "name": "temperature",
+      "label": "Effective temperature (↓ g_eff, more dispersive)",
+      "min": 0.15,
+      "max": 3,
+      "step": 0.01,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "dt",
+      "label": "Δt",
+      "min": 0.0002,
+      "max": 0.004,
+      "step": 0.0001,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "g",
+      "label": "Interaction ĝ (cold scale)",
+      "min": 0,
+      "max": 80,
+      "step": 0.5,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "omega",
+      "label": "Trap ω",
+      "min": 0.15,
+      "max": 1.2,
+      "step": 0.01,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "particleNumber",
+      "label": "Norm ∫|ψ|² (dimensionless)",
+      "min": 0.5,
+      "max": 8,
+      "step": 0.05,
+      "live": true,
+      "type": "range"
+    }
+  ],
+  "metadata": {
+    "gridWidth": 192,
+    "gridHeight": 192,
+    "temperature": 2.3,
+    "dt": 0.001,
+    "g": 14,
+    "omega": 0.48,
+    "particleNumber": 2.5,
+    "domainHalf": 7,
+    "time": 0,
+    "partialNormCount": 576
+  },
+  "resources": {
+    "BecParams": {
+      "type": "uniform",
+      "fields": {
+        "gridWidth": "f32",
+        "gridHeight": "f32",
+        "temperature": "f32",
+        "dt": "f32",
+        "g": "f32",
+        "omega": "f32",
+        "particleNumber": "f32",
+        "domainHalf": "f32",
+        "time": "f32",
+        "partialNormCount": "f32"
+      }
+    },
+    "Psi": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "vec2<f32>",
+      "count": "$metadata.gridWidth * $metadata.gridHeight",
+      "bufferCount": 2
+    },
+    "PsiRK": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "vec2<f32>",
+      "count": "$metadata.gridWidth * $metadata.gridHeight"
+    },
+    "PartialNorm": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "f32",
+      "count": "$metadata.partialNormCount"
+    },
+    "NormScalar": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "f32",
+      "count": 4
+    }
+  },
+  "nodes": [
+    {
+      "id": "InitPsi",
+      "type": "compute",
+      "shader": "init_psi",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormPartialA",
+      "type": "compute",
+      "shader": "norm_partial",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiR",
+          "access": "read"
+        },
+        {
+          "binding": 2,
+          "resource": "PartialNorm",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormTotalA",
+      "type": "compute",
+      "shader": "norm_total",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          1,
+          1,
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "PartialNorm",
+          "access": "read"
+        },
+        {
+          "binding": 2,
+          "resource": "NormScalar",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormApplyA",
+      "type": "compute",
+      "shader": "norm_apply",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiN",
+          "access": "read_write"
+        },
+        {
+          "binding": 2,
+          "resource": "NormScalar",
+          "access": "read"
+        }
+      ]
+    },
+    {
+      "id": "Rk2Mid",
+      "type": "compute",
+      "shader": "rk2_mid",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 1,
+          "varName": "psiIn"
+        },
+        {
+          "binding": 2,
+          "resource": "PsiRK",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "Rk2Finish",
+      "type": "compute",
+      "shader": "rk2_finish",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 1,
+          "varName": "psi0"
+        },
+        {
+          "binding": 2,
+          "resource": "PsiRK",
+          "access": "read"
+        },
+        {
+          "binding": 3,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormPartialB",
+      "type": "compute",
+      "shader": "norm_partial",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiR",
+          "access": "read"
+        },
+        {
+          "binding": 2,
+          "resource": "PartialNorm",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormTotalB",
+      "type": "compute",
+      "shader": "norm_total",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          1,
+          1,
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "PartialNorm",
+          "access": "read"
+        },
+        {
+          "binding": 2,
+          "resource": "NormScalar",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "NormApplyB",
+      "type": "compute",
+      "shader": "norm_apply",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi",
+          "historyLevel": 0,
+          "varName": "psiN",
+          "access": "read_write"
+        },
+        {
+          "binding": 2,
+          "resource": "NormScalar",
+          "access": "read"
+        }
+      ]
+    },
+    {
+      "id": "RenderPsi",
+      "type": "render",
+      "shader": "render_psi",
+      "topology": "triangle-list",
+      "draw": {
+        "type": "direct",
+        "vertexCount": 6
+      },
+      "bindings": [
+        {
+          "binding": 0,
+          "resource": "BecParams",
+          "varName": "params"
+        },
+        {
+          "binding": 1,
+          "resource": "Psi"
+        }
+      ]
+    }
+  ]
+}

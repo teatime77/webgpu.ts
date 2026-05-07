@@ -6,11 +6,13 @@
 
 export const PHYSICS_ENGINE_SCHEMA_IDS = [
     "ball",
+    "bec",
     "cfd_simple",
     "collision",
     "em_fem",
     "fem_cg",
     "fem_cg2",
+    "ising",
     "life",
     "md",
     "surface",

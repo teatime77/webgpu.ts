@@ -1,0 +1,151 @@
+{
+  "name": "2D Ising model (statistical mechanics)",
+  "version": "1.0",
+  "uis": [
+    {
+      "name": "temperature",
+      "label": "Temperature T",
+      "min": 0.2,
+      "max": 5,
+      "step": 0.01,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "couplingJ",
+      "label": "Coupling J",
+      "min": 0.1,
+      "max": 2,
+      "step": 0.01,
+      "live": true,
+      "type": "range"
+    },
+    {
+      "name": "fieldH",
+      "label": "External field h",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "live": true,
+      "type": "range"
+    }
+  ],
+  "metadata": {
+    "gridWidth": 192,
+    "gridHeight": 192,
+    "temperature": 2.2,
+    "couplingJ": 1,
+    "fieldH": 0,
+    "time": 0
+  },
+  "resources": {
+    "IsingParams": {
+      "type": "uniform",
+      "fields": {
+        "gridWidth": "f32",
+        "gridHeight": "f32",
+        "temperature": "f32",
+        "couplingJ": "f32",
+        "fieldH": "f32",
+        "time": "f32"
+      }
+    },
+    "SpinBuffer": {
+      "type": "storage",
+      "access": "read_write",
+      "format": "u32",
+      "count": "$metadata.gridWidth * $metadata.gridHeight",
+      "bufferCount": 2
+    }
+  },
+  "nodes": [
+    {
+      "id": "InitSpins",
+      "type": "compute",
+      "shader": "init_spins",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "group": 0,
+          "binding": 0,
+          "resource": "IsingParams",
+          "varName": "params"
+        },
+        {
+          "group": 0,
+          "binding": 1,
+          "resource": "SpinBuffer",
+          "historyLevel": 0,
+          "varName": "spinOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "UpdateSpins",
+      "type": "compute",
+      "shader": "update_spins",
+      "dispatch": {
+        "type": "direct",
+        "workgroups": [
+          "$metadata.gridWidth / 8",
+          "$metadata.gridHeight / 8",
+          1
+        ]
+      },
+      "bindings": [
+        {
+          "group": 0,
+          "binding": 0,
+          "resource": "IsingParams",
+          "varName": "params"
+        },
+        {
+          "group": 0,
+          "binding": 1,
+          "resource": "SpinBuffer",
+          "historyLevel": 1,
+          "varName": "spinIn"
+        },
+        {
+          "group": 0,
+          "binding": 2,
+          "resource": "SpinBuffer",
+          "historyLevel": 0,
+          "varName": "spinOut",
+          "access": "read_write"
+        }
+      ]
+    },
+    {
+      "id": "RenderSpins",
+      "type": "render",
+      "shader": "render_spins",
+      "topology": "triangle-list",
+      "draw": {
+        "type": "direct",
+        "vertexCount": 6
+      },
+      "bindings": [
+        {
+          "group": 0,
+          "binding": 0,
+          "resource": "IsingParams",
+          "varName": "params"
+        },
+        {
+          "group": 0,
+          "binding": 1,
+          "resource": "SpinBuffer"
+        }
+      ]
+    }
+  ]
+}
