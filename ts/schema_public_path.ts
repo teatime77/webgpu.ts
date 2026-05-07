@@ -9,6 +9,7 @@ export const PHYSICS_ENGINE_SCHEMA_IDS = [
     "bec",
     "cfd_simple",
     "collision",
+    "hydrogen_orbital",
     "em_fem",
     "fem_cg",
     "fem_cg2",
